@@ -388,7 +388,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="stat-card"><div class="stat-label">未實現損益</div><div class="stat-value" id="stat-pnl">--</div></div>
 </div>
 <div class="section-title">📊 持倉清單與 EV / Kelly 分析</div>
-<table class="positions-table" id="pos-table">
+<table class="positions-table" id="positions-container">
   <thead><tr><th>標的/策略</th><th>模組/方向</th><th>DTE</th><th>EV</th><th>KELLY%</th><th>風險</th><th>狀態</th></tr></thead>
   <tbody id="pos-tbody"><tr><td colspan="7" style="text-align:center;color:var(--color-text-faint);padding:var(--space-8)">點擊「從 Webhook 載入」或「載入範例」查看數據</td></tr></tbody>
 </table>
@@ -665,10 +665,14 @@ function parseJSON() {
 function updateStats(data) {
   const pos = data.positions || [];
   const sig = data.signals || [];
-  const el1 = document.getElementById('stat-positions');
-  const el2 = document.getElementById('stat-signals');
+  const el1 = document.getElementById('stat-pos');
+  const el2 = document.getElementById('stat-sig');
   if (el1) el1.textContent = pos.length;
   if (el2) el2.textContent = sig.length;
+        const el3 = document.getElementById('stat-risk');
+      const el4 = document.getElementById('stat-pnl');
+      if (el3) el3.textContent = data.risk_budget_used_pct !== undefined ? data.risk_budget_used_pct + '%' : '--';
+      if (el4) el4.textContent = data.unrealized_pnl !== undefined ? '$' + data.unrealized_pnl : '--';
 }
     
     // === Init ===
