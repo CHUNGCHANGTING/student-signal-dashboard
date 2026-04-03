@@ -282,7 +282,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <button class="nav-item" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">即時系統</div>
-  <button class="nav-item" onclick="showSection('live',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
+  <button class="nav-item" onclick="showSection('live-dashboard',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">收租模組</div>
   <button class="nav-item" onclick="showSection('s-ic',this)"><span class="nav-dot income"></span>Iron Condor</button>
@@ -417,7 +417,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
   <script>
 // === Navigation ===
-let currentGate = 'gate0';
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
