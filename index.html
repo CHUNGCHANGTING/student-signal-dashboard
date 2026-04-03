@@ -364,7 +364,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="info-block warn"><p><strong>Vega 提醒：</strong>Credit spread（IC/BPCS/BCCS/CV）= short premium，Vega ↓ 利好。Debit spread（BCDS/BPDS）= long premium，Vega ↑ 利好。進場前確認 IV 方向與 Vega 暴露一致。</p></div>
 </section>
 <!-- LIVE DASHBOARD -->
-<section class="live-section" id="live" style="display:none">
+<section class="live-section" id="live-dashboard" style="display:none">
 <div class="live-topbar">
   <div class="live-status"><div class="live-dot" id="live-dot"></div><span id="live-time">尚未連線</span></div>
   <div class="live-actions">
@@ -607,7 +607,71 @@ function startAutoRefresh() {
   }, 60000);
 }
 
-// === Init ===
+// === Webhook/Demo/Parse ===
+function loadWebhook() {
+  const url = document.getElementById('webhook-url').value;
+  const statusEl = document.getElementById('load-status');
+  const dotEl = document.getElementById('live-dot');
+  const timeEl = document.getElementById('live-time');
+  if (statusEl) statusEl.textContent = '載入中...';
+  fetch(url).then(r => r.json()).then(data => {
+    dashboardData = data;
+    renderPositions(data.positions || []);
+    renderSignals(data.signals || []);
+    renderRisk(data.risk || {});
+    renderOrders(data.positions || []);
+    updateStats(data);
+    if (dotEl) dotEl.classList.add('online');
+    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+    if (statusEl) { statusEl.textContent = '✅ 載入成功 (' + new Date().toLocaleTimeString() + ')'; statusEl.className = 'load-status ok'; }
+  }).catch(e => {
+    if (statusEl) { statusEl.textContent = '❌ 載入失敗: ' + e.message; statusEl.className = 'load-status err'; }
+  });
+}
+
+function loadDemo() {
+  const demo = {positions:[{symbol:'SPX',strategy:'IC',expiration:'2025-05-16',quantity:2,pop:72,credit_received:1.2,debit_paid:0,max_loss:3.8,status:'active'},{symbol:'QQQ',strategy:'BPCS',expiration:'2025-05-09',quantity:1,pop:68,credit_received:0.85,debit_paid:0,max_loss:4.15,status:'active'},{symbol:'AAPL',strategy:'BCDS',expiration:'2025-05-23',quantity:1,pop:45,credit_received:0,debit_paid:2.5,target_value:5,max_loss:2.5,status:'active'}],signals:[{symbol:'MSFT',strategy:'BPCS',pop:70,credit_received:1.1,debit_paid:0,max_loss:3.9},{symbol:'AMZN',strategy:'BCDS',pop:48,credit_received:0,debit_paid:3.0,target_value:6,max_loss:3.0},{symbol:'SPX',strategy:'IC',pop:75,credit_received:1.5,debit_paid:0,max_loss:3.5}],risk:{buying_power:'$45,000',net_liq:'$52,300',portfolio_delta:'-0.15'}};
+  dashboardData = demo;
+  renderPositions(demo.positions);
+  renderSignals(demo.signals);
+  renderRisk(demo.risk);
+  renderOrders(demo.positions);
+  updateStats(demo);
+  const dotEl = document.getElementById('live-dot');
+  const timeEl = document.getElementById('live-time');
+  const statusEl = document.getElementById('load-status');
+  if (dotEl) dotEl.classList.add('online');
+  if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+  if (statusEl) { statusEl.textContent = '✅ 範例資料已載入'; statusEl.className = 'load-status ok'; }
+}
+
+function parseJSON() {
+  const input = document.getElementById('json-input').value;
+  const statusEl = document.getElementById('load-status');
+  try {
+    const data = JSON.parse(input);
+    dashboardData = data;
+    renderPositions(data.positions || []);
+    renderSignals(data.signals || []);
+    renderRisk(data.risk || {});
+    renderOrders(data.positions || []);
+    updateStats(data);
+    if (statusEl) { statusEl.textContent = '✅ JSON 解析成功'; statusEl.className = 'load-status ok'; }
+  } catch(e) {
+    if (statusEl) { statusEl.textContent = '❌ JSON 解析失敗: ' + e.message; statusEl.className = 'load-status err'; }
+  }
+}
+
+function updateStats(data) {
+  const pos = data.positions || [];
+  const sig = data.signals || [];
+  const el1 = document.getElementById('stat-positions');
+  const el2 = document.getElementById('stat-signals');
+  if (el1) el1.textContent = pos.length;
+  if (el2) el2.textContent = sig.length;
+}
+    
+    // === Init ===
 showGate('gate0');
 updateSummary();
 startAutoRefresh();
