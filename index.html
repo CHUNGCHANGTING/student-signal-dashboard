@@ -1,1 +1,442 @@
-<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>學生訊號決策台</title><style>:root{--bg:#0d1117;--c:#161b22;--c2:#1c2128;--bd:#30363d;--t:#e6edf3;--m:#8b949e;--g:#3fb950;--r:#f85149;--y:#d29922;--b:#58a6ff;--p:#bc8cff;--o:#ffa657}*{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--t);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px}.hd{background:linear-gradient(135deg,#161b22,#1c2128);border-bottom:1px solid var(--bd);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}.hd h1{font-size:18px}.hd p{color:var(--m);font-size:12px;margin-top:2px}.tabs{display:flex;background:var(--c);border-bottom:1px solid var(--bd);padding:0 20px;overflow-x:auto}.tab{padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;color:var(--m);font-size:13px;font-weight:500;white-space:nowrap}.tab.active{color:var(--b);border-bottom-color:var(--b)}.main{padding:18px 22px;max-width:1400px;margin:0 auto}.sec{display:none}.sec.active{display:block}.card{background:var(--c);border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:14px}.btn{padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:5px}.btn-p{background:var(--b);color:#000}.btn-s{background:var(--g);color:#000}.btn-g{background:transparent;color:var(--m);border:1px solid var(--bd)}.btn-w{background:var(--y);color:#000}.btn-d{background:var(--r);color:#fff}.btn-pp{background:var(--p);color:#000}.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.import-box{background:var(--c2);border:2px dashed var(--bd);border-radius:8px;padding:14px;margin-bottom:10px}.import-box textarea{width:100%;background:transparent;border:none;color:var(--t);font-family:'Courier New',monospace;font-size:12px;resize:vertical;outline:none;min-height:150px;line-height:1.6}.acc-set{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px}.ig{display:flex;flex-direction:column;gap:4px}.ig label{font-size:11px;color:var(--m);text-transform:uppercase}.ig input{background:var(--c2);border:1px solid var(--bd);color:var(--t);border-radius:6px;padding:7px 10px;font-size:13px;outline:none}.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px}.st{background:var(--c2);border-radius:8px;padding:12px;border:1px solid var(--bd);text-align:center}.st .v{font-size:22px;font-weight:700}.st .l{font-size:11px;color:var(--m);text-transform:uppercase;margin-top:2px}.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:14px}@media(max-width:700px){.sg{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}.sc{background:var(--c2);border:1px solid var(--bd);border-radius:10px;padding:15px;position:relative;transition:border-color .2s}.sc:hover{border-color:var(--b)}.sc.evp{border-left:3px solid var(--g)}.sc.evn{opacity:.55;border-left:3px solid var(--r)}.sc.tp{border-color:var(--y)}.sc.tp::before{content:'TOP';position:absolute;top:-1px;right:12px;background:var(--y);color:#000;font-size:10px;font-weight:700;padding:2px 8px;border-radius:0 0 6px 6px}.scmd{background:#0d1117;border:1px solid var(--bd);border-radius:6px;padding:8px 12px;font-family:'Courier New',monospace;font-size:13px;font-weight:700;color:var(--o);margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}.scmd:hover{background:var(--c2)}.mg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}.me{background:var(--bg);border-radius:6px;padding:7px;text-align:center}.me .ml{font-size:10px;color:var(--m);text-transform:uppercase}.me .mv{font-size:15px;font-weight:700;margin-top:2px}.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}.cp{color:var(--p)}.pnl{display:flex;gap:6px;margin-bottom:10px}.pb{flex:1;border-radius:6px;padding:7px;text-align:center}.pw{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.25)}.pl{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.25)}.pw .vv{color:var(--g)}.pl .vv{color:var(--r)}.pb .ll{font-size:10px;color:var(--m)}.pb .vv{font-size:16px;font-weight:700}.kr{background:rgba(188,140,255,.08);border:1px solid rgba(188,140,255,.2);border-radius:6px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.kr .kl{font-size:11px;color:var(--m)}.kr .kv{font-size:18px;font-weight:800;color:var(--p)}.kr .kc{font-size:26px;font-weight:900;color:var(--p)}.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}.bg{background:rgba(63,185,80,.2);color:var(--g);border:1px solid rgba(63,185,80,.4)}.br{background:rgba(248,81,73,.2);color:var(--r);border:1px solid rgba(248,81,73,.4)}.by{background:rgba(210,153,34,.2);color:var(--y);border:1px solid rgba(210,153,34,.4)}.bb{background:rgba(88,166,255,.2);color:var(--b);border:1px solid rgba(88,166,255,.4)}.dot{width:7px;height:7px;border-radius:50%;background:var(--g);animation:pulse 2s infinite;display:inline-block;margin-right:4px}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}.tw{overflow-x:auto;border-radius:8px;border:1px solid var(--bd)}table{width:100%;border-collapse:collapse}th{background:var(--c2);padding:10px 12px;text-align:left;font-size:11px;color:var(--m);text-transform:uppercase;border-bottom:1px solid var(--bd);white-space:nowrap}td{padding:10px 12px;border-bottom:1px solid rgba(48,54,61,.5);font-size:13px;white-space:nowrap}.sr{display:flex;justify-content:space-between;font-size:11px;color:var(--m);margin-bottom:10px}.er2{display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:10px}.dc{padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700}.dc-ok{background:rgba(63,185,80,.2);color:var(--g)}.dc-w{background:rgba(210,153,34,.2);color:var(--y)}.dc-d{background:rgba(248,81,73,.2);color:var(--r)}</style></head><body><div class="hd"><div><h1>&#127942; &#27704;&#26085;&#39770;&#36785;&#24179;&#40517; &#31934;&#36984; TOP5 &#35759;&#34399;&#20915;&#31574;&#21488;</h1><p><span class="dot"></span>&#21010;&#26178;&#26356;&#26032; | &#23416;&#29983;&#37096;&#20301;&#31649;&#29702;&#38754;&#26495; v2.0</p></div><div style="display:flex;gap:8px"><span class="badge bg" id="ev-count">0 &#27491;EV</span><span class="badge by" id="sig-count">0 &#35759;&#34399;</span></div></div><div class="tabs"><div class="tab active" onclick="showTab(0)">&#128229; &#21319;&#20837;&#35759;&#34399;</div><div class="tab" onclick="showTab(1)">&#128202; &#35759;&#34399;&#20998;&#26512;</div><div class="tab" onclick="showTab(2)">&#128203; &#25345;&#20倉;&#32060;&#35222;</div><div class="tab" onclick="showTab(3)">&#128228; &#21319;&#20986;/&#19979;&#36617;</div></div><div class="main"><div class="sec active" id="tab0"><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:15px;font-weight:600">&#9000;&#65039; &#36148;&#20837;&#35759;&#34399;&#25991;&#23383;</span><button class="btn btn-p" onclick="parseSignals()">&#35299;&#26512;&#35759;&#34399;</button></div><div class="import-box"><textarea id="raw-input" rows="8" placeholder="&#36148;&#20837;&#35759;&#34399;..."></textarea></div><p style="font-size:11px;color:var(--m)">&#9650; &#30452;&#25509;&#36148;&#20837;&#22810;&#31508;&#35759;&#34399;&#65292;&#31995;&#32113;&#33258;&#21160;&#35299;&#26512;</p></div><div class="card"><div style="font-size:15px;font-weight:600;margin-bottom:12px">&#9881;&#65039; &#24115;&#25143;&#35373;&#23450;</div><div class="acc-set"><div class="ig"><label>&#24115;&#25143;&#32317;&#36039;&#37329;($)</label><input type="number" id="acct-size" value="7650" onchange="recalcAll()"></div><div class="ig"><label>&#27599;&#31508;&#39118;&#38570;&#19978;&#38480;(%)</label><input type="number" id="risk-pct" value="2" step="0.5" onchange="recalcAll()"></div><div class="ig"><label>&#24050;&#29992;&#39118;&#38570;&#38989;&#24230;($)</label><input type="number" id="used-risk" value="0" onchange="recalcAll()"></div><div class="ig"><label>Kelly&#20449;&#24515;&#20418;&#25976;</label><input type="number" id="kelly-conf" value="0.25" step="0.05" min="0.1" max="1" onchange="recalcAll()"></div></div></div></div><div class="sec" id="tab1"><div class="stats" id="stats-row"></div><div class="btn-row"><button class="btn btn-g" onclick="filterSig('all')">&#20840;&#37096;</button><button class="btn btn-g" onclick="filterSig('ev+')">&#20677;&#27491;EV</button><button class="btn btn-g" onclick="filterSig('bull')">&#30475;&#28966;</button><button class="btn btn-g" onclick="filterSig('bear')">&#30475;&#36291;</button></div><div class="sg" id="signal-grid"></div></div><div class="sec" id="tab2"><div class="stats" id="pos-stats"></div><div class="tw" id="pos-table"></div></div><div class="sec" id="tab3"><div class="card"><div style="font-size:15px;font-weight:600;margin-bottom:12px">&#128228; &#21319;&#20986;&#36039;&#26009;</div><div class="btn-row"><button class="btn btn-s" onclick="copyAll()">&#128203; &#35010;&#35299;&#20840;&#37096;&#35759;&#34399;</button><button class="btn btn-p" onclick="downloadCSV()">&#11015;&#65039; &#19979;&#36617; Excel CSV</button><button class="btn btn-pp" onclick="copyForComet()">&#129302; &#35010;&#35299;&#32102; Comet AI &#19979;&#21934;</button></div><div id="export-preview" style="background:var(--c2);border:1px solid var(--bd);border-radius:8px;padding:14px;font-family:monospace;font-size:12px;white-space:pre-wrap;max-height:400px;overflow-y:auto;color:var(--m)">&#35299;&#26512;&#35759;&#34399;&#24460;&#21487;&#39044;&#35230;&#21319;&#20986;&#20839;&#23481;</div></div></div></div><script>var signals=[];var curFilter='all';function showTab(n){document.querySelectorAll('.sec').forEach(function(s,i){s.classList.toggle('active',i===n)});document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',i===n)})}function gv(t,re){var m=t.match(re);return m?m[1]:'';}function gn(t,re){var m=t.match(re);return m?parseFloat(m[1]):0;}function parseSignals(){var raw=document.getElementById('raw-input').value;if(!raw.trim()){alert('Please paste signals first');return;}signals=[];var blocks=raw.split(/(?=\u3010)/);blocks.forEach(function(b){if(!b.trim())return;var s={};s.symbol=gv(b,/\u3010(.+?)\u3011/);s.price=gn(b,/\u73fe\u50f9[::\uff1a]([\d.]+)/);s.iv=gn(b,/IV[::\uff1a]([\d.]+)/);s.strategy=gv(b,/\u7b56\u7565[::\uff1a]\s*(.+)/);s.command=gv(b,/\u6307\u4ee4[::\uff1a]\s*(.+)/);s.ev=gn(b,/EV[::：]\s*([\d.-]+)/);s.winRate=gn(b,/勝率[::：]\s*([\d.]+)/);var pnlm=b.match(/盈虧[::：]\s*([\d.+-]+)\/([\d.+-]+)/);s.maxWin=pnlm?parseFloat(pnlm[1]):0;s.maxLoss=pnlm?parseFloat(pnlm[2]):0;var exm=b.match(/到期[::：]\s*([\d-]+)/);s.expiry=exm?exm[1]:'';var dm=b.match(/剩(\d+)天/);s.dte=dm?parseInt(dm[1]):0;s.isBull=s.strategy.indexOf('漲')>=0||s.strategy.indexOf('CALL')>=0;s.isBear=s.strategy.indexOf('跌')>=0||s.strategy.indexOf('PUT')>=0;s.isPositiveEV=s.ev>0;signals.push(s);});recalcAll();renderSignals();showTab(1);}function recalcAll(){var acct=parseFloat(document.getElementById('acct-size').value)||0;var riskPct=parseFloat(document.getElementById('risk-pct').value)||2;var usedRisk=parseFloat(document.getElementById('used-risk').value)||0;var kConf=parseFloat(document.getElementById('kelly-conf').value)||0.25;var riskBudget=acct*(riskPct/100);signals.forEach(function(s){if(s.winRate>0&&s.maxLoss!==0){var p=s.winRate/100;var b=Math.abs(s.maxWin/s.maxLoss);var kelly=((p*b)-(1-p))/b;s.kellyPct=Math.max(0,kelly*kConf*100);s.contracts=Math.max(1,Math.floor((acct*s.kellyPct/100)/Math.abs(s.maxLoss)));}else{s.kellyPct=0;s.contracts=0;}});}function filterSig(f){curFilter=f;renderSignals();}function renderSignals(){var filtered=signals.filter(function(s){if(curFilter==='ev+')return s.isPositiveEV;if(curFilter==='bull')return s.isBull;if(curFilter==='bear')return s.isBear;return true;});var evC=signals.filter(function(s){return s.isPositiveEV}).length;document.getElementById('ev-count').textContent=evC+' \u6b63EV';document.getElementById('sig-count').textContent=signals.length+' \u8a0a\u865f';var grid=document.getElementById('signal-grid');grid.innerHTML='';filtered.forEach(function(s,i){var cls='sc'+(s.isPositiveEV?' evp':' evn')+(i<5?' tp':'');var dteCls=s.dte<=3?'dc-d':s.dte<=7?'dc-w':'dc-ok';var dirIcon=s.isBull?'\u{1F4C8}':'\u{1F4C9}';grid.innerHTML+='<div class="'+cls+'">'+'<div class="scmd" onclick="navigator.clipboard.writeText(this.textContent)">'+s.command+'<span style="font-size:10px;color:var(--m)">COPY</span></div>'+'<div class="mg"><div class="me"><div class="ml">EV</div><div class="mv '+(s.isPositiveEV?'cg':'cr')+'">'+s.ev.toFixed(2)+'</div></div><div class="me"><div class="ml">WIN%</div><div class="mv cb">'+s.winRate+'%</div></div><div class="me"><div class="ml">IV</div><div class="mv cy">'+s.iv+'%</div></div></div>'+'<div class="pnl"><div class="pb pw"><div class="ll">MAX WIN</div><div class="vv">+'+s.maxWin+'</div></div><div class="pb pl"><div class="ll">MAX LOSS</div><div class="vv">'+s.maxLoss+'</div></div></div>'+'<div class="kr"><div><div class="kl">KELLY</div><div class="kv">'+s.kellyPct.toFixed(1)+'%</div></div><div class="kc">'+s.contracts+'</div></div>'+'<div class="er2"><span>'+s.strategy+'</span><span class="dc '+dteCls+'">'+s.dte+'D</span></div>'+'<div class="sr"><span>'+s.symbol+' $'+s.price+'</span><span>'+s.expiry+'</span></div></div>';});var sr=document.getElementById('stats-row');sr.innerHTML='<div class="st"><div class="v cb">'+signals.length+'</div><div class="l">SIGNALS</div></div><div class="st"><div class="v cg">'+evC+'</div><div class="l">+EV</div></div><div class="st"><div class="v cy">'+(signals.length>0?(signals.reduce(function(a,b){return a+b.winRate},0)/signals.length).toFixed(1):0)+'%</div><div class="l">AVG WIN%</div></div><div class="st"><div class="v cp">'+filtered.length+'</div><div class="l">FILTERED</div></div>';var pt=document.getElementById('pos-table');pt.innerHTML='<table><tr><th>Symbol</th><th>Command</th><th>EV</th><th>Win%</th><th>Kelly%</th><th>Contracts</th><th>Expiry</th><th>DTE</th></tr>'+signals.map(function(s){return '<tr><td><b>'+s.symbol+'</b></td><td style="color:var(--o)">'+s.command+'</td><td class="'+(s.isPositiveEV?'cg':'cr')+'">'+s.ev.toFixed(2)+'</td><td>'+s.winRate+'%</td><td class="cp">'+s.kellyPct.toFixed(1)+'%</td><td><b>'+s.contracts+'</b></td><td>'+s.expiry+'</td><td><span class="dc '+(s.dte<=3?'dc-d':s.dte<=7?'dc-w':'dc-ok')+'">'+s.dte+'D</span></td></tr>'}).join('')+'</table>';}function copyAll(){var t=signals.map(function(s){return s.symbol+' | '+s.command+' | EV:'+s.ev+' | Win:'+s.winRate+'% | Kelly:'+s.kellyPct.toFixed(1)+'% | Contracts:'+s.contracts+' | Exp:'+s.expiry}).join('\n');navigator.clipboard.writeText(t);alert('Copied!');}function downloadCSV(){var rows=['Symbol,Command,EV,WinRate,MaxWin,MaxLoss,Kelly%,Contracts,Expiry,DTE'];signals.forEach(function(s){rows.push(s.symbol+','+s.command+','+s.ev+','+s.winRate+','+s.maxWin+','+s.maxLoss+','+s.kellyPct.toFixed(1)+','+s.contracts+','+s.expiry+','+s.dte)});var blob=new Blob([rows.join('\n')],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='signals.csv';a.click();}function copyForComet(){var evSigs=signals.filter(function(s){return s.isPositiveEV});var t='Please execute these trades:\n';evSigs.forEach(function(s){t+=s.symbol+': '+s.command+' x'+s.contracts+' contracts (Kelly:'+s.kellyPct.toFixed(1)+'%, EV:'+s.ev+', Exp:'+s.expiry+')\n'});navigator.clipboard.writeText(t);alert('Copied for Comet AI!');document.getElementById('export-preview').textContent=t;}</script></body></html>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Options Strategy Engine</title>
+<style>
+:root {
+  --bg: #1a1a2e; --card: #16213e; --card2: #0f3460; --accent: #e94560;
+  --green: #00d2a0; --yellow: #f0c040; --red: #e94560; --blue: #4da6ff;
+  --text: #e8e8e8; --text2: #a0a0b8; --border: #2a2a4a;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+[data-theme="light"] {
+  --bg: #f0f2f5; --card: #fff; --card2: #f8f9fa; --accent: #e94560;
+  --text: #1a1a2e; --text2: #666; --border: #ddd;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:var(--font); background:var(--bg); color:var(--text); line-height:1.6; letter-spacing:0.3px; }
+.container { max-width:1200px; margin:0 auto; padding:20px; }
+header { background:var(--card); border-bottom:1px solid var(--border); padding:16px 24px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; }
+header h1 { font-size:1.3rem; font-weight:700; letter-spacing:0.5px; }
+header h1 span { color:var(--accent); }
+.header-actions { display:flex; gap:10px; align-items:center; }
+.btn { padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600; transition:all 0.2s; letter-spacing:0.3px; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { opacity:0.85; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+.btn-outline:hover { border-color:var(--accent); }
+.btn-green { background:var(--green); color:#000; }
+.btn-sm { padding:5px 10px; font-size:0.78rem; }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:20px 0; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.stat-card .label { font-size:0.8rem; color:var(--text2); margin-bottom:6px; }
+.stat-card .value { font-size:1.8rem; font-weight:700; }
+.stat-card .sub { font-size:0.75rem; color:var(--text2); margin-top:4px; }
+.section { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; margin:20px 0; }
+.section h2 { font-size:1.1rem; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+th { text-align:left; padding:10px 12px; border-bottom:2px solid var(--border); color:var(--text2); font-weight:600; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.5px; }
+td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+tr:hover { background:var(--card2); }
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.72rem; font-weight:600; }
+.badge-green { background:rgba(0,210,160,0.15); color:var(--green); }
+.badge-yellow { background:rgba(240,192,64,0.15); color:var(--yellow); }
+.badge-red { background:rgba(233,69,96,0.15); color:var(--red); }
+.badge-blue { background:rgba(77,166,255,0.15); color:var(--blue); }
+.signal-card { background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:16px; margin:10px 0; }
+.signal-card .symbol { font-size:1rem; font-weight:700; }
+.ev-positive { color:var(--green); font-weight:700; }
+.ev-negative { color:var(--red); font-weight:700; }
+.progress-bar { height:8px; background:var(--border); border-radius:4px; overflow:hidden; margin:6px 0; }
+.progress-fill { height:100%; border-radius:4px; transition:width 0.5s; }
+.auto-refresh { display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--text2); }
+.auto-refresh select { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:0.78rem; }
+.pulse { animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.tabs { display:flex; gap:4px; margin-bottom:16px; }
+.tab { padding:8px 16px; border:1px solid var(--border); border-radius:8px 8px 0 0; cursor:pointer; font-size:0.85rem; background:transparent; color:var(--text2); }
+.tab.active { background:var(--card); color:var(--text); border-bottom-color:var(--card); }
+input[type=text],textarea { background:var(--card2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 12px; width:100%; font-size:0.85rem; font-family:var(--font); }
+textarea { min-height:80px; resize:vertical; }
+.flex { display:flex; gap:10px; align-items:center; }
+.flex-wrap { flex-wrap:wrap; }
+.mt { margin-top:16px; }
+.hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Options Strategy Engine</span></h1>
+  <div class="header-actions">
+    <div class="auto-refresh">
+      <span id="refresh-status">&#x1F7E2;</span>
+      <select id="refresh-interval">
+        <option value="0">手動更新</option>
+        <option value="30">30秒</option>
+        <option value="60" selected>60秒</option>
+        <option value="300">5分鐘</option>
+      </select>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="toggleTheme()">&#127763; 主題</button>
+    <button class="btn btn-green btn-sm" onclick="exportExcel()">&#128229; 匯出 Excel</button>
+    <button class="btn btn-primary btn-sm" onclick="loadFromWebhook()">&#128259; 載入訊號</button>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Data Import Section -->
+  <div class="section" id="import-section">
+    <h2>&#128225; 資料匯入</h2>
+    <div class="flex flex-wrap">
+      <input type="text" id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-positions" placeholder="Webhook URL" style="flex:1;min-width:300px">
+      <button class="btn btn-primary" onclick="loadFromWebhook()">從 Webhook 載入</button>
+      <button class="btn btn-outline" onclick="loadDemo()">載入示範資料</button>
+    </div>
+    <div class="mt">
+      <textarea id="json-input" placeholder="或直接貼上 JSON：{&quot;positions&quot;:[...],&quot;signals&quot;:[...]}"></textarea>
+      <button class="btn btn-outline btn-sm mt" onclick="parseJSON()">解析 JSON</button>
+    </div>
+    <div id="import-status" class="mt" style="font-size:0.8rem;color:var(--text2)"></div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="label">目前持倉</div><div class="value" id="s-positions">--</div><div class="sub" id="s-positions-sub"></div></div>
+    <div class="stat-card"><div class="label">今日新訊號</div><div class="value" id="s-signals">--</div><div class="sub" id="s-signals-sub"></div></div>
+    <div class="stat-card"><div class="label">風險預算使用</div><div class="value" id="s-risk">--</div><div class="progress-bar"><div class="progress-fill" id="s-risk-bar" style="width:0;background:var(--green)"></div></div></div>
+    <div class="stat-card"><div class="label">未實現損益</div><div class="value" id="s-pnl">--</div><div class="sub" id="s-pnl-sub"></div></div>
+  </div>
+
+  <!-- Positions Table -->
+  <div class="section">
+    <h2>&#128200; 持倉清單與 EV / Kelly 分析</h2>
+    <div class="flex flex-wrap" style="margin-bottom:12px">
+      <input type="text" id="search" placeholder="搜尋代號 / 策略" style="max-width:250px" oninput="renderPositions()">
+      <select id="filter-module" onchange="renderPositions()" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px">
+        <option value="all">全部模組</option><option value="income">只看收租</option><option value="offense">只看進攻</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>標的 / 策略</th><th>學生看法</th><th>方向 / 模組</th><th>DTE</th><th>即時報價</th><th>EV</th><th>Kelly %</th><th>風險</th><th>狀態</th></tr></thead>
+      <tbody id="positions-body"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Signals Section -->
+  <div class="section">
+    <h2>&#128276; 今日新訊號</h2>
+    <p style="font-size:0.8rem;color:var(--text2);margin-bottom:12px">訊號不等於一定下單，還要過風控與人工確認</p>
+    <div id="signals-list"></div>
+  </div>
+
+  <!-- Risk Alerts -->
+  <div class="section" id="risk-section" style="border-left:3px solid var(--yellow)">
+    <h2>&#9888;&#65039; 風險警示</h2>
+    <div id="risk-alerts"></div>
+  </div>
+
+  <!-- Order Suggestions -->
+  <div class="section">
+    <h2>&#128203; 建議下單清單（給 Comet AI）</h2>
+    <p style="font-size:0.8rem;color:var(--text2);margin-bottom:12px">正 EV 且通過風控的訊號會自動產生建議單，匯出 Excel 後可交給 Comet AI 執行</p>
+    <div id="order-suggestions"></div>
+    <button class="btn btn-green mt" onclick="exportExcel()">&#128229; 匯出 Excel 給 Comet AI 下單</button>
+  </div>
+
+</div><!-- end container -->
+
+<script>
+let DATA = null;
+let QUOTES = {};
+let refreshTimer = null;
+
+const WEBHOOK_URL = 'https://chilldove.app.n8n.cloud/webhook/student-positions';
+const QUOTES_URL = 'https://chilldove.app.n8n.cloud/webhook/tastytrade-quotes';
+
+const STRATEGY_LABELS = {
+  'IRON_CONDOR': '區間收租',
+  'BULL_PUT_CREDIT_SPREAD': '偏多收租',
+  'BEAR_CALL_CREDIT_SPREAD': '偏空收租',
+  'BULL_CALL_DEBIT_SPREAD': '抓上漲方向',
+  'BEAR_PUT_DEBIT_SPREAD': '抓下跌方向',
+  'CREDIT_VERTICAL': '高IV保守方向單'
+};
+
+const DEMO_DATA = {
+  positions: [
+    {id:'POS-001',symbol:'QQQ',strategy:'IRON_CONDOR',module:'income',bias:'neutral',dte:45,max_loss:380,status:'active',student_label:'區間收租',student_note:'市場偏震盪，賺 theta 與 IV 收縮',contracts:1,short_delta:0.14,long_delta:null,iv_environment:'high',risk_flag:'none',credit_received:1.20,pop:0.72},
+    {id:'POS-002',symbol:'SPX',strategy:'BULL_PUT_CREDIT_SPREAD',module:'income',bias:'bullish',dte:23,max_loss:290,status:'warning',student_label:'偏多收租',student_note:'看多但不追價，接近 21 DTE 管理',contracts:1,short_delta:0.23,long_delta:null,iv_environment:'mid',risk_flag:'21_dte',credit_received:0.85,pop:0.68},
+    {id:'POS-003',symbol:'NVDA',strategy:'BULL_CALL_DEBIT_SPREAD',module:'offense',bias:'bullish',dte:36,max_loss:220,status:'active',student_label:'抓上漲方向',student_note:'看多突破，限制風險版本',contracts:1,short_delta:null,long_delta:0.61,iv_environment:'mid',risk_flag:'none',debit_paid:2.20,target_value:5.00,pop:0.42}
+  ],
+  signals: [
+    {id:'SIG-001',symbol:'MSFT',strategy:'BULL_CALL_DEBIT_SPREAD',decision:'review',student_note:'偏多突破、IV 中等、趨勢支持',module:'offense',bias:'bullish',event_risk:false,credit_received:null,debit_paid:1.80,max_loss:180,target_value:4.50,pop:0.45},
+    {id:'SIG-002',symbol:'SPX',strategy:'IRON_CONDOR',decision:'approved',student_note:'區間震盪、IVR 34、流動性佳',module:'income',bias:'neutral',event_risk:false,credit_received:1.50,max_loss:350,pop:0.70},
+    {id:'SIG-003',symbol:'AMD',strategy:'BEAR_PUT_DEBIT_SPREAD',decision:'blocked',student_note:'方向成立，但碰到財報前夕',module:'offense',bias:'bearish',event_risk:true,debit_paid:2.00,max_loss:200,target_value:5.00,pop:0.40}
+  ],
+  risk_budget_used_pct: 59,
+  unrealized_pnl: 0,
+  meta: {positions_count:3, signals_count:3, total_max_loss:890, account_risk_budget:1500}
+};
+
+// EV Calculation
+function calcEV(item) {
+  const pop = item.pop || 0.5;
+  if (item.credit_received && item.max_loss) {
+    const credit = item.credit_received * 100;
+    const maxLoss = item.max_loss;
+    return (pop * credit) - ((1-pop) * maxLoss);
+  }
+  if (item.debit_paid && item.target_value) {
+    const profit = (item.target_value - item.debit_paid) * 100;
+    const loss = item.debit_paid * 100;
+    return (pop * profit) - ((1-pop) * loss);
+  }
+  return null;
+}
+
+function calcKelly(item) {
+  const pop = item.pop || 0.5;
+  if (item.credit_received && item.max_loss) {
+    const b = (item.credit_received * 100) / item.max_loss;
+    return ((pop * (b+1)) - 1) / b;
+  }
+  if (item.debit_paid && item.target_value) {
+    const profit = (item.target_value - item.debit_paid) * 100;
+    const loss = item.debit_paid * 100;
+    const b = profit / loss;
+    return ((pop * (b+1)) - 1) / b;
+  }
+  return null;
+}
+
+// Theme
+function toggleTheme() {
+  const t = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', t === 'light' ? '' : 'light');
+}
+
+// Load from webhook
+async function loadFromWebhook() {
+  const url = document.getElementById('webhook-url').value || WEBHOOK_URL;
+  const status = document.getElementById('import-status');
+  status.textContent = '載入中...';
+  document.getElementById('refresh-status').textContent = '\u23F3';
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    processData(json);
+    status.textContent = `\u2705 載入成功 (${new Date().toLocaleTimeString()})`;
+    document.getElementById('refresh-status').textContent = '\uD83D\uDFE2';
+  } catch(e) {
+    status.textContent = `\u274C 載入失敗: ${e.message}`;
+    document.getElementById('refresh-status').textContent = '\uD83D\uDD34';
+  }
+}
+
+function parseJSON() {
+  const txt = document.getElementById('json-input').value;
+  try {
+    const json = JSON.parse(txt);
+    processData(json);
+    document.getElementById('import-status').textContent = '\u2705 JSON 解析成功';
+  } catch(e) {
+    document.getElementById('import-status').textContent = '\u274C JSON 解析失敗: ' + e.message;
+  }
+}
+
+function loadDemo() {
+  processData(DEMO_DATA);
+  document.getElementById('import-status').textContent = '\u2705 已載入示範資料';
+}
+
+function processData(json) {
+  if (json.positions) {
+    DATA = json;
+  } else if (Array.isArray(json)) {
+    DATA = { positions: json, signals: [], risk_budget_used_pct: 0, unrealized_pnl: 0 };
+  } else {
+    DATA = { positions: [], signals: [], ...json };
+  }
+  fetchQuotes();
+  renderAll();
+}
+
+// Fetch quotes from tastytrade proxy
+async function fetchQuotes() {
+  if (!DATA) return;
+  const symbols = [...new Set([...DATA.positions.map(p=>p.symbol), ...DATA.signals.map(s=>s.symbol)])];
+  if (!symbols.length) return;
+  try {
+    const res = await fetch(QUOTES_URL + '?symbols=' + symbols.join(','));
+    const json = await res.json();
+    if (json.quotes) {
+      json.quotes.forEach(q => { QUOTES[q.symbol] = q; });
+    } else if (Array.isArray(json)) {
+      json.forEach(q => { if(q.symbol) QUOTES[q.symbol] = q; });
+    }
+    renderAll();
+  } catch(e) { console.log('Quotes fetch failed:', e); }
+}
+
+function renderAll() {
+  if (!DATA) return;
+  renderStats();
+  renderPositions();
+  renderSignals();
+  renderRiskAlerts();
+  renderOrderSuggestions();
+}
+
+function renderStats() {
+  const p = DATA.positions || [];
+  const s = DATA.signals || [];
+  const income = p.filter(x=>x.module==='income').length;
+  const offense = p.filter(x=>x.module==='offense').length;
+  document.getElementById('s-positions').textContent = p.length;
+  document.getElementById('s-positions-sub').textContent = `${income} 筆收租、${offense} 筆進攻`;
+  document.getElementById('s-signals').textContent = s.length;
+  const review = s.filter(x=>x.decision==='review').length;
+  document.getElementById('s-signals-sub').textContent = review ? `${review} 筆待確認` : '全部已處理';
+  const risk = DATA.risk_budget_used_pct || 0;
+  document.getElementById('s-risk').textContent = risk + '%';
+  const bar = document.getElementById('s-risk-bar');
+  bar.style.width = risk + '%';
+  bar.style.background = risk > 80 ? 'var(--red)' : risk > 60 ? 'var(--yellow)' : 'var(--green)';
+  const pnl = DATA.unrealized_pnl || 0;
+  document.getElementById('s-pnl').textContent = (pnl >= 0 ? '+' : '') + '$' + pnl;
+  document.getElementById('s-pnl').style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+}
+
+function renderPositions() {
+  const body = document.getElementById('positions-body');
+  if (!DATA) { body.innerHTML = '<tr><td colspan=9 style="text-align:center;color:var(--text2)">請先載入資料</td></tr>'; return; }
+  const search = (document.getElementById('search').value || '').toLowerCase();
+  const mod = document.getElementById('filter-module').value;
+  let rows = DATA.positions.filter(p => {
+    if (mod !== 'all' && p.module !== mod) return false;
+    if (search && !p.symbol.toLowerCase().includes(search) && !p.strategy.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  body.innerHTML = rows.map(p => {
+    const ev = calcEV(p);
+    const kelly = calcKelly(p);
+    const q = QUOTES[p.symbol];
+    const quote = q ? `$${q.last || q.price || '--'}` : '--';
+    const evClass = ev !== null ? (ev > 0 ? 'ev-positive' : 'ev-negative') : '';
+    const evText = ev !== null ? (ev > 0 ? '+' : '') + '$' + ev.toFixed(0) : 'N/A';
+    const kellyText = kelly !== null ? (kelly * 100).toFixed(1) + '%' : 'N/A';
+    const statusBadge = p.status === 'active' ? '<span class="badge badge-green">持有中</span>' :
+      p.status === 'warning' ? '<span class="badge badge-yellow">有警示</span>' :
+      '<span class="badge badge-red">' + p.status + '</span>';
+    const modBadge = p.module === 'income' ? '<span class="badge badge-blue">收租</span>' : '<span class="badge badge-red">進攻</span>';
+    return `<tr>
+      <td><strong>${p.symbol}</strong><br><span style="font-size:0.75rem;color:var(--text2)">${p.strategy}</span></td>
+      <td>${p.student_label || ''}<br><span style="font-size:0.75rem;color:var(--text2)">${p.student_note || ''}</span></td>
+      <td>${modBadge} ${p.bias}</td>
+      <td>${p.dte}</td>
+      <td>${quote}</td>
+      <td class="${evClass}">${evText}</td>
+      <td>${kellyText}</td>
+      <td>$${p.max_loss} max<br><span style="font-size:0.72rem;color:var(--text2)">${p.short_delta ? '\u77ED\u817F \u0394' + p.short_delta : ''}${p.long_delta ? '\u9577\u817F \u0394' + p.long_delta : ''}</span></td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSignals() {
+  const list = document.getElementById('signals-list');
+  if (!DATA || !DATA.signals) { list.innerHTML = ''; return; }
+  list.innerHTML = DATA.signals.map(s => {
+    const ev = calcEV(s);
+    const evText = ev !== null ? ((ev>0?'+':'') + '$' + ev.toFixed(0)) : '';
+    const evBadge = ev !== null ? `<span class="badge ${ev>0?'badge-green':'badge-red'}">EV ${evText}</span>` : '';
+    const decMap = {review:'待確認',approved:'可評估',blocked:'先暫停'};
+    const decClass = {review:'badge-yellow',approved:'badge-green',blocked:'badge-red'};
+    return `<div class="signal-card">
+      <div class="flex" style="justify-content:space-between">
+        <div><span class="symbol">${s.symbol}</span> &middot; ${s.strategy} ${evBadge}</div>
+        <span class="badge ${decClass[s.decision] || ''}">${decMap[s.decision] || s.decision}</span>
+      </div>
+      <div style="font-size:0.82rem;color:var(--text2);margin-top:6px">${s.student_note || ''}</div>
+      ${s.event_risk ? '<div style="color:var(--red);font-size:0.8rem;margin-top:4px">\u26A0 事件風險</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderRiskAlerts() {
+  const el = document.getElementById('risk-alerts');
+  if (!DATA) { el.innerHTML = ''; return; }
+  const alerts = [];
+  DATA.positions.forEach(p => {
+    if (p.risk_flag === '21_dte' || (p.dte && p.dte <= 21 && p.module === 'income'))
+      alerts.push(`<div style="margin:8px 0"><strong>${p.symbol}</strong> 收租單接近 21 DTE，建議開始主動管理</div>`);
+    if (p.status === 'warning')
+      alerts.push(`<div style="margin:8px 0"><strong>${p.symbol}</strong> 有警示，請檢查事件風險、Delta 漂移或倉位上限</div>`);
+  });
+  el.innerHTML = alerts.length ? alerts.join('') : '<div style="color:var(--text2)">目前無警示</div>';
+}
+
+function renderOrderSuggestions() {
+  const el = document.getElementById('order-suggestions');
+  if (!DATA) { el.innerHTML = ''; return; }
+  const orders = DATA.signals.filter(s => {
+    if (s.decision === 'blocked' || s.event_risk) return false;
+    const ev = calcEV(s);
+    return ev !== null && ev > 0;
+  });
+  if (!orders.length) { el.innerHTML = '<div style="color:var(--text2)">目前無符合條件的建議單</div>'; return; }
+  el.innerHTML = '<table><thead><tr><th>標的</th><th>策略</th><th>方向</th><th>EV</th><th>Kelly</th><th>建議</th></tr></thead><tbody>' +
+    orders.map(s => {
+      const ev = calcEV(s);
+      const kelly = calcKelly(s);
+      return `<tr><td><strong>${s.symbol}</strong></td><td>${STRATEGY_LABELS[s.strategy]||s.strategy}</td><td>${s.bias}</td><td class="ev-positive">+$${ev.toFixed(0)}</td><td>${kelly!==null?(kelly*100).toFixed(1)+'%':'--'}</td><td><span class="badge badge-green">可執行</span></td></tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+// Excel Export (CSV)
+function exportExcel() {
+  if (!DATA) { alert('請先載入資料'); return; }
+  const rows = [['\u6a19\u7684','\u7b56\u7565','\u6a21\u7d44','\u65b9\u5411','DTE','Max Loss','EV','Kelly %','\u72c0\u614b','\u5b78\u751f\u770b\u6cd5','\u5373\u6642\u5831\u50f9']];
+  DATA.positions.forEach(p => {
+    const ev = calcEV(p); const kelly = calcKelly(p); const q = QUOTES[p.symbol];
+    rows.push([p.symbol, p.strategy, p.module, p.bias, p.dte, p.max_loss,
+      ev!==null?ev.toFixed(2):'', kelly!==null?(kelly*100).toFixed(1):'',
+      p.status, p.student_label||'', q?(q.last||q.price||''):'']);
+  });
+  rows.push([]);
+  rows.push(['--- \u4ECA\u65E5\u8A0A\u865F ---']);
+  rows.push(['\u6a19\u7684','\u7b56\u7565','\u6c7a\u7b56','EV','Kelly %','\u5099\u8a3b']);
+  DATA.signals.forEach(s => {
+    const ev = calcEV(s); const kelly = calcKelly(s);
+    rows.push([s.symbol, s.strategy, s.decision,
+      ev!==null?ev.toFixed(2):'', kelly!==null?(kelly*100).toFixed(1):'', s.student_note||'']);
+  });
+  const csv = rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'options-strategy-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+// Auto-refresh
+document.getElementById('refresh-interval').addEventListener('change', function() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  const sec = parseInt(this.value);
+  if (sec > 0) {
+    refreshTimer = setInterval(() => loadFromWebhook(), sec * 1000);
+  }
+});
+
+// Init
+renderPositions();
+// Auto-load on start
+loadFromWebhook();
+</script>
+</body>
+</html>
