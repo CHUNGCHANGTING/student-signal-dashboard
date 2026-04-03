@@ -1,442 +1,617 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #1a1a2e; --card: #16213e; --card2: #0f3460; --accent: #e94560;
-  --green: #00d2a0; --yellow: #f0c040; --red: #e94560; --blue: #4da6ff;
-  --text: #e8e8e8; --text2: #a0a0b8; --border: #2a2a4a;
-  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+:root, [data-theme="light"] {
+  --color-bg: #f7f6f2; --color-surface: #f9f8f5; --color-surface-2: #fbfbf9;
+  --color-surface-offset: #f3f0ec; --color-surface-dynamic: #e6e4df;
+  --color-divider: #dcd9d5; --color-border: #d4d1ca;
+  --color-text: #28251d; --color-text-muted: #7a7974; --color-text-faint: #bab9b4;
+  --color-primary: #01696f; --color-primary-hover: #0c4e54;
+  --color-primary-highlight: #cedcd8;
+  --color-success: #437a22; --color-success-highlight: #d4dfcc;
+  --color-warning: #964219; --color-warning-highlight: #ddcfc6;
+  --color-error: #a12c7b; --color-error-highlight: #e0ced7;
+  --color-gold: #d19900; --color-gold-highlight: #e9e0c6;
+  --color-blue: #006494; --color-blue-highlight: #c6d8e4;
+  --color-orange: #da7101; --color-orange-highlight: #e7d7c4;
+  --color-purple: #7a39bb; --color-purple-highlight: #dacfde;
+  --shadow-sm: 0 1px 2px oklch(0.2 0.01 80/0.06);
+  --shadow-md: 0 4px 12px oklch(0.2 0.01 80/0.08);
+  --shadow-lg: 0 12px 32px oklch(0.2 0.01 80/0.12);
+  --radius-sm: 0.375rem; --radius-md: 0.5rem; --radius-lg: 0.75rem; --radius-xl: 1rem;
+  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+  --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
+  --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem;
+  --space-12: 3rem; --space-16: 4rem;
+  --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-[data-theme="light"] {
-  --bg: #f0f2f5; --card: #fff; --card2: #f8f9fa; --accent: #e94560;
-  --text: #1a1a2e; --text2: #666; --border: #ddd;
+[data-theme="dark"] {
+  --color-bg: #171614; --color-surface: #1c1b19; --color-surface-2: #201f1d;
+  --color-surface-offset: #1d1c1a; --color-surface-dynamic: #2d2c2a;
+  --color-divider: #262523; --color-border: #393836;
+  --color-text: #cdccca; --color-text-muted: #797876; --color-text-faint: #5a5957;
+  --color-primary: #4f98a3; --color-primary-hover: #227f8b;
+  --color-primary-highlight: #313b3b;
+  --color-success: #6daa45; --color-success-highlight: #3a4435;
+  --color-warning: #bb653b; --color-warning-highlight: #564942;
+  --color-error: #d163a7; --color-error-highlight: #4c3d46;
+  --color-gold: #e8af34; --color-gold-highlight: #4d4332;
+  --color-blue: #5591c7; --color-blue-highlight: #3a4550;
+  --color-orange: #fdab43; --color-orange-highlight: #564b3e;
+  --color-purple: #a86fdf; --color-purple-highlight: #4e4652;
+  --shadow-sm: 0 1px 2px oklch(0 0 0/0.2);
+  --shadow-md: 0 4px 12px oklch(0 0 0/0.3);
+  --shadow-lg: 0 12px 32px oklch(0 0 0/0.4);
 }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:var(--font); background:var(--bg); color:var(--text); line-height:1.6; letter-spacing:0.3px; }
-.container { max-width:1200px; margin:0 auto; padding:20px; }
-header { background:var(--card); border-bottom:1px solid var(--border); padding:16px 24px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; }
-header h1 { font-size:1.3rem; font-weight:700; letter-spacing:0.5px; }
-header h1 span { color:var(--accent); }
-.header-actions { display:flex; gap:10px; align-items:center; }
-.btn { padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600; transition:all 0.2s; letter-spacing:0.3px; }
-.btn-primary { background:var(--accent); color:#fff; }
-.btn-primary:hover { opacity:0.85; }
-.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
-.btn-outline:hover { border-color:var(--accent); }
-.btn-green { background:var(--green); color:#000; }
-.btn-sm { padding:5px 10px; font-size:0.78rem; }
-.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:20px 0; }
-.stat-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; }
-.stat-card .label { font-size:0.8rem; color:var(--text2); margin-bottom:6px; }
-.stat-card .value { font-size:1.8rem; font-weight:700; }
-.stat-card .sub { font-size:0.75rem; color:var(--text2); margin-top:4px; }
-.section { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; margin:20px 0; }
-.section h2 { font-size:1.1rem; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-th { text-align:left; padding:10px 12px; border-bottom:2px solid var(--border); color:var(--text2); font-weight:600; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.5px; }
-td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
-tr:hover { background:var(--card2); }
-.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.72rem; font-weight:600; }
-.badge-green { background:rgba(0,210,160,0.15); color:var(--green); }
-.badge-yellow { background:rgba(240,192,64,0.15); color:var(--yellow); }
-.badge-red { background:rgba(233,69,96,0.15); color:var(--red); }
-.badge-blue { background:rgba(77,166,255,0.15); color:var(--blue); }
-.signal-card { background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:16px; margin:10px 0; }
-.signal-card .symbol { font-size:1rem; font-weight:700; }
-.ev-positive { color:var(--green); font-weight:700; }
-.ev-negative { color:var(--red); font-weight:700; }
-.progress-bar { height:8px; background:var(--border); border-radius:4px; overflow:hidden; margin:6px 0; }
-.progress-fill { height:100%; border-radius:4px; transition:width 0.5s; }
-.auto-refresh { display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--text2); }
-.auto-refresh select { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:0.78rem; }
-.pulse { animation:pulse 2s infinite; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-.tabs { display:flex; gap:4px; margin-bottom:16px; }
-.tab { padding:8px 16px; border:1px solid var(--border); border-radius:8px 8px 0 0; cursor:pointer; font-size:0.85rem; background:transparent; color:var(--text2); }
-.tab.active { background:var(--card); color:var(--text); border-bottom-color:var(--card); }
-input[type=text],textarea { background:var(--card2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 12px; width:100%; font-size:0.85rem; font-family:var(--font); }
-textarea { min-height:80px; resize:vertical; }
-.flex { display:flex; gap:10px; align-items:center; }
-.flex-wrap { flex-wrap:wrap; }
-.mt { margin-top:16px; }
-.hidden { display:none; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+body { min-height: 100dvh; font-family: Satoshi, sans-serif; font-size: var(--text-sm); color: var(--color-text); background: var(--color-bg); line-height: 1.6; }
+button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
+a, button, [role=button] { transition: color var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition); }
+/* Layout */
+.app { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: auto 1fr; min-height: 100dvh; }
+.topbar { grid-column: 1/-1; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6); background: var(--color-surface); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 100; }
+.logo { display: flex; align-items: center; gap: var(--space-2); text-decoration: none; color: var(--color-text); }
+.logo-mark svg { width: 28px; height: 28px; }
+.logo-text { font-size: var(--text-sm); font-weight: 600; letter-spacing: -0.01em; }
+.logo-sub { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 400; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+.theme-toggle { width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--color-text-muted); border: 1px solid var(--color-border); }
+.theme-toggle:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
+.badge { font-size: var(--text-xs); padding: 2px var(--space-2); border-radius: 999px; font-weight: 500; }
+.badge-version { background: var(--color-primary-highlight); color: var(--color-primary); }
+/* Sidebar */
+.sidebar { background: var(--color-surface); border-right: 1px solid var(--color-border); padding: var(--space-4) 0; overflow-y: auto; position: sticky; top: 53px; height: calc(100dvh - 53px); }
+.sidebar-section { padding: var(--space-2) var(--space-4) var(--space-1); font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-faint); margin-top: var(--space-4); }
+.sidebar-section:first-child { margin-top: 0; }
+.nav-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); border-radius: 0; width: 100%; text-align: left; border-left: 2px solid transparent; }
+.nav-item:hover { background: var(--color-surface-offset); color: var(--color-text); }
+.nav-item.active { background: var(--color-primary-highlight); color: var(--color-primary); border-left-color: var(--color-primary); font-weight: 500; }
+.nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.nav-dot.income { background: var(--color-success); }
+.nav-dot.offense { background: var(--color-orange); }
+.nav-dot.neutral { background: var(--color-text-faint); }
+.nav-dot.gate { background: var(--color-primary); }
+.nav-dot.live { background: var(--color-gold); }
+.sidebar-divider { height: 1px; background: var(--color-divider); margin: var(--space-3) var(--space-4); }
+/* Main */
+.main { padding: var(--space-8) var(--space-10); max-width: 900px; }
+/* Gate cards */
+.gate { margin-bottom: var(--space-8); }
+.gate-header { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-5); }
+.gate-num { width: 36px; height: 36px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-sm); font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+.gate-num.g0 { background: var(--color-primary-highlight); color: var(--color-primary); }
+.gate-num.g1 { background: var(--color-gold-highlight); color: var(--color-gold); }
+.gate-num.g2 { background: var(--color-blue-highlight); color: var(--color-blue); }
+.gate-num.g3 { background: var(--color-warning-highlight); color: var(--color-warning); }
+.gate-num.g4 { background: var(--color-success-highlight); color: var(--color-success); }
+.gate-title { font-size: var(--text-lg); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.gate-subtitle { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+/* Module cards */
+.module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-5); }
+.module-card { border-radius: var(--radius-lg); padding: var(--space-5); border: 1px solid var(--color-border); background: var(--color-surface); }
+.module-card.income { border-top: 3px solid var(--color-success); }
+.module-card.offense { border-top: 3px solid var(--color-orange); }
+.module-card h3 { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+.module-icon { width: 20px; height: 20px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+.module-icon.income { background: var(--color-success-highlight); color: var(--color-success); }
+.module-icon.offense { background: var(--color-orange-highlight); color: var(--color-orange); }
+/* Strategy rows */
+.strategy-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.strategy-row { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface-2); border: 1px solid var(--color-divider); }
+.strategy-tag { font-size: var(--text-xs); font-weight: 600; padding: 2px var(--space-2); border-radius: 999px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+.tag-ic { background: var(--color-primary-highlight); color: var(--color-primary); }
+.tag-bpcs { background: var(--color-success-highlight); color: var(--color-success); }
+.tag-bccs { background: var(--color-error-highlight); color: var(--color-error); }
+.tag-bcds { background: var(--color-orange-highlight); color: var(--color-orange); }
+.tag-bpds { background: var(--color-error-highlight); color: var(--color-error); }
+.tag-cv { background: var(--color-gold-highlight); color: var(--color-gold); }
+.strategy-desc { font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.5; }
+.strategy-cond { font-size: var(--text-xs); color: var(--color-text-faint); margin-top: 2px; }
+.strategy-cond span { color: var(--color-text-muted); }
+/* Checklist */
+.checklist { display: flex; flex-direction: column; gap: var(--space-2); }
+.check-item { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-border); cursor: pointer; user-select: none; transition: background var(--transition); }
+.check-item:hover { background: var(--color-surface-dynamic); }
+.check-item.checked { background: var(--color-success-highlight); border-color: var(--color-success); }
+.check-box { width: 18px; height: 18px; border-radius: var(--radius-sm); border: 1.5px solid var(--color-border); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; background: var(--color-surface-2); }
+.check-item.checked .check-box { background: var(--color-success); border-color: var(--color-success); }
+.check-icon { display: none; color: #fff; }
+.check-item.checked .check-icon { display: block; }
+.check-content { flex: 1; }
+.check-label { font-size: var(--text-sm); font-weight: 500; }
+.check-detail { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+.check-item.checked .check-label { color: var(--color-success); }
+.progress-bar { height: 4px; background: var(--color-divider); border-radius: 999px; margin: var(--space-3) 0 var(--space-5); }
+.progress-fill { height: 100%; background: var(--color-success); border-radius: 999px; transition: width 0.4s cubic-bezier(0.16,1,0.3,1); width: 0; }
+.progress-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); display: flex; justify-content: space-between; }
+/* Param table */
+.param-tabs { display: flex; gap: var(--space-1); margin-bottom: var(--space-4); border-bottom: 1px solid var(--color-border); }
+.param-tab { padding: var(--space-2) var(--space-4); font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; }
+.param-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.param-tab:hover:not(.active) { color: var(--color-text); }
+.param-panel { display: none; }
+.param-panel.active { display: block; }
+.param-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+.param-table th { text-align: left; padding: var(--space-2) var(--space-3); font-weight: 600; color: var(--color-text-muted); background: var(--color-surface-offset); border-bottom: 1px solid var(--color-border); }
+.param-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-divider); color: var(--color-text-muted); }
+.param-table td:first-child { color: var(--color-text); font-weight: 500; }
+.param-table tr:last-child td { border-bottom: none; }
+.param-table tr:hover td { background: var(--color-surface-offset); }
+.val { color: var(--color-primary); font-weight: 600; }
+.val-warn { color: var(--color-warning); font-weight: 600; }
+.val-stop { color: var(--color-error); font-weight: 600; }
+/* Confirm box */
+.confirm-box { border: 2px solid var(--color-primary); border-radius: var(--radius-xl); padding: var(--space-6); background: var(--color-primary-highlight); }
+.confirm-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); }
+.confirm-phrase { font-size: var(--text-lg); font-weight: 700; color: var(--color-primary); text-align: center; padding: var(--space-4); border-radius: var(--radius-lg); background: var(--color-surface); border: 1px dashed var(--color-primary); margin: var(--space-4) 0; letter-spacing: 0.02em; }
+.forbidden-list { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+.forbidden-item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-error); }
+.forbidden-item svg { flex-shrink: 0; }
+/* Info blocks */
+.info-block { border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4); border-left: 3px solid; }
+.info-block.note { background: var(--color-blue-highlight); border-color: var(--color-blue); }
+.info-block.warn { background: var(--color-warning-highlight); border-color: var(--color-warning); }
+.info-block p { font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }
+.info-block strong { color: var(--color-text); }
+.section-divider { height: 1px; background: var(--color-divider); margin: var(--space-6) 0; }
+/* Regime matrix */
+.regime-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-bottom: var(--space-5); }
+.regime-card { border-radius: var(--radius-lg); padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); text-align: center; }
+.regime-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); }
+.regime-name { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-2); }
+.regime-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); justify-content: center; }
+.rt { font-size: 10px; padding: 1px 6px; border-radius: 999px; font-weight: 600; }
+/* Summary bar */
+.summary-bar { position: sticky; bottom: 0; background: var(--color-surface); border-top: 1px solid var(--color-border); padding: var(--space-3) var(--space-10); display: flex; align-items: center; gap: var(--space-4); grid-column: 2/-1; }
+.summary-item { display: flex; flex-direction: column; gap: 2px; min-width: 100px; }
+.summary-key { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-faint); }
+.summary-val { font-size: var(--text-sm); font-weight: 600; }
+.summary-val.green { color: var(--color-success); }
+.summary-val.amber { color: var(--color-gold); }
+.summary-val.red { color: var(--color-error); }
+.summary-val.blue { color: var(--color-primary); }
+.btn-reset { margin-left: auto; font-size: var(--text-xs); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.btn-reset:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
+/* Live Dashboard section */
+.live-section { padding: var(--space-8) var(--space-10); max-width: 900px; }
+.live-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-6); flex-wrap: wrap; gap: var(--space-3); }
+.live-status { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-faint); }
+.live-dot.online { background: var(--color-success); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.live-actions { display: flex; gap: var(--space-2); }
+.btn-primary { padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); background: var(--color-primary); color: #fff; font-size: var(--text-xs); font-weight: 600; }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-secondary { padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--text-xs); }
+.btn-secondary:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
+.btn-excel { padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); background: var(--color-success); color: #fff; font-size: var(--text-xs); font-weight: 600; }
+.btn-excel:hover { opacity: 0.85; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
+.stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); }
+.stat-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); }
+.stat-value { font-size: var(--text-lg); font-weight: 700; }
+.stat-sub { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 4px; }
+.stat-bar { height: 3px; background: var(--color-divider); border-radius: 999px; margin-top: var(--space-3); }
+.stat-bar-fill { height: 100%; background: var(--color-primary); border-radius: 999px; transition: width 0.5s; }
+.positions-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); margin-bottom: var(--space-6); }
+.positions-table th { text-align: left; padding: var(--space-2) var(--space-3); font-weight: 600; color: var(--color-text-muted); background: var(--color-surface-offset); border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.positions-table td { padding: var(--space-3); border-bottom: 1px solid var(--color-divider); vertical-align: top; }
+.positions-table tr:hover td { background: var(--color-surface-offset); }
+.pos-symbol { font-weight: 700; font-size: var(--text-sm); }
+.pos-strategy { font-size: 10px; color: var(--color-text-muted); }
+.module-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
+.module-badge.income { background: var(--color-success-highlight); color: var(--color-success); }
+.module-badge.offense { background: var(--color-orange-highlight); color: var(--color-orange); }
+.ev-positive { color: var(--color-success); font-weight: 700; }
+.ev-negative { color: var(--color-error); font-weight: 700; }
+.ev-neutral { color: var(--color-text-muted); }
+.status-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.status-active { background: var(--color-success-highlight); color: var(--color-success); }
+.status-warning { background: var(--color-warning-highlight); color: var(--color-warning); }
+.status-stop { background: var(--color-error-highlight); color: var(--color-error); }
+.signal-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-3); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.signal-card.approved { border-left: 3px solid var(--color-success); }
+.signal-card.review { border-left: 3px solid var(--color-gold); }
+.signal-card.blocked { border-left: 3px solid var(--color-error); }
+.signal-symbol { font-weight: 700; font-size: var(--text-sm); }
+.signal-strategy { font-size: var(--text-xs); color: var(--color-text-muted); }
+.signal-decision { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.decision-approved { background: var(--color-success-highlight); color: var(--color-success); }
+.decision-review { background: var(--color-gold-highlight); color: var(--color-gold); }
+.decision-blocked { background: var(--color-error-highlight); color: var(--color-error); }
+.risk-box { background: var(--color-warning-highlight); border: 1px solid var(--color-warning); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-6); }
+.risk-box h4 { font-size: var(--text-sm); font-weight: 700; color: var(--color-warning); margin-bottom: var(--space-3); }
+.risk-item { font-size: var(--text-xs); color: var(--color-text-muted); padding: var(--space-1) 0; }
+.order-card { background: var(--color-success-highlight); border: 1px solid var(--color-success); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4); }
+.order-card h4 { font-size: var(--text-sm); font-weight: 700; color: var(--color-success); margin-bottom: var(--space-3); }
+.order-row { display: flex; justify-content: space-between; font-size: var(--text-xs); padding: var(--space-1) 0; border-bottom: 1px solid var(--color-success-highlight); }
+.order-row:last-child { border-bottom: none; }
+.load-box { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-6); }
+.load-box label { font-size: var(--text-xs); color: var(--color-text-muted); display: block; margin-bottom: var(--space-2); }
+.load-box input { width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); color: var(--color-text); font-size: var(--text-xs); margin-bottom: var(--space-3); }
+.load-box textarea { width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); color: var(--color-text); font-size: var(--text-xs); height: 80px; resize: vertical; margin-bottom: var(--space-3); }
+.load-row { display: flex; gap: var(--space-2); }
+.load-status { font-size: var(--text-xs); margin-top: var(--space-2); }
+.load-status.ok { color: var(--color-success); }
+.load-status.err { color: var(--color-error); }
+.section-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); }
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+  .sidebar { display: none; }
+  .main, .live-section { padding: var(--space-6) var(--space-4); }
+  .module-grid { grid-template-columns: 1fr; }
+  .regime-grid { grid-template-columns: 1fr 1fr; }
+  .summary-bar { grid-column: 1/-1; flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .positions-table { font-size: 11px; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1><span>Options Strategy Engine</span></h1>
-  <div class="header-actions">
-    <div class="auto-refresh">
-      <span id="refresh-status">&#x1F7E2;</span>
-      <select id="refresh-interval">
-        <option value="0">手動更新</option>
-        <option value="30">30秒</option>
-        <option value="60" selected>60秒</option>
-        <option value="300">5分鐘</option>
-      </select>
-    </div>
-    <button class="btn btn-outline btn-sm" onclick="toggleTheme()">&#127763; 主題</button>
-    <button class="btn btn-green btn-sm" onclick="exportExcel()">&#128229; 匯出 Excel</button>
-    <button class="btn btn-primary btn-sm" onclick="loadFromWebhook()">&#128259; 載入訊號</button>
+<div class="app">
+<!-- Topbar -->
+<header class="topbar">
+  <a class="logo" href="#">
+    <div class="logo-mark"><svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="24" height="24" rx="6" fill="var(--color-primary)" opacity="0.15"/><path d="M7 14 L12 9 L16 13 L21 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 21 L12 18 L16 20 L21 16" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="7" r="2" fill="var(--color-primary)"/><circle cx="21" cy="16" r="2" fill="var(--color-gold)"/></svg></div>
+    <div><div class="logo-text">Options Strategy Engine</div><div class="logo-sub">決策流程 SOP v1.2</div></div>
+  </a>
+  <div class="topbar-right">
+    <span class="badge badge-version">Schema 1.2.0</span>
+    <button class="theme-toggle" data-theme-toggle aria-label="切換主題">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
   </div>
 </header>
-
-<div class="container">
-  <!-- Data Import Section -->
-  <div class="section" id="import-section">
-    <h2>&#128225; 資料匯入</h2>
-    <div class="flex flex-wrap">
-      <input type="text" id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-positions" placeholder="Webhook URL" style="flex:1;min-width:300px">
-      <button class="btn btn-primary" onclick="loadFromWebhook()">從 Webhook 載入</button>
-      <button class="btn btn-outline" onclick="loadDemo()">載入示範資料</button>
-    </div>
-    <div class="mt">
-      <textarea id="json-input" placeholder="或直接貼上 JSON：{&quot;positions&quot;:[...],&quot;signals&quot;:[...]}"></textarea>
-      <button class="btn btn-outline btn-sm mt" onclick="parseJSON()">解析 JSON</button>
-    </div>
-    <div id="import-status" class="mt" style="font-size:0.8rem;color:var(--text2)"></div>
-  </div>
-
-  <!-- Stats Grid -->
-  <div class="stats-grid" id="stats-grid">
-    <div class="stat-card"><div class="label">目前持倉</div><div class="value" id="s-positions">--</div><div class="sub" id="s-positions-sub"></div></div>
-    <div class="stat-card"><div class="label">今日新訊號</div><div class="value" id="s-signals">--</div><div class="sub" id="s-signals-sub"></div></div>
-    <div class="stat-card"><div class="label">風險預算使用</div><div class="value" id="s-risk">--</div><div class="progress-bar"><div class="progress-fill" id="s-risk-bar" style="width:0;background:var(--green)"></div></div></div>
-    <div class="stat-card"><div class="label">未實現損益</div><div class="value" id="s-pnl">--</div><div class="sub" id="s-pnl-sub"></div></div>
-  </div>
-
-  <!-- Positions Table -->
-  <div class="section">
-    <h2>&#128200; 持倉清單與 EV / Kelly 分析</h2>
-    <div class="flex flex-wrap" style="margin-bottom:12px">
-      <input type="text" id="search" placeholder="搜尋代號 / 策略" style="max-width:250px" oninput="renderPositions()">
-      <select id="filter-module" onchange="renderPositions()" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px">
-        <option value="all">全部模組</option><option value="income">只看收租</option><option value="offense">只看進攻</option>
-      </select>
-    </div>
-    <div style="overflow-x:auto">
-    <table>
-      <thead><tr><th>標的 / 策略</th><th>學生看法</th><th>方向 / 模組</th><th>DTE</th><th>即時報價</th><th>EV</th><th>Kelly %</th><th>風險</th><th>狀態</th></tr></thead>
-      <tbody id="positions-body"></tbody>
-    </table>
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-section">決策流程</div>
+  <button class="nav-item active" onclick="showSection('gate0',this)"><span class="nav-dot gate"></span>第0關　策略分流</button>
+  <button class="nav-item" onclick="showSection('gate1',this)"><span class="nav-dot gate"></span>第1關　盤前訊號</button>
+  <button class="nav-item" onclick="showSection('gate2',this)"><span class="nav-dot gate"></span>第2關　TOS 試算</button>
+  <button class="nav-item" onclick="showSection('gate3',this)"><span class="nav-dot gate"></span>第3關　部位確認</button>
+  <button class="nav-item" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">即時系統</div>
+  <button class="nav-item" onclick="showSection('live',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">收租模組</div>
+  <button class="nav-item" onclick="showSection('s-ic',this)"><span class="nav-dot income"></span>Iron Condor</button>
+  <button class="nav-item" onclick="showSection('s-bpcs',this)"><span class="nav-dot income"></span>Bull Put Credit Spread</button>
+  <button class="nav-item" onclick="showSection('s-bccs',this)"><span class="nav-dot income"></span>Bear Call Credit Spread</button>
+  <div class="sidebar-section">進攻模組</div>
+  <button class="nav-item" onclick="showSection('s-bcds',this)"><span class="nav-dot offense"></span>Bull Call Debit Spread</button>
+  <button class="nav-item" onclick="showSection('s-bpds',this)"><span class="nav-dot offense"></span>Bear Put Debit Spread</button>
+  <button class="nav-item" onclick="showSection('s-cv',this)"><span class="nav-dot offense"></span>Credit Vertical（次要）</button>
+</nav>
+<!-- Main content wrapper -->
+<div id="main-wrapper">
+<!-- GATE 0: 策略分流 -->
+<section class="gate" id="gate0">
+<div class="gate-header"><div class="gate-num g0">0</div><div><div class="gate-title">策略分流</div><div class="gate-subtitle">先選戰術，再用對應規則 — 不先決定這件事，後面所有條件都會互相打架</div></div></div>
+<div class="module-grid">
+  <div class="module-card income"><h3><span class="module-icon income">收</span> 收租模組</h3>
+    <div class="strategy-list">
+      <div class="strategy-row"><span class="strategy-tag tag-ic">IC</span><div><div class="strategy-desc">Iron Condor</div><div class="strategy-cond">→ <span>中性偏震盪 + IVR ≥ 30 + SPX/QQQ</span></div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bpcs">BPCS</span><div><div class="strategy-desc">Bull Put Credit Spread</div><div class="strategy-cond">→ <span>偏多 + 非強趨勢 + IVR ≥ 27</span></div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bccs">BCCS</span><div><div class="strategy-desc">Bear Call Credit Spread</div><div class="strategy-cond">→ <span>偏空 + 非崩跌 + IVR ≥ 27</span></div></div></div>
     </div>
   </div>
-
-  <!-- Signals Section -->
-  <div class="section">
-    <h2>&#128276; 今日新訊號</h2>
-    <p style="font-size:0.8rem;color:var(--text2);margin-bottom:12px">訊號不等於一定下單，還要過風控與人工確認</p>
-    <div id="signals-list"></div>
+  <div class="module-card offense"><h3><span class="module-icon offense">攻</span> 進攻模組</h3>
+    <div class="strategy-list">
+      <div class="strategy-row"><span class="strategy-tag tag-bcds">BCDS</span><div><div class="strategy-desc">Bull Call Debit Spread</div><div class="strategy-cond">→ <span>偏多突破 + IV 低到中 + 趨勢確認</span></div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bpds">BPDS</span><div><div class="strategy-desc">Bear Put Debit Spread</div><div class="strategy-cond">→ <span>偏空跌破 + IV 低到中 + 趨勢確認</span></div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-cv">CV</span><div><div class="strategy-desc">Credit Vertical（次要）</div><div class="strategy-cond">→ <span>IV 很高 + 方向極明確 + 個股</span></div></div></div>
+    </div>
   </div>
-
-  <!-- Risk Alerts -->
-  <div class="section" id="risk-section" style="border-left:3px solid var(--yellow)">
-    <h2>&#9888;&#65039; 風險警示</h2>
-    <div id="risk-alerts"></div>
+</div>
+<div class="regime-grid">
+  <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-success)">SPX / QQQ</div><div class="regime-tags"><span class="rt tag-ic">IC</span><span class="rt tag-bpcs">BPCS</span><span class="rt tag-bccs">BCCS</span></div></div>
+  <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-orange)">個股</div><div class="regime-tags"><span class="rt tag-bcds">BCDS</span><span class="rt tag-bpds">BPDS</span><span class="rt tag-cv">CV*</span></div></div>
+  <div class="regime-card"><div class="regime-label">主要禁止</div><div class="regime-name" style="color:var(--color-error)">混用規則</div><div class="regime-tags"><span class="rt" style="background:var(--color-error-highlight);color:var(--color-error)">SPX收租邏輯 ≠ 個股進攻邏輯</span></div></div>
+</div>
+<div class="info-block note"><p><strong>n8n 對應：</strong>Code node 第一步 <code>pickModule()</code> 函數根據 <code>symbol</code> 與 <code>underlying_type</code> 自動分流。若 <code>resolved_module === "unknown"</code>，<code>module_resolved</code> 為 false，整筆會在 IF node 被濾掉。</p></div>
+</section>
+<!-- GATE 1-4 簡化版 -->
+<section class="gate" id="gate1" style="display:none">
+<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號</div><div class="gate-subtitle">regime 判斷、篩選條件、事件風險排除</div></div></div>
+<div class="info-block note"><p>詳細參數請參考原始 SOP 文件，或在本地開啟 <code>options-strategy-engine.html</code> 查看完整篩選條件表。</p></div>
+</section>
+<section class="gate" id="gate2" style="display:none">
+<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上確認 Delta、DTE、Wing 寬度、Credit/Width 比</div></div></div>
+<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。包含 IC / Credit Spread / Debit Spread / CV 分頁籤參數表。</p></div>
+</section>
+<section class="gate" id="gate3" style="display:none">
+<div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位確認</div><div class="gate-subtitle">確認清單 8 項：含 max loss、倉位、事件風險、EV/Kelly</div></div></div>
+<div class="progress-label"><span>確認進度</span><span id="check-count">0 / 8</span></div>
+<div class="progress-bar"><div class="progress-fill" id="check-progress"></div></div>
+<div class="checklist" id="checklist">
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">策略分流確認</div><div class="check-detail">已確認收租/進攻模組</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">IV 環境確認</div><div class="check-detail">IVR 達標（收租）或 Debit IV低（進攻）</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">趨勢/regime 確認</div><div class="check-detail">trend_alignment = true</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">最大號損確認</div><div class="check-detail">max loss ≤ width × credit × 100</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">倉位上限</div><div class="check-detail">同標的 ≤ 6～8 合約</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">事件風險排除</div><div class="check-detail">CPI/FOMC/NFP 不在 DTE 內</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">出場條件設定</div><div class="check-detail">Credit: stop = credit×1.5x / Debit: soft stop = debit -50%</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><div class="check-content"><div class="check-label">EV / Kelly 確認</div><div class="check-detail">EV = p×AvgWin - (1-p)×AvgLoss > 0</div></div></div>
+</div>
+</section>
+<section class="gate" id="gate4" style="display:none">
+<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終確認：通過 n8n webhook 送出交易指令</div></div></div>
+<div class="confirm-box">
+  <div class="confirm-title">🛡️ 最終確認</div>
+  <div class="confirm-phrase">我確認這筆交易符合所有規則</div>
+  <p style="font-size:var(--text-xs);color:var(--color-text-muted)">n8n Code node <code>broker_guardrail.approval_phrase_required</code> 必須確認後才會透過 webhook 送到 Telegram / AI。</p>
+</div>
+<div class="section-divider"></div>
+<div class="confirm-title" style="font-size:var(--text-sm)">⛔ 禁止事項</div>
+<div class="forbidden-list">
+  <div class="forbidden-item">✔ 不得拆 multi-leg spread 單獨下單</div>
+  <div class="forbidden-item">✔ STP/LMT單價，Debit spread 不得用市價</div>
+  <div class="forbidden-item">✔ 只允許 MULTILEG_SPREAD 單一組合單</div>
+  <div class="forbidden-item">✔ 同標的不超過 1.5% 帳戶總風險 / 單筆不超 2 合約</div>
+</div>
+<div class="section-divider"></div>
+<div class="info-block warn"><p><strong>Vega 提醒：</strong>Credit spread（IC/BPCS/BCCS/CV）= short premium，Vega ↓ 利好。Debit spread（BCDS/BPDS）= long premium，Vega ↑ 利好。進場前確認 IV 方向與 Vega 暴露一致。</p></div>
+</section>
+<!-- LIVE DASHBOARD -->
+<section class="live-section" id="live" style="display:none">
+<div class="live-topbar">
+  <div class="live-status"><div class="live-dot" id="live-dot"></div><span id="live-time">尚未連線</span></div>
+  <div class="live-actions">
+    <button class="btn-primary" onclick="loadWebhook()">從 Webhook 載入</button>
+    <button class="btn-secondary" onclick="loadDemo()">載入範例</button>
+    <button class="btn-excel" onclick="exportExcel()">📤 匯出 Excel</button>
   </div>
+</div>
+<div class="load-box">
+  <label>Webhook URL</label>
+  <input id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-positions">
+  <label>或貼上 JSON</label>
+  <textarea id="json-input" placeholder='{"positions":[...],"signals":[...]}'></textarea>
+  <div class="load-row"><button class="btn-secondary" onclick="parseJSON()">解析 JSON</button></div>
+  <div class="load-status" id="load-status"></div>
+</div>
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-label">目前持倉</div><div class="stat-value" id="stat-pos">--</div><div class="stat-sub" id="stat-pos-sub"></div></div>
+  <div class="stat-card"><div class="stat-label">今日新訊號</div><div class="stat-value" id="stat-sig">--</div><div class="stat-sub" id="stat-sig-sub"></div></div>
+  <div class="stat-card"><div class="stat-label">風險預算使用</div><div class="stat-value" id="stat-risk">--</div><div class="stat-bar"><div class="stat-bar-fill" id="stat-risk-bar" style="width:0"></div></div></div>
+  <div class="stat-card"><div class="stat-label">未實現損益</div><div class="stat-value" id="stat-pnl">--</div></div>
+</div>
+<div class="section-title">📊 持倉清單與 EV / Kelly 分析</div>
+<table class="positions-table" id="pos-table">
+  <thead><tr><th>標的/策略</th><th>模組/方向</th><th>DTE</th><th>EV</th><th>KELLY%</th><th>風險</th><th>狀態</th></tr></thead>
+  <tbody id="pos-tbody"><tr><td colspan="7" style="text-align:center;color:var(--color-text-faint);padding:var(--space-8)">點擊「從 Webhook 載入」或「載入範例」查看數據</td></tr></tbody>
+</table>
+<div class="section-title">🔔 今日新訊號</div>
+<div id="signals-container"><div style="text-align:center;color:var(--color-text-faint);padding:var(--space-6)">尚無訊號資料</div></div>
+<div id="risk-container"></div>
+<div class="section-title">📝 建議下單清單（給 Comet AI）</div>
+<div id="orders-container"><div style="text-align:center;color:var(--color-text-faint);padding:var(--space-4)">正 EV 且通過風控的訊號會自動產生建議單</div></div>
+</section>
+<!-- Strategy detail pages (simplified) -->
+<section class="gate" id="s-ic" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">IC</div><div><div class="gate-title">Iron Condor</div><div class="gate-subtitle">SPX / QQQ 專用 • IVR ≥ 30</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+<section class="gate" id="s-bpcs" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BPCS</div><div><div class="gate-title">Bull Put Credit Spread</div><div class="gate-subtitle">SPX/QQQ • IVR ≥ 27</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+<section class="gate" id="s-bccs" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BCCS</div><div><div class="gate-title">Bear Call Credit Spread</div><div class="gate-subtitle">SPX/QQQ • IVR ≥ 27</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+<section class="gate" id="s-bcds" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-orange-highlight);color:var(--color-orange);font-size:var(--text-xs)">BCDS</div><div><div class="gate-title">Bull Call Debit Spread</div><div class="gate-subtitle">個股 • IV 低到中</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+<section class="gate" id="s-bpds" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-error-highlight);color:var(--color-error);font-size:var(--text-xs)">BPDS</div><div><div class="gate-title">Bear Put Debit Spread</div><div class="gate-subtitle">個股 • IV 低到中</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+<section class="gate" id="s-cv" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-gold-highlight);color:var(--color-gold);font-size:var(--text-xs)">CV</div><div><div class="gate-title">Credit Vertical（次要）</div><div class="gate-subtitle">高 IV 環境專用</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+</div><!-- end main-wrapper -->
+<!-- Summary bar -->
+<div class="summary-bar" id="summary-bar">
+  <div class="summary-item"><div class="summary-key">模組</div><div class="summary-val blue" id="sum-module">—</div></div>
+  <div class="summary-item"><div class="summary-key">策略</div><div class="summary-val" id="sum-strategy">—</div></div>
+  <div class="summary-item"><div class="summary-key">確認清單</div><div class="summary-val red" id="sum-checks">0 / 8</div></div>
+  <div class="summary-item"><div class="summary-key">送單狀態</div><div class="summary-val red" id="sum-status">未完成</div></div>
+  <button class="btn-reset" onclick="resetAll()">↺ 重置</button>
+</div>
 
-  <!-- Order Suggestions -->
-  <div class="section">
-    <h2>&#128203; 建議下單清單（給 Comet AI）</h2>
-    <p style="font-size:0.8rem;color:var(--text2);margin-bottom:12px">正 EV 且通過風控的訊號會自動產生建議單，匯出 Excel 後可交給 Comet AI 執行</p>
-    <div id="order-suggestions"></div>
-    <button class="btn btn-green mt" onclick="exportExcel()">&#128229; 匯出 Excel 給 Comet AI 下單</button>
-  </div>
+  <script>
+// === Navigation ===
+let currentGate = 'gate0';
+let currentStrategy = null;
 
-</div><!-- end container -->
-
-<script>
-let DATA = null;
-let QUOTES = {};
-let refreshTimer = null;
-
-const WEBHOOK_URL = 'https://chilldove.app.n8n.cloud/webhook/student-positions';
-const QUOTES_URL = 'https://chilldove.app.n8n.cloud/webhook/tastytrade-quotes';
-
-const STRATEGY_LABELS = {
-  'IRON_CONDOR': '區間收租',
-  'BULL_PUT_CREDIT_SPREAD': '偏多收租',
-  'BEAR_CALL_CREDIT_SPREAD': '偏空收租',
-  'BULL_CALL_DEBIT_SPREAD': '抓上漲方向',
-  'BEAR_PUT_DEBIT_SPREAD': '抓下跌方向',
-  'CREDIT_VERTICAL': '高IV保守方向單'
-};
-
-const DEMO_DATA = {
-  positions: [
-    {id:'POS-001',symbol:'QQQ',strategy:'IRON_CONDOR',module:'income',bias:'neutral',dte:45,max_loss:380,status:'active',student_label:'區間收租',student_note:'市場偏震盪，賺 theta 與 IV 收縮',contracts:1,short_delta:0.14,long_delta:null,iv_environment:'high',risk_flag:'none',credit_received:1.20,pop:0.72},
-    {id:'POS-002',symbol:'SPX',strategy:'BULL_PUT_CREDIT_SPREAD',module:'income',bias:'bullish',dte:23,max_loss:290,status:'warning',student_label:'偏多收租',student_note:'看多但不追價，接近 21 DTE 管理',contracts:1,short_delta:0.23,long_delta:null,iv_environment:'mid',risk_flag:'21_dte',credit_received:0.85,pop:0.68},
-    {id:'POS-003',symbol:'NVDA',strategy:'BULL_CALL_DEBIT_SPREAD',module:'offense',bias:'bullish',dte:36,max_loss:220,status:'active',student_label:'抓上漲方向',student_note:'看多突破，限制風險版本',contracts:1,short_delta:null,long_delta:0.61,iv_environment:'mid',risk_flag:'none',debit_paid:2.20,target_value:5.00,pop:0.42}
-  ],
-  signals: [
-    {id:'SIG-001',symbol:'MSFT',strategy:'BULL_CALL_DEBIT_SPREAD',decision:'review',student_note:'偏多突破、IV 中等、趨勢支持',module:'offense',bias:'bullish',event_risk:false,credit_received:null,debit_paid:1.80,max_loss:180,target_value:4.50,pop:0.45},
-    {id:'SIG-002',symbol:'SPX',strategy:'IRON_CONDOR',decision:'approved',student_note:'區間震盪、IVR 34、流動性佳',module:'income',bias:'neutral',event_risk:false,credit_received:1.50,max_loss:350,pop:0.70},
-    {id:'SIG-003',symbol:'AMD',strategy:'BEAR_PUT_DEBIT_SPREAD',decision:'blocked',student_note:'方向成立，但碰到財報前夕',module:'offense',bias:'bearish',event_risk:true,debit_paid:2.00,max_loss:200,target_value:5.00,pop:0.40}
-  ],
-  risk_budget_used_pct: 59,
-  unrealized_pnl: 0,
-  meta: {positions_count:3, signals_count:3, total_max_loss:890, account_risk_budget:1500}
-};
-
-// EV Calculation
-function calcEV(item) {
-  const pop = item.pop || 0.5;
-  if (item.credit_received && item.max_loss) {
-    const credit = item.credit_received * 100;
-    const maxLoss = item.max_loss;
-    return (pop * credit) - ((1-pop) * maxLoss);
-  }
-  if (item.debit_paid && item.target_value) {
-    const profit = (item.target_value - item.debit_paid) * 100;
-    const loss = item.debit_paid * 100;
-    return (pop * profit) - ((1-pop) * loss);
-  }
-  return null;
+function showGate(id) {
+  document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');
+  const el = document.getElementById(id);
+  if (el) { el.style.display = 'block'; currentGate = id; }
+  updateSummary();
 }
 
-function calcKelly(item) {
-  const pop = item.pop || 0.5;
-  if (item.credit_received && item.max_loss) {
-    const b = (item.credit_received * 100) / item.max_loss;
-    return ((pop * (b+1)) - 1) / b;
-  }
-  if (item.debit_paid && item.target_value) {
-    const profit = (item.target_value - item.debit_paid) * 100;
-    const loss = item.debit_paid * 100;
-    const b = profit / loss;
-    return ((pop * (b+1)) - 1) / b;
-  }
-  return null;
+function showStrategy(id) {
+  document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');
+  const el = document.getElementById('s-' + id);
+  if (el) { el.style.display = 'block'; currentStrategy = id; }
 }
 
-// Theme
-function toggleTheme() {
-  const t = document.documentElement.getAttribute('data-theme');
-  document.documentElement.setAttribute('data-theme', t === 'light' ? '' : 'light');
+function backToGate(gateId) {
+  currentStrategy = null;
+  showGate(gateId);
 }
 
-// Load from webhook
-async function loadFromWebhook() {
-  const url = document.getElementById('webhook-url').value || WEBHOOK_URL;
-  const status = document.getElementById('import-status');
-  status.textContent = '載入中...';
-  document.getElementById('refresh-status').textContent = '\u23F3';
-  try {
-    const res = await fetch(url);
-    const json = await res.json();
-    processData(json);
-    status.textContent = `\u2705 載入成功 (${new Date().toLocaleTimeString()})`;
-    document.getElementById('refresh-status').textContent = '\uD83D\uDFE2';
-  } catch(e) {
-    status.textContent = `\u274C 載入失敗: ${e.message}`;
-    document.getElementById('refresh-status').textContent = '\uD83D\uDD34';
-  }
+function nextGate(from, to) { showGate(to); }
+function prevGate(from, to) { showGate(to); }
+
+// === Sidebar nav ===
+function showDashboard() {
+  document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');
+  document.getElementById('live-dashboard').style.display = 'block';
+  currentGate = 'live-dashboard';
+  loadDashboard();
 }
 
-function parseJSON() {
-  const txt = document.getElementById('json-input').value;
-  try {
-    const json = JSON.parse(txt);
-    processData(json);
-    document.getElementById('import-status').textContent = '\u2705 JSON 解析成功';
-  } catch(e) {
-    document.getElementById('import-status').textContent = '\u274C JSON 解析失敗: ' + e.message;
-  }
-}
-
-function loadDemo() {
-  processData(DEMO_DATA);
-  document.getElementById('import-status').textContent = '\u2705 已載入示範資料';
-}
-
-function processData(json) {
-  if (json.positions) {
-    DATA = json;
-  } else if (Array.isArray(json)) {
-    DATA = { positions: json, signals: [], risk_budget_used_pct: 0, unrealized_pnl: 0 };
-  } else {
-    DATA = { positions: [], signals: [], ...json };
-  }
-  fetchQuotes();
-  renderAll();
-}
-
-// Fetch quotes from tastytrade proxy
-async function fetchQuotes() {
-  if (!DATA) return;
-  const symbols = [...new Set([...DATA.positions.map(p=>p.symbol), ...DATA.signals.map(s=>s.symbol)])];
-  if (!symbols.length) return;
-  try {
-    const res = await fetch(QUOTES_URL + '?symbols=' + symbols.join(','));
-    const json = await res.json();
-    if (json.quotes) {
-      json.quotes.forEach(q => { QUOTES[q.symbol] = q; });
-    } else if (Array.isArray(json)) {
-      json.forEach(q => { if(q.symbol) QUOTES[q.symbol] = q; });
-    }
-    renderAll();
-  } catch(e) { console.log('Quotes fetch failed:', e); }
-}
-
-function renderAll() {
-  if (!DATA) return;
-  renderStats();
-  renderPositions();
-  renderSignals();
-  renderRiskAlerts();
-  renderOrderSuggestions();
-}
-
-function renderStats() {
-  const p = DATA.positions || [];
-  const s = DATA.signals || [];
-  const income = p.filter(x=>x.module==='income').length;
-  const offense = p.filter(x=>x.module==='offense').length;
-  document.getElementById('s-positions').textContent = p.length;
-  document.getElementById('s-positions-sub').textContent = `${income} 筆收租、${offense} 筆進攻`;
-  document.getElementById('s-signals').textContent = s.length;
-  const review = s.filter(x=>x.decision==='review').length;
-  document.getElementById('s-signals-sub').textContent = review ? `${review} 筆待確認` : '全部已處理';
-  const risk = DATA.risk_budget_used_pct || 0;
-  document.getElementById('s-risk').textContent = risk + '%';
-  const bar = document.getElementById('s-risk-bar');
-  bar.style.width = risk + '%';
-  bar.style.background = risk > 80 ? 'var(--red)' : risk > 60 ? 'var(--yellow)' : 'var(--green)';
-  const pnl = DATA.unrealized_pnl || 0;
-  document.getElementById('s-pnl').textContent = (pnl >= 0 ? '+' : '') + '$' + pnl;
-  document.getElementById('s-pnl').style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-}
-
-function renderPositions() {
-  const body = document.getElementById('positions-body');
-  if (!DATA) { body.innerHTML = '<tr><td colspan=9 style="text-align:center;color:var(--text2)">請先載入資料</td></tr>'; return; }
-  const search = (document.getElementById('search').value || '').toLowerCase();
-  const mod = document.getElementById('filter-module').value;
-  let rows = DATA.positions.filter(p => {
-    if (mod !== 'all' && p.module !== mod) return false;
-    if (search && !p.symbol.toLowerCase().includes(search) && !p.strategy.toLowerCase().includes(search)) return false;
-    return true;
+document.querySelectorAll('.sidebar-item').forEach(item => {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
   });
-  body.innerHTML = rows.map(p => {
-    const ev = calcEV(p);
-    const kelly = calcKelly(p);
-    const q = QUOTES[p.symbol];
-    const quote = q ? `$${q.last || q.price || '--'}` : '--';
-    const evClass = ev !== null ? (ev > 0 ? 'ev-positive' : 'ev-negative') : '';
-    const evText = ev !== null ? (ev > 0 ? '+' : '') + '$' + ev.toFixed(0) : 'N/A';
-    const kellyText = kelly !== null ? (kelly * 100).toFixed(1) + '%' : 'N/A';
-    const statusBadge = p.status === 'active' ? '<span class="badge badge-green">持有中</span>' :
-      p.status === 'warning' ? '<span class="badge badge-yellow">有警示</span>' :
-      '<span class="badge badge-red">' + p.status + '</span>';
-    const modBadge = p.module === 'income' ? '<span class="badge badge-blue">收租</span>' : '<span class="badge badge-red">進攻</span>';
-    return `<tr>
-      <td><strong>${p.symbol}</strong><br><span style="font-size:0.75rem;color:var(--text2)">${p.strategy}</span></td>
-      <td>${p.student_label || ''}<br><span style="font-size:0.75rem;color:var(--text2)">${p.student_note || ''}</span></td>
-      <td>${modBadge} ${p.bias}</td>
-      <td>${p.dte}</td>
-      <td>${quote}</td>
-      <td class="${evClass}">${evText}</td>
-      <td>${kellyText}</td>
-      <td>$${p.max_loss} max<br><span style="font-size:0.72rem;color:var(--text2)">${p.short_delta ? '\u77ED\u817F \u0394' + p.short_delta : ''}${p.long_delta ? '\u9577\u817F \u0394' + p.long_delta : ''}</span></td>
-      <td>${statusBadge}</td>
-    </tr>`;
-  }).join('');
-}
-
-function renderSignals() {
-  const list = document.getElementById('signals-list');
-  if (!DATA || !DATA.signals) { list.innerHTML = ''; return; }
-  list.innerHTML = DATA.signals.map(s => {
-    const ev = calcEV(s);
-    const evText = ev !== null ? ((ev>0?'+':'') + '$' + ev.toFixed(0)) : '';
-    const evBadge = ev !== null ? `<span class="badge ${ev>0?'badge-green':'badge-red'}">EV ${evText}</span>` : '';
-    const decMap = {review:'待確認',approved:'可評估',blocked:'先暫停'};
-    const decClass = {review:'badge-yellow',approved:'badge-green',blocked:'badge-red'};
-    return `<div class="signal-card">
-      <div class="flex" style="justify-content:space-between">
-        <div><span class="symbol">${s.symbol}</span> &middot; ${s.strategy} ${evBadge}</div>
-        <span class="badge ${decClass[s.decision] || ''}">${decMap[s.decision] || s.decision}</span>
-      </div>
-      <div style="font-size:0.82rem;color:var(--text2);margin-top:6px">${s.student_note || ''}</div>
-      ${s.event_risk ? '<div style="color:var(--red);font-size:0.8rem;margin-top:4px">\u26A0 事件風險</div>' : ''}
-    </div>`;
-  }).join('');
-}
-
-function renderRiskAlerts() {
-  const el = document.getElementById('risk-alerts');
-  if (!DATA) { el.innerHTML = ''; return; }
-  const alerts = [];
-  DATA.positions.forEach(p => {
-    if (p.risk_flag === '21_dte' || (p.dte && p.dte <= 21 && p.module === 'income'))
-      alerts.push(`<div style="margin:8px 0"><strong>${p.symbol}</strong> 收租單接近 21 DTE，建議開始主動管理</div>`);
-    if (p.status === 'warning')
-      alerts.push(`<div style="margin:8px 0"><strong>${p.symbol}</strong> 有警示，請檢查事件風險、Delta 漂移或倉位上限</div>`);
-  });
-  el.innerHTML = alerts.length ? alerts.join('') : '<div style="color:var(--text2)">目前無警示</div>';
-}
-
-function renderOrderSuggestions() {
-  const el = document.getElementById('order-suggestions');
-  if (!DATA) { el.innerHTML = ''; return; }
-  const orders = DATA.signals.filter(s => {
-    if (s.decision === 'blocked' || s.event_risk) return false;
-    const ev = calcEV(s);
-    return ev !== null && ev > 0;
-  });
-  if (!orders.length) { el.innerHTML = '<div style="color:var(--text2)">目前無符合條件的建議單</div>'; return; }
-  el.innerHTML = '<table><thead><tr><th>標的</th><th>策略</th><th>方向</th><th>EV</th><th>Kelly</th><th>建議</th></tr></thead><tbody>' +
-    orders.map(s => {
-      const ev = calcEV(s);
-      const kelly = calcKelly(s);
-      return `<tr><td><strong>${s.symbol}</strong></td><td>${STRATEGY_LABELS[s.strategy]||s.strategy}</td><td>${s.bias}</td><td class="ev-positive">+$${ev.toFixed(0)}</td><td>${kelly!==null?(kelly*100).toFixed(1)+'%':'--'}</td><td><span class="badge badge-green">可執行</span></td></tr>`;
-    }).join('') + '</tbody></table>';
-}
-
-// Excel Export (CSV)
-function exportExcel() {
-  if (!DATA) { alert('請先載入資料'); return; }
-  const rows = [['\u6a19\u7684','\u7b56\u7565','\u6a21\u7d44','\u65b9\u5411','DTE','Max Loss','EV','Kelly %','\u72c0\u614b','\u5b78\u751f\u770b\u6cd5','\u5373\u6642\u5831\u50f9']];
-  DATA.positions.forEach(p => {
-    const ev = calcEV(p); const kelly = calcKelly(p); const q = QUOTES[p.symbol];
-    rows.push([p.symbol, p.strategy, p.module, p.bias, p.dte, p.max_loss,
-      ev!==null?ev.toFixed(2):'', kelly!==null?(kelly*100).toFixed(1):'',
-      p.status, p.student_label||'', q?(q.last||q.price||''):'']);
-  });
-  rows.push([]);
-  rows.push(['--- \u4ECA\u65E5\u8A0A\u865F ---']);
-  rows.push(['\u6a19\u7684','\u7b56\u7565','\u6c7a\u7b56','EV','Kelly %','\u5099\u8a3b']);
-  DATA.signals.forEach(s => {
-    const ev = calcEV(s); const kelly = calcKelly(s);
-    rows.push([s.symbol, s.strategy, s.decision,
-      ev!==null?ev.toFixed(2):'', kelly!==null?(kelly*100).toFixed(1):'', s.student_note||'']);
-  });
-  const csv = rows.map(r => r.map(c => '"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const BOM = '\uFEFF';
-  const blob = new Blob([BOM + csv], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'options-strategy-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-}
-
-// Auto-refresh
-document.getElementById('refresh-interval').addEventListener('change', function() {
-  if (refreshTimer) clearInterval(refreshTimer);
-  const sec = parseInt(this.value);
-  if (sec > 0) {
-    refreshTimer = setInterval(() => loadFromWebhook(), sec * 1000);
-  }
 });
 
-// Init
-renderPositions();
-// Auto-load on start
-loadFromWebhook();
+// === Toggle check ===
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  updateSummary();
+}
+
+// === Regime toggle ===
+function toggleRegime(el) {
+  el.classList.toggle('active');
+}
+
+// === Summary bar ===
+function updateSummary() {
+  const totalChecks = document.querySelectorAll('#gate4 .check-item').length;
+  const doneChecks = document.querySelectorAll('#gate4 .check-item.checked').length;
+  const checkEl = document.getElementById('summary-checklist');
+  if (checkEl) {
+    checkEl.textContent = doneChecks + '/' + totalChecks;
+    checkEl.className = 'summary-val ' + (doneChecks === totalChecks && totalChecks > 0 ? 'green' : 'red');
+  }
+}
+
+function resetAll() {
+  document.querySelectorAll('.check-item').forEach(i => i.classList.remove('checked'));
+  document.querySelectorAll('.regime-card').forEach(i => i.classList.remove('active'));
+  showGate('gate0');
+  updateSummary();
+}
+
+    // === Live Dashboard ===
+const WEBHOOK_URL = 'https://chilldove.app.n8n.cloud/webhook/student-positions';
+let dashboardData = null;
+
+async function loadDashboard() {
+  const posC = document.getElementById('positions-container');
+  const sigC = document.getElementById('signals-container');
+  const ordC = document.getElementById('orders-container');
+  const riskC = document.getElementById('risk-container');
+  if (posC) posC.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">載入中...</div>';
+  try {
+    const res = await fetch(WEBHOOK_URL);
+    const data = await res.json();
+    dashboardData = data;
+    renderPositions(data.positions || []);
+    renderSignals(data.signals || []);
+    renderRisk(data.risk || {});
+    renderOrders(data.positions || []);
+  } catch(e) {
+    if (posC) posC.innerHTML = '<div style="text-align:center;padding:2rem;color:#e74c3c">載入失敗: ' + e.message + '</div>';
+  }
+}
+
+function calcEV(p) {
+  const pop = parseFloat(p.pop);
+  const cr = parseFloat(p.credit_received || 0);
+  const dp = parseFloat(p.debit_paid || 0);
+  const tv = parseFloat(p.target_value || 0);
+  const ml = parseFloat(p.max_loss || 0);
+  if (isNaN(pop) || pop === 0) return { ev: 'N/A', kelly: 'N/A' };
+  const netCredit = cr - dp;
+  const maxProfit = netCredit > 0 ? netCredit * 100 : (tv - dp) * 100;
+  const maxLoss = ml > 0 ? ml * 100 : Math.abs(netCredit) * 100;
+  const ev = (pop / 100) * maxProfit - (1 - pop / 100) * maxLoss;
+  const b = maxProfit / (maxLoss || 1);
+  const kelly = (pop / 100) - ((1 - pop / 100) / b);
+  return { ev: '$' + ev.toFixed(0), kelly: (kelly * 100).toFixed(1) + '%', evNum: ev, kellyNum: kelly };
+}
+
+    function renderPositions(positions) {
+  const c = document.getElementById('positions-container');
+  if (!c) return;
+  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">無持倉資料</div>'; return; }
+  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>部位</th><th>EV</th><th>Kelly</th><th>狀態</th></tr></thead><tbody id="pos-tbody">';
+  positions.forEach(p => {
+    const evData = calcEV(p);
+    const evClass = evData.evNum > 0 ? 'green' : evData.evNum < 0 ? 'red' : '';
+    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + (p.quantity||'-') + '</td><td class="' + evClass + '">' + evData.ev + '</td><td>' + evData.kelly + '</td><td>' + (p.status||'-') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  c.innerHTML = html;
+}
+
+function renderSignals(signals) {
+  const c = document.getElementById('signals-container');
+  if (!c) return;
+  if (!signals.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無新訊號</div>'; return; }
+  let html = '';
+  signals.forEach(s => {
+    const evData = calcEV(s);
+    html += '<div class="signal-card"><div class="signal-header"><span class="signal-symbol">' + (s.symbol||'') + '</span><span class="signal-strategy">' + (s.strategy||'') + '</span></div><div class="signal-details">EV: <span class="' + (evData.evNum > 0 ? 'green' : 'red') + '">' + evData.ev + '</span> | Kelly: ' + evData.kelly + ' | POP: ' + (s.pop||'N/A') + '%</div></div>';
+  });
+  c.innerHTML = html;
+}
+
+function renderRisk(risk) {
+  const c = document.getElementById('risk-container');
+  if (!c) return;
+  const bp = risk.buying_power || 'N/A';
+  const nl = risk.net_liq || 'N/A';
+  const delta = risk.portfolio_delta || 'N/A';
+  c.innerHTML = '<div class="risk-bar"><div class="risk-item"><span class="risk-label">購買力</span><span class="risk-val">' + bp + '</span></div><div class="risk-item"><span class="risk-label">Net Liq</span><span class="risk-val">' + nl + '</span></div><div class="risk-item"><span class="risk-label">Portfolio Δ</span><span class="risk-val">' + delta + '</span></div></div>';
+}
+
+function renderOrders(positions) {
+  const c = document.getElementById('orders-container');
+  if (!c) return;
+  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無建議下單</div>'; return; }
+  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>建議</th></tr></thead><tbody>';
+  positions.forEach(p => {
+    const evData = calcEV(p);
+    const action = evData.evNum > 0 ? '✅ 正EV - 可下單' : '⚠️ 負EV - 請評估';
+    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + action + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  c.innerHTML = html;
+}
+
+    // === Excel Export ===
+function exportExcel() {
+  if (!dashboardData || !dashboardData.positions) { alert('請先載入 Dashboard 資料'); return; }
+  const positions = dashboardData.positions;
+  let csv = '\uFEFF個股,策略,到期日,部位,POP,Credit,Debit,EV,Kelly,狀態\n';
+  positions.forEach(p => {
+    const evData = calcEV(p);
+    csv += [p.symbol, p.strategy, p.expiration, p.quantity, p.pop, p.credit_received, p.debit_paid, evData.ev, evData.kelly, p.status].join(',') + '\n';
+  });
+  if (dashboardData.signals && dashboardData.signals.length) {
+    csv += '\n訊號\n個股,策略,POP,Credit,Debit,EV,Kelly\n';
+    dashboardData.signals.forEach(s => {
+      const evData = calcEV(s);
+      csv += [s.symbol, s.strategy, s.pop, s.credit_received, s.debit_paid, evData.ev, evData.kelly].join(',') + '\n';
+    });
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'options-dashboard-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// === Auto refresh ===
+let refreshInterval = null;
+function startAutoRefresh() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
+    if (currentGate === 'live-dashboard') loadDashboard();
+  }, 60000);
+}
+
+// === Init ===
+showGate('gate0');
+updateSummary();
+startAutoRefresh();
 </script>
 </body>
 </html>
+</div><!-- end .app -->
