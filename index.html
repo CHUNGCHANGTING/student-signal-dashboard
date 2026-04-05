@@ -573,6 +573,106 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   .admin-table { font-size: 11px; }
 }
 
+/* === Gate 2: TOS Tabs === */
+.g2-tabs { display: flex; gap: var(--space-1); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); margin-bottom: var(--space-4); flex-wrap: wrap; }
+.g2-tab { padding: var(--space-2) var(--space-4); font-size: var(--text-xs); font-weight: 500; border-radius: var(--radius-md) var(--radius-md) 0 0; color: var(--color-text-muted); border-bottom: 2px solid transparent; transition: all var(--transition); }
+.g2-tab:hover { color: var(--color-text); background: var(--color-surface-offset); }
+.g2-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); background: var(--color-primary-highlight); }
+.g2-panel { display: none; padding: var(--space-4) 0; }
+.g2-panel.active { display: block; }
+.g2-strategy-badge { display: inline-block; font-size: var(--text-xs); padding: 2px var(--space-3); border-radius: 999px; font-weight: 600; margin-bottom: var(--space-2); }
+.g2-strategy-badge.income { background: var(--color-success-highlight); color: var(--color-success); }
+.g2-strategy-badge.offense { background: var(--color-orange-highlight); color: var(--color-orange); }
+.g2-title { font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--space-1); }
+.g2-subtitle { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-4); }
+.g2-param-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.g2-param-table th { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 2px solid var(--color-border); color: var(--color-text-muted); font-weight: 600; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.05em; }
+.g2-param-table td { padding: var(--space-3); border-bottom: 1px solid var(--color-divider); }
+.g2-param-table tr:hover { background: var(--color-surface-offset); }
+.g2-val { font-weight: 600; color: var(--color-primary); font-family: 'SF Mono', 'Menlo', monospace; }
+.g2-val.stop { color: var(--color-error); }
+.g2-val.profit { color: var(--color-success); }
+.g2-formula-box { margin-top: var(--space-4); padding: var(--space-4); background: var(--color-surface-offset); border-radius: var(--radius-md); border: 1px solid var(--color-divider); }
+.g2-formula-title { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-2); }
+.g2-formula { font-family: 'SF Mono', 'Menlo', monospace; font-size: var(--text-sm); font-weight: 600; color: var(--color-primary); }
+.g2-formula-note { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-2); }
+
+/* === Gate 3: Checklist === */
+.g3-input-section { margin-bottom: var(--space-4); }
+.g3-input-title { font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+.g3-input-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+@media (max-width: 768px) { .g3-input-grid { grid-template-columns: 1fr 1fr; } }
+.g3-field label { display: block; font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-1); font-weight: 500; }
+.g3-field input, .g3-field select { width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font-size: var(--text-sm); }
+.g3-field input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-highlight); }
+.g3-input-wrap { display: flex; align-items: center; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); overflow: hidden; }
+.g3-input-wrap input { border: none; background: none; flex: 1; padding: var(--space-2) var(--space-3); }
+.g3-input-wrap input:focus { outline: none; }
+.g3-input-wrap:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-highlight); }
+.g3-prefix, .g3-suffix { padding: 0 var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); font-weight: 500; }
+.g3-checklist { display: flex; flex-direction: column; gap: var(--space-2); }
+.g3-check-item { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-divider); border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition); background: var(--color-surface); }
+.g3-check-item:hover { border-color: var(--color-border); background: var(--color-surface-offset); }
+.g3-check-item.checked { border-color: var(--color-success); background: var(--color-success-highlight); }
+.g3-ci-num { width: 24px; height: 24px; border-radius: 50%; background: var(--color-surface-dynamic); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--color-text-muted); flex-shrink: 0; }
+.g3-check-item.checked .g3-ci-num { background: var(--color-success); color: #fff; }
+.g3-ci-box { width: 18px; height: 18px; border: 2px solid var(--color-border); border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; transition: all var(--transition); }
+.g3-check-item.checked .g3-ci-box { background: var(--color-success); border-color: var(--color-success); }
+.g3-ci-box svg { opacity: 0; transition: opacity var(--transition); }
+.g3-check-item.checked .g3-ci-box svg { opacity: 1; }
+.g3-ci-content { flex: 1; }
+.g3-ci-label { font-weight: 600; font-size: var(--text-sm); }
+.g3-ci-detail { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; }
+.g3-ci-calc { font-size: var(--text-xs); margin-top: var(--space-1); font-family: 'SF Mono', 'Menlo', monospace; font-weight: 500; }
+.g3-ci-calc.pass { color: var(--color-success); }
+.g3-ci-calc.fail { color: var(--color-error); }
+.g3-ci-status { font-size: var(--text-xs); font-weight: 600; min-width: 40px; text-align: right; }
+.g3-progress-section { margin-top: var(--space-4); }
+.g3-gate-status { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin-top: var(--space-3); font-size: var(--text-sm); font-weight: 500; background: var(--color-warning-highlight); color: var(--color-warning); }
+.g3-gate-status.unlocked { background: var(--color-success-highlight); color: var(--color-success); }
+.g3-lock-icon { font-size: 1.1em; }
+
+/* === Gate 4: Stop Loss & Order === */
+.g4-section { margin-bottom: var(--space-4); }
+.g4-section-title { font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+.g4-st-icon { width: 22px; height: 22px; border-radius: 50%; background: var(--color-primary-highlight); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+.g4-stoploss-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+@media (max-width: 768px) { .g4-stoploss-grid { grid-template-columns: 1fr 1fr; } }
+.g4-sl-card { padding: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); }
+.g4-sl-card select { width: 100%; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font-size: var(--text-sm); }
+.g4-sl-label { font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 500; margin-bottom: var(--space-2); }
+.g4-sl-result { font-size: var(--text-lg); font-weight: 700; color: var(--color-error); font-family: 'SF Mono', 'Menlo', monospace; }
+.g4-sl-formula { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-2); padding: var(--space-2) var(--space-3); background: var(--color-surface-offset); border-radius: var(--radius-sm); font-family: 'SF Mono', 'Menlo', monospace; }
+.g4-order-box { padding: var(--space-4); border: 2px solid var(--color-border); border-radius: var(--radius-lg); text-align: center; }
+.g4-order-lock { display: flex; align-items: center; justify-content: center; gap: var(--space-2); color: var(--color-text-muted); padding: var(--space-4); }
+.g4-order-ready { padding: var(--space-4); }
+.g4-order-icon { font-size: 2rem; margin-bottom: var(--space-2); }
+.g4-order-text { font-size: var(--text-sm); font-weight: 500; margin-bottom: var(--space-3); }
+.g4-order-actions { display: flex; gap: var(--space-3); justify-content: center; }
+.g4-btn-execute { padding: var(--space-3) var(--space-6); background: var(--color-success); color: #fff; border-radius: var(--radius-md); font-weight: 600; font-size: var(--text-sm); border: none; cursor: pointer; transition: all var(--transition); }
+.g4-btn-execute:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.g4-btn-cancel { padding: var(--space-3) var(--space-6); background: var(--color-surface-dynamic); color: var(--color-text-muted); border-radius: var(--radius-md); font-weight: 500; font-size: var(--text-sm); border: 1px solid var(--color-border); cursor: pointer; }
+.g4-order-done { padding: var(--space-4); }
+
+/* === Live Dashboard: Close Position Modal === */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.modal-box { background: var(--color-surface); border-radius: var(--radius-xl); padding: var(--space-6); min-width: 400px; max-width: 90vw; box-shadow: var(--shadow-lg); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
+.modal-header h3 { font-size: var(--text-lg); font-weight: 600; }
+.modal-close { font-size: 1.5rem; width: 32px; height: 32px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--color-text-muted); }
+.modal-close:hover { background: var(--color-surface-dynamic); }
+.modal-pos-info { padding: var(--space-3); background: var(--color-surface-offset); border-radius: var(--radius-md); margin-bottom: var(--space-4); font-size: var(--text-sm); line-height: 1.8; }
+.modal-field { margin-bottom: var(--space-3); }
+.modal-field label { display: block; font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 500; margin-bottom: var(--space-1); }
+.modal-field select, .modal-field input { width: 100%; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font-size: var(--text-sm); }
+.modal-footer { display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-4); }
+.live-info-note { font-size: var(--text-xs); color: var(--color-text-muted); padding: var(--space-2) 0; margin-bottom: var(--space-2); }
+.pos-close-btn { padding: 4px var(--space-3); font-size: 11px; font-weight: 600; border-radius: var(--radius-sm); cursor: pointer; transition: all var(--transition); border: 1px solid; }
+.pos-close-btn.profit { background: var(--color-success-highlight); color: var(--color-success); border-color: var(--color-success); }
+.pos-close-btn.profit:hover { background: var(--color-success); color: #fff; }
+.pos-close-btn.stop { background: var(--color-error-highlight); color: var(--color-error); border-color: var(--color-error); }
+.pos-close-btn.stop:hover { background: var(--color-error); color: #fff; }
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -950,52 +1050,345 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 </section>
 <section class="gate" id="gate2" style="display:none">
-<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上確認 Delta、DTE、Wing 寬度、Credit/Width 比</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。包含 IC / Credit Spread / Debit Spread / CV 分頁籤參數表。</p></div>
+<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">切換策略 Tab，對照 Delta、DTE、停損與獲利目標參數表</div></div></div>
+
+<!-- Strategy Tabs -->
+<div class="g2-tabs">
+  <button class="g2-tab active" onclick="g2SwitchTab('ic',this)">Iron Condor</button>
+  <button class="g2-tab" onclick="g2SwitchTab('pcs',this)">Put Credit Spread</button>
+  <button class="g2-tab" onclick="g2SwitchTab('ccs',this)">Call Credit Spread</button>
+  <button class="g2-tab" onclick="g2SwitchTab('bcds',this)">Bull Call Debit</button>
+  <button class="g2-tab" onclick="g2SwitchTab('bpds',this)">Bear Put Debit</button>
+</div>
+
+<!-- IC Tab -->
+<div class="g2-panel active" id="g2-tab-ic">
+<div class="g2-strategy-badge income">收租</div>
+<div class="g2-title">Iron Condor 參數表</div>
+<div class="g2-subtitle">SPX / QQQ 專用 — 同時賣 Put Spread + Call Spread</div>
+<table class="g2-param-table">
+<thead><tr><th>參數</th><th>標準值</th><th>說明</th></tr></thead>
+<tbody>
+<tr><td>Short Delta</td><td class="g2-val">0.10 – 0.15</td><td>兩邊賣腿 Delta，越小越安全</td></tr>
+<tr><td>DTE（天數）</td><td class="g2-val">20 – 30 天</td><td>時間衰減最快區間</td></tr>
+<tr><td>Wing 寬度</td><td class="g2-val">$5 – $10</td><td>買腿與賣腿間距</td></tr>
+<tr><td>IVR 門檻</td><td class="g2-val">≥ 30%</td><td>IV Rank 需達標才能做</td></tr>
+<tr><td>Credit/Width 比</td><td class="g2-val">≥ 25%</td><td>收到權利金 / 寬度比率</td></tr>
+<tr><td>停損</td><td class="g2-val stop">Credit × 2.0</td><td>虧損達 credit 的 2 倍時出場</td></tr>
+<tr><td>獲利目標</td><td class="g2-val profit">收到 50% credit</td><td>收回一半即平倉</td></tr>
+<tr><td>Max Loss</td><td class="g2-val">Width - Credit</td><td>最大虧損 = 寬度 - 收到權利金</td></tr>
+</tbody>
+</table>
+<div class="g2-formula-box">
+  <div class="g2-formula-title">EV 公式</div>
+  <div class="g2-formula">EV = P(win) × MaxProfit − P(loss) × MaxLoss</div>
+  <div class="g2-formula-note">IC 的 P(win) ≈ POP，MaxProfit = Net Credit × 100，MaxLoss = (Width − Credit) × 100</div>
+</div>
+</div>
+
+<!-- PCS Tab -->
+<div class="g2-panel" id="g2-tab-pcs">
+<div class="g2-strategy-badge income">收租</div>
+<div class="g2-title">Put Credit Spread (Bull Put) 參數表</div>
+<div class="g2-subtitle">看漲/中性 — 賣高 Put + 買低 Put 收取權利金</div>
+<table class="g2-param-table">
+<thead><tr><th>參數</th><th>標準值</th><th>說明</th></tr></thead>
+<tbody>
+<tr><td>Short Put Delta</td><td class="g2-val">0.20 – 0.25</td><td>賣腿 Delta，靠近支撐位</td></tr>
+<tr><td>DTE（天數）</td><td class="g2-val">14 – 30 天</td><td>Credit spread 最佳 DTE</td></tr>
+<tr><td>Wing 寬度</td><td class="g2-val">$5</td><td>標準寬度</td></tr>
+<tr><td>IVR 門檻</td><td class="g2-val">30% – 60%</td><td>IVR 太高風險大，太低沒肉</td></tr>
+<tr><td>Credit/Width 比</td><td class="g2-val">≥ 30%</td><td>至少收到 30% 寬度的權利金</td></tr>
+<tr><td>停損</td><td class="g2-val stop">Credit × 1.3</td><td>虧損達 30% 時出場</td></tr>
+<tr><td>獲利目標</td><td class="g2-val profit">收到 50% credit</td><td>達到目標即平倉</td></tr>
+<tr><td>方向確認</td><td class="g2-val">RSI ≥ 50 偏多</td><td>趨勢跟隨，RSI < 50 不做 PCS</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- CCS Tab -->
+<div class="g2-panel" id="g2-tab-ccs">
+<div class="g2-strategy-badge income">收租</div>
+<div class="g2-title">Call Credit Spread (Bear Call) 參數表</div>
+<div class="g2-subtitle">看跌/中性 — 賣低 Call + 買高 Call 收取權利金</div>
+<table class="g2-param-table">
+<thead><tr><th>參數</th><th>標準值</th><th>說明</th></tr></thead>
+<tbody>
+<tr><td>Short Call Delta</td><td class="g2-val">0.10 – 0.20</td><td>賣腿 Delta，靠近壓力位</td></tr>
+<tr><td>DTE（天數）</td><td class="g2-val">14 – 30 天</td><td>Credit spread 最佳 DTE</td></tr>
+<tr><td>Wing 寬度</td><td class="g2-val">$5</td><td>標準寬度</td></tr>
+<tr><td>IVR 門檻</td><td class="g2-val">30% – 50%</td><td>CCS 的 IVR 區間</td></tr>
+<tr><td>Credit/Width 比</td><td class="g2-val">≥ 30%</td><td>至少收到 30% 寬度的權利金</td></tr>
+<tr><td>停損</td><td class="g2-val stop">Credit × 1.3</td><td>虧損達 30% 時出場</td></tr>
+<tr><td>獲利目標</td><td class="g2-val profit">收到 50% credit</td><td>達到目標即平倉</td></tr>
+<tr><td>方向確認</td><td class="g2-val">RSI < 50 偏空</td><td>趨勢跟隨，RSI ≥ 50 不做 CCS</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- BCDS Tab -->
+<div class="g2-panel" id="g2-tab-bcds">
+<div class="g2-strategy-badge offense">進攻</div>
+<div class="g2-title">Bull Call Debit Spread 參數表</div>
+<div class="g2-subtitle">看漲突破 — 買低 Call + 賣高 Call 付出權利金</div>
+<table class="g2-param-table">
+<thead><tr><th>參數</th><th>標準值</th><th>說明</th></tr></thead>
+<tbody>
+<tr><td>Long Call Delta</td><td class="g2-val">0.40 – 0.60</td><td>買腿 Delta，ATM 附近</td></tr>
+<tr><td>DTE（天數）</td><td class="g2-val">14 – 45 天</td><td>Debit spread 需要更多時間</td></tr>
+<tr><td>Wing 寬度</td><td class="g2-val">$5 – $10</td><td>寬度決定最大獲利</td></tr>
+<tr><td>IVP 門檻</td><td class="g2-val">20% – 50%</td><td>IV Percentile 不能太高（買方成本）</td></tr>
+<tr><td>Debit/Width 比</td><td class="g2-val">≤ 50%</td><td>付出不超過寬度一半</td></tr>
+<tr><td>停損</td><td class="g2-val stop">Debit × 0.7</td><td>虧損達 30% 時出場</td></tr>
+<tr><td>獲利目標</td><td class="g2-val profit">Debit × 2.0</td><td>翻倍即平倉</td></tr>
+<tr><td>方向確認</td><td class="g2-val">RSI ≥ 50 + MACD 多頭</td><td>需要明確方向突破</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- BPDS Tab -->
+<div class="g2-panel" id="g2-tab-bpds">
+<div class="g2-strategy-badge offense">進攻</div>
+<div class="g2-title">Bear Put Debit Spread 參數表</div>
+<div class="g2-subtitle">看跌突破 — 買高 Put + 賣低 Put 付出權利金</div>
+<table class="g2-param-table">
+<thead><tr><th>參數</th><th>標準值</th><th>說明</th></tr></thead>
+<tbody>
+<tr><td>Long Put Delta</td><td class="g2-val">0.40 – 0.60</td><td>買腿 Delta，ATM 附近</td></tr>
+<tr><td>DTE（天數）</td><td class="g2-val">14 – 45 天</td><td>Debit spread 需要更多時間</td></tr>
+<tr><td>Wing 寬度</td><td class="g2-val">$5 – $10</td><td>寬度決定最大獲利</td></tr>
+<tr><td>IVP 門檻</td><td class="g2-val">20% – 50%</td><td>IV Percentile 不能太高（買方成本）</td></tr>
+<tr><td>Debit/Width 比</td><td class="g2-val">≤ 50%</td><td>付出不超過寬度一半</td></tr>
+<tr><td>停損</td><td class="g2-val stop">Debit × 0.7</td><td>虧損達 30% 時出場</td></tr>
+<tr><td>獲利目標</td><td class="g2-val profit">Debit × 2.0</td><td>翻倍即平倉</td></tr>
+<tr><td>方向確認</td><td class="g2-val">RSI < 50 + MACD 空頭</td><td>需要明確方向跌破</td></tr>
+</tbody>
+</table>
+</div>
+
 </section>
 <section class="gate" id="gate3" style="display:none">
-<div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位確認</div><div class="gate-subtitle">帳戶風險、相關性、BP使用率</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。</p></div>
-</section>
-<section class="gate" id="gate4" style="display:none">
-<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終核查清單與送單確認詞</div></div></div>
-<div class="checklist" id="gate4-checklist">
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">策略分流已完成</div><div class="check-detail">Module 已鎖定（收租 or 進攻）</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">盤前訊號確認</div><div class="check-detail">IVR / Regime / 事件風險已排除</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">TOS 試算完成</div><div class="check-detail">Delta / DTE / Credit / Width 符合標準</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">BP 使用率 ≤ 50%</div><div class="check-detail">單筆 BP ≤ 5%，總部位 BP ≤ 50%</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">相關性 ≤ 3 個標的</div><div class="check-detail">不重複押注同方向</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">停損點已設定</div><div class="check-detail">收租: 2×Credit / 進攻: 50% Debit</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">EV 為正</div><div class="check-detail">期望值 > 0，Kelly > 0%</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">送單確認詞唸出</div><div class="check-detail">「我已完成所有確認，這筆符合系統規則」</div></div>
+<div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位確認</div><div class="gate-subtitle">把 8 個 checklist 一條條勾，全部通過才可進第 4 關</div></div></div>
+
+<div class="g3-input-section">
+  <div class="g3-input-title">A 輸入交易參數</div>
+  <div class="g3-input-grid">
+    <div class="g3-field">
+      <label>帳戶總資產 (Net Liq)</label>
+      <div class="g3-input-wrap"><span class="g3-prefix">$</span><input type="number" id="g3-netliq" placeholder="50000" oninput="g3Calculate()"></div>
+    </div>
+    <div class="g3-field">
+      <label>本筆 Max Loss</label>
+      <div class="g3-input-wrap"><span class="g3-prefix">$</span><input type="number" id="g3-maxloss" placeholder="380" oninput="g3Calculate()"></div>
+    </div>
+    <div class="g3-field">
+      <label>口數 (Contracts)</label>
+      <input type="number" id="g3-qty" value="1" min="1" max="50" oninput="g3Calculate()">
+    </div>
+    <div class="g3-field">
+      <label>目前總曝險</label>
+      <div class="g3-input-wrap"><span class="g3-prefix">$</span><input type="number" id="g3-total-exposure" placeholder="5000" oninput="g3Calculate()"></div>
+    </div>
+    <div class="g3-field">
+      <label>EV 值</label>
+      <div class="g3-input-wrap"><span class="g3-prefix">$</span><input type="number" id="g3-ev" placeholder="120" oninput="g3Calculate()"></div>
+    </div>
+    <div class="g3-field">
+      <label>Kelly %</label>
+      <div class="g3-input-wrap"><input type="number" id="g3-kelly" placeholder="15" oninput="g3Calculate()"><span class="g3-suffix">%</span></div>
+    </div>
   </div>
 </div>
+
+<div class="g3-input-title" style="margin-top:var(--space-6)">B 部位確認清單</div>
+<div class="g3-checklist" id="g3-checklist">
+  <div class="g3-check-item" id="g3-c1" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">1</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">Max Loss 確認</div>
+      <div class="g3-ci-detail">單筆最大虧損不超過帳戶總資產 2%</div>
+      <div class="g3-ci-calc" id="g3-c1-calc"></div>
+    </div>
+    <div class="g3-ci-status" id="g3-c1-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c2" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">2</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">口數確認</div>
+      <div class="g3-ci-detail">口數 × Max Loss 不超過帳戶 5%</div>
+      <div class="g3-ci-calc" id="g3-c2-calc"></div>
+    </div>
+    <div class="g3-ci-status" id="g3-c2-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c3" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">3</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">總曝險不超過 50%</div>
+      <div class="g3-ci-detail">總曝險 / Net Liq ≤ 50%（BP 使用率）</div>
+      <div class="g3-ci-calc" id="g3-c3-calc"></div>
+    </div>
+    <div class="g3-ci-status" id="g3-c3-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c4" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">4</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">事件風險已排除</div>
+      <div class="g3-ci-detail">無 FOMC / CPI / 財報等重大事件在 DTE 內</div>
+    </div>
+    <div class="g3-ci-status" id="g3-c4-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c5" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">5</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">EV 為正</div>
+      <div class="g3-ci-detail">期望值 > 0，該筆交易有正期望報酬</div>
+      <div class="g3-ci-calc" id="g3-c5-calc"></div>
+    </div>
+    <div class="g3-ci-status" id="g3-c5-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c6" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">6</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">Kelly 部位合理</div>
+      <div class="g3-ci-detail">Kelly % > 0%，建議使用 Kelly/2 保守部位</div>
+      <div class="g3-ci-calc" id="g3-c6-calc"></div>
+    </div>
+    <div class="g3-ci-status" id="g3-c6-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c7" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">7</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">相關性檢查</div>
+      <div class="g3-ci-detail">同方向標的 ≤ 3 個，同產業 ≤ 2 檔</div>
+    </div>
+    <div class="g3-ci-status" id="g3-c7-status"></div>
+  </div>
+  <div class="g3-check-item" id="g3-c8" onclick="g3Toggle(this)">
+    <div class="g3-ci-num">8</div>
+    <div class="g3-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="g3-ci-content">
+      <div class="g3-ci-label">停損點已設定</div>
+      <div class="g3-ci-detail">取消或修改單的觸發條件已確認</div>
+    </div>
+    <div class="g3-ci-status" id="g3-c8-status"></div>
+  </div>
+</div>
+
+<div class="g3-progress-section">
+  <div class="progress-label"><span>確認進度</span><span id="g3-progress-text">0 / 8</span></div>
+  <div class="progress-bar"><div class="progress-fill" id="g3-progress-fill"></div></div>
+  <div class="g3-gate-status" id="g3-gate-status">
+    <span class="g3-lock-icon">🔒</span>
+    <span>未完成 — 請完成所有確認項目才能進入第 4 關</span>
+  </div>
+</div>
+</section>
+<section class="gate" id="gate4" style="display:none">
+<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終確認 + 止損單設定 — 只有人工批准才能送單</div></div></div>
+
+<!-- Stop Loss Setup -->
+<div class="g4-section">
+  <div class="g4-section-title"><span class="g4-st-icon">A</span> 止損單設定 (Stop Limit Order)</div>
+  <div class="g4-stoploss-grid">
+    <div class="g4-sl-card">
+      <div class="g4-sl-label">策略類型</div>
+      <select id="g4-strategy-type" onchange="g4CalcStopLoss()">
+        <option value="">— 請選擇 —</option>
+        <option value="credit">收租 (Credit Spread)</option>
+        <option value="debit">進攻 (Debit Spread)</option>
+        <option value="ic">Iron Condor</option>
+      </select>
+    </div>
+    <div class="g4-sl-card">
+      <div class="g4-sl-label">進場價格 (Credit 或 Debit)</div>
+      <div class="g3-input-wrap"><span class="g3-prefix">$</span><input type="number" id="g4-entry-price" placeholder="1.20" step="0.01" oninput="g4CalcStopLoss()"></div>
+    </div>
+    <div class="g4-sl-card">
+      <div class="g4-sl-label">止損觸發價</div>
+      <div class="g4-sl-result" id="g4-stop-trigger">—</div>
+    </div>
+    <div class="g4-sl-card">
+      <div class="g4-sl-label">止損限價 (Limit)</div>
+      <div class="g4-sl-result" id="g4-stop-limit">—</div>
+    </div>
+  </div>
+  <div class="g4-sl-formula" id="g4-sl-formula"></div>
+</div>
+
+<!-- Final Checklist -->
+<div class="g4-section">
+  <div class="g4-section-title"><span class="g4-st-icon">B</span> 最終核查清單</div>
+  <div class="checklist" id="gate4-checklist">
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">策略分流已完成</div><div class="check-detail">Module 已鎖定（收租 or 進攻）</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">盤前訊號確認</div><div class="check-detail">IVR / Regime / 事件風險已排除</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">TOS 試算完成</div><div class="check-detail">Delta / DTE / Credit / Width 符合標準</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">部位確認 8/8 通過</div><div class="check-detail">Max Loss / 口數 / BP / EV / Kelly 全部合格</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">止損單已設定</div><div class="check-detail">Stop Limit Order 觸發價與限價已確認</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">相關性 ≤ 3 個標的</div><div class="check-detail">不重複押注同方向</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">EV 為正</div><div class="check-detail">期望值 > 0，Kelly > 0%</div></div>
+    </div>
+    <div class="check-item" onclick="toggleCheck(this)">
+      <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="check-content"><div class="check-label">送單確認詞唸出</div><div class="check-detail">「我已完成所有確認，這筆符合系統規則」</div></div>
+    </div>
+  </div>
+</div>
+
 <div class="progress-label" style="margin-top:var(--space-4)"><span>確認進度</span><span id="gate4-progress-text">0 / 8</span></div>
 <div class="progress-bar"><div class="progress-fill" id="gate4-progress-fill"></div></div>
-<div class="confirm-box">
+
+<!-- Order Execution -->
+<div class="g4-section" style="margin-top:var(--space-6)">
+  <div class="g4-section-title"><span class="g4-st-icon">C</span> 送單執行</div>
+  <div class="g4-order-box" id="g4-order-box">
+    <div class="g4-order-lock" id="g4-order-lock">
+      <span class="g3-lock-icon">🔒</span>
+      <span>請完成以上 8 項確認才能送單</span>
+    </div>
+    <div class="g4-order-ready" id="g4-order-ready" style="display:none">
+      <div class="g4-order-icon">✅</div>
+      <div class="g4-order-text">所有確認已通過，可以送單</div>
+      <div class="g4-order-actions">
+        <button class="g4-btn-execute" onclick="g4ExecuteOrder()">🚀 人工確認送單</button>
+        <button class="g4-btn-cancel" onclick="g4CancelOrder()">取消</button>
+      </div>
+    </div>
+    <div class="g4-order-done" id="g4-order-done" style="display:none">
+      <div class="g4-order-icon">🎯</div>
+      <div class="g4-order-text">送單完成！倉位已更新至即時持倉 Dashboard</div>
+      <button class="btn-primary" onclick="showSection('live-dashboard',document.querySelector('[onclick*=live-dashboard]'))" style="margin-top:var(--space-3)">前往即時持倉 Dashboard →</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-box" style="margin-top:var(--space-4)">
   <div class="confirm-title">🔒 送單確認詞</div>
   <div class="confirm-phrase">「我已完成所有確認，這筆符合系統規則」</div>
   <div class="forbidden-list">
@@ -1016,30 +1409,69 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   </div>
   <div class="live-actions">
     <button class="btn-secondary" onclick="loadDemo()">載入範例</button>
-    <button class="btn-primary" onclick="loadWebhook()">🔄 刷新</button>
+    <button class="btn-primary" onclick="loadWebhook()">🔄 從 Webhook 載入</button>
     <button class="btn-excel" onclick="exportExcel()">📥 匯出 CSV</button>
   </div>
 </div>
 <div class="load-box">
   <label>Webhook URL（n8n GET endpoint）</label>
-  <input type="text" id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-positions" placeholder="https://...">
+  <input type="text" id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-dashboard?student_id=S001" placeholder="https://...">
   <label>或貼上 JSON 資料</label>
   <textarea id="json-input" placeholder='{"positions":[...],"signals":[...],"risk":{}}'></textarea>
   <div class="load-row">
-    <button class="btn-primary" onclick="loadWebhook()">載入 Webhook</button>
+    <button class="btn-primary" onclick="loadWebhook()">從 Webhook 載入</button>
     <button class="btn-secondary" onclick="parseJSON()">解析 JSON</button>
     <button class="btn-secondary" onclick="loadDemo()">載入範例資料</button>
   </div>
   <div class="load-status" id="load-status"></div>
 </div>
+
+<!-- Stats Grid -->
 <div class="stats-grid">
   <div class="stat-card"><div class="stat-label">持倉數</div><div class="stat-value" id="stat-pos">—</div><div class="stat-sub">Active Positions</div></div>
   <div class="stat-card"><div class="stat-label">新訊號</div><div class="stat-value" id="stat-sig">—</div><div class="stat-sub">Pending Signals</div></div>
   <div class="stat-card"><div class="stat-label">風險預算使用</div><div class="stat-value" id="stat-risk">—</div><div class="stat-sub">Risk Budget Used</div></div>
   <div class="stat-card"><div class="stat-label">未實現損益</div><div class="stat-value" id="stat-pnl">—</div><div class="stat-sub">Unrealized P&L</div></div>
 </div>
+
+<!-- Positions Table with Close Button -->
 <div class="section-title">📋 持倉列表</div>
+<div class="live-info-note">可直接按「平倉」按鈕獲利了結或停損出場，系統會發送平倉指令至 n8n webhook</div>
 <div id="positions-container"><div style="text-align:center;padding:2rem;color:var(--color-text-faint)">尚未載入資料</div></div>
+
+<!-- Close Position Modal -->
+<div class="modal-overlay" id="close-modal" style="display:none" onclick="closeModalDismiss(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>平倉確認</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-pos-info" id="modal-pos-info"></div>
+      <div class="modal-field">
+        <label>平倉類型</label>
+        <select id="close-type">
+          <option value="profit">🟢 獲利了結</option>
+          <option value="stop">🔴 停損出場</option>
+          <option value="manual">⚪ 手動平倉</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>平倉價格（留空=市價）</label>
+        <div class="g3-input-wrap"><span class="g3-prefix">$</span><input type="number" id="close-price" placeholder="市價" step="0.01"></div>
+      </div>
+      <div class="modal-field">
+        <label>備註</label>
+        <input type="text" id="close-note" placeholder="選填：平倉原因">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="g4-btn-cancel" onclick="closeModal()">取消</button>
+      <button class="g4-btn-execute" onclick="executeClosePosition()">確認平倉</button>
+    </div>
+  </div>
+</div>
+
 <div class="section-title" style="margin-top:var(--space-6)">⚡ 訊號審核</div>
 <div id="signals-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
 <div class="section-title" style="margin-top:var(--space-6)">💰 風險概覽</div>
@@ -1165,10 +1597,214 @@ document.querySelectorAll('.sidebar-item').forEach(item => {
   });
 });
 
+// === Gate 2: Tab switching ===
+function g2SwitchTab(tabId, btn) {
+  document.querySelectorAll('.g2-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.g2-panel').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const panel = document.getElementById('g2-tab-' + tabId);
+  if (panel) panel.classList.add('active');
+}
+
+// === Gate 3: Calculate & Toggle ===
+function g3Toggle(el) {
+  el.classList.toggle('checked');
+  g3UpdateProgress();
+}
+
+function g3Calculate() {
+  const netliq = parseFloat(document.getElementById('g3-netliq').value) || 0;
+  const maxloss = parseFloat(document.getElementById('g3-maxloss').value) || 0;
+  const qty = parseInt(document.getElementById('g3-qty').value) || 1;
+  const totalExposure = parseFloat(document.getElementById('g3-total-exposure').value) || 0;
+  const ev = parseFloat(document.getElementById('g3-ev').value) || 0;
+  const kelly = parseFloat(document.getElementById('g3-kelly').value) || 0;
+
+  // Check 1: Max Loss <= 2% of Net Liq (maxloss = per contract in $)
+  if (netliq > 0 && maxloss > 0) {
+    const pct1 = (maxloss / netliq * 100).toFixed(2);
+    const pass1 = maxloss <= netliq * 0.02;
+    const el1 = document.getElementById('g3-c1-calc');
+    el1.textContent = '$' + maxloss + ' / $' + netliq + ' = ' + pct1 + '% ' + (pass1 ? '✓ PASS' : '✗ FAIL (>2%)');
+    el1.className = 'g3-ci-calc ' + (pass1 ? 'pass' : 'fail');
+  }
+  // Check 2: Qty * MaxLoss <= 5% of Net Liq
+  if (netliq > 0 && maxloss > 0) {
+    const total = qty * maxloss;
+    const pct2 = (total / netliq * 100).toFixed(2);
+    const pass2 = total <= netliq * 0.05;
+    const el2 = document.getElementById('g3-c2-calc');
+    el2.textContent = qty + ' × $' + maxloss + ' = $' + total + ' (' + pct2 + '%) ' + (pass2 ? '✓ PASS' : '✗ FAIL (>5%)');
+    el2.className = 'g3-ci-calc ' + (pass2 ? 'pass' : 'fail');
+  }
+  // Check 3: Total Exposure <= 50%
+  if (netliq > 0 && totalExposure > 0) {
+    const pct3 = (totalExposure / netliq * 100).toFixed(1);
+    const pass3 = totalExposure <= netliq * 0.5;
+    const el3 = document.getElementById('g3-c3-calc');
+    el3.textContent = '$' + totalExposure + ' / $' + netliq + ' = ' + pct3 + '% ' + (pass3 ? '✓ PASS' : '✗ FAIL (>50%)');
+    el3.className = 'g3-ci-calc ' + (pass3 ? 'pass' : 'fail');
+  }
+  // Check 5: EV > 0
+  if (ev !== 0) {
+    const pass5 = ev > 0;
+    const el5 = document.getElementById('g3-c5-calc');
+    el5.textContent = 'EV = $' + ev + ' ' + (pass5 ? '✓ 正EV' : '✗ 負EV');
+    el5.className = 'g3-ci-calc ' + (pass5 ? 'pass' : 'fail');
+  }
+  // Check 6: Kelly > 0
+  if (kelly !== 0) {
+    const pass6 = kelly > 0;
+    const el6 = document.getElementById('g3-c6-calc');
+    el6.textContent = 'Kelly = ' + kelly + '%, Half-Kelly = ' + (kelly/2).toFixed(1) + '% ' + (pass6 ? '✓ PASS' : '✗ FAIL');
+    el6.className = 'g3-ci-calc ' + (pass6 ? 'pass' : 'fail');
+  }
+}
+
+function g3UpdateProgress() {
+  const total = document.querySelectorAll('#g3-checklist .g3-check-item').length;
+  const done = document.querySelectorAll('#g3-checklist .g3-check-item.checked').length;
+  const textEl = document.getElementById('g3-progress-text');
+  const fillEl = document.getElementById('g3-progress-fill');
+  const statusEl = document.getElementById('g3-gate-status');
+  if (textEl) textEl.textContent = done + ' / ' + total;
+  if (fillEl) fillEl.style.width = (done / total * 100) + '%';
+  if (statusEl) {
+    if (done === total) {
+      statusEl.className = 'g3-gate-status unlocked';
+      statusEl.innerHTML = '<span class="g3-lock-icon">\ud83d\udd13</span><span>\u5168\u90e8\u901a\u904e\uff01\u53ef\u4ee5\u9032\u5165\u7b2c 4 \u95dc</span>';
+    } else {
+      statusEl.className = 'g3-gate-status';
+      statusEl.innerHTML = '<span class="g3-lock-icon">\ud83d\udd12</span><span>\u672a\u5b8c\u6210 \u2014 \u8acb\u5b8c\u6210\u6240\u6709\u78ba\u8a8d\u9805\u76ee\u624d\u80fd\u9032\u5165\u7b2c 4 \u95dc</span>';
+    }
+  }
+}
+
+// === Gate 4: Stop Loss Calculator ===
+function g4CalcStopLoss() {
+  const type = document.getElementById('g4-strategy-type').value;
+  const price = parseFloat(document.getElementById('g4-entry-price').value) || 0;
+  const triggerEl = document.getElementById('g4-stop-trigger');
+  const limitEl = document.getElementById('g4-stop-limit');
+  const formulaEl = document.getElementById('g4-sl-formula');
+  if (!type || price <= 0) { triggerEl.textContent = '\u2014'; limitEl.textContent = '\u2014'; if(formulaEl) formulaEl.textContent=''; return; }
+  let trigger, limit, formula;
+  if (type === 'credit') {
+    trigger = (price * 1.3).toFixed(2);
+    limit = (price * 1.35).toFixed(2);
+    formula = 'Credit \u00d7 1.3 = $' + price + ' \u00d7 1.3 = $' + trigger + ' (\u8667\u640d 30% \u51fa\u5834)';
+  } else if (type === 'debit') {
+    trigger = (price * 0.7).toFixed(2);
+    limit = (price * 0.65).toFixed(2);
+    formula = 'Debit \u00d7 0.7 = $' + price + ' \u00d7 0.7 = $' + trigger + ' (\u8667\u640d 30% \u51fa\u5834)';
+  } else if (type === 'ic') {
+    trigger = (price * 2.0).toFixed(2);
+    limit = (price * 2.1).toFixed(2);
+    formula = 'Credit \u00d7 2.0 = $' + price + ' \u00d7 2.0 = $' + trigger + ' (\u8667\u640d\u9054 credit 2\u500d)';
+  }
+  triggerEl.textContent = '$' + trigger;
+  limitEl.textContent = '$' + limit;
+  if (formulaEl) formulaEl.textContent = formula;
+}
+
+function g4UpdateOrderState() {
+  const total = document.querySelectorAll('#gate4-checklist .check-item').length;
+  const done = document.querySelectorAll('#gate4-checklist .check-item.checked').length;
+  const textEl = document.getElementById('gate4-progress-text');
+  const fillEl = document.getElementById('gate4-progress-fill');
+  if (textEl) textEl.textContent = done + ' / ' + total;
+  if (fillEl) fillEl.style.width = (done / total * 100) + '%';
+  const lockEl = document.getElementById('g4-order-lock');
+  const readyEl = document.getElementById('g4-order-ready');
+  if (done === total && total > 0) {
+    if (lockEl) lockEl.style.display = 'none';
+    if (readyEl) readyEl.style.display = 'block';
+  } else {
+    if (lockEl) lockEl.style.display = 'flex';
+    if (readyEl) readyEl.style.display = 'none';
+  }
+}
+
+function g4ExecuteOrder() {
+  const readyEl = document.getElementById('g4-order-ready');
+  const doneEl = document.getElementById('g4-order-done');
+  if (readyEl) readyEl.style.display = 'none';
+  if (doneEl) doneEl.style.display = 'block';
+  // In production: POST to n8n webhook to record the order
+}
+
+function g4CancelOrder() {
+  document.querySelectorAll('#gate4-checklist .check-item').forEach(i => i.classList.remove('checked'));
+  g4UpdateOrderState();
+}
+
+// === Live Dashboard: Close Position ===
+var closingPositionIndex = -1;
+
+function openCloseModal(idx) {
+  if (!dashboardData || !dashboardData.positions) return;
+  const p = dashboardData.positions[idx];
+  closingPositionIndex = idx;
+  const info = document.getElementById('modal-pos-info');
+  if (info) {
+    info.innerHTML = '<strong>' + (p.symbol||'') + '</strong> ' + (p.strategy||'') + '<br>'
+      + '\u5230\u671f: ' + (p.expiration||'N/A') + ' | \u53e3\u6578: ' + (p.quantity||1) + '<br>'
+      + 'Credit: $' + (p.credit_received||0) + ' | Max Loss: $' + (p.max_loss||0);
+  }
+  document.getElementById('close-modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('close-modal').style.display = 'none';
+  closingPositionIndex = -1;
+}
+
+function closeModalDismiss(e) {
+  if (e.target === document.getElementById('close-modal')) closeModal();
+}
+
+function executeClosePosition() {
+  if (closingPositionIndex < 0 || !dashboardData) return;
+  const p = dashboardData.positions[closingPositionIndex];
+  const closeType = document.getElementById('close-type').value;
+  const closePrice = document.getElementById('close-price').value;
+  const closeNote = document.getElementById('close-note').value;
+  const payload = {
+    action: 'close_position',
+    symbol: p.symbol,
+    strategy: p.strategy,
+    close_type: closeType,
+    close_price: closePrice || 'market',
+    note: closeNote,
+    timestamp: new Date().toISOString()
+  };
+  // Send to n8n webhook
+  const webhookUrl = document.getElementById('webhook-url').value.replace('student-dashboard', 'student-close-position');
+  fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(r => r.json()).then(data => {
+    alert('\u2705 \u5e73\u5009\u6307\u4ee4\u5df2\u767c\u9001\uff01\n' + p.symbol + ' ' + p.strategy + '\n\u985e\u578b: ' + closeType);
+    // Remove from local data
+    dashboardData.positions.splice(closingPositionIndex, 1);
+    renderPositions(dashboardData.positions);
+    updateStats(dashboardData);
+    closeModal();
+  }).catch(e => {
+    alert('\u2705 \u5e73\u5009\u6307\u4ee4\u5df2\u8a18\u9304\uff08\u672c\u5730\u6a21\u5f0f\uff09\n' + p.symbol + ' ' + p.strategy);
+    dashboardData.positions.splice(closingPositionIndex, 1);
+    renderPositions(dashboardData.positions);
+    updateStats(dashboardData);
+    closeModal();
+  });
+}
+
 // === Toggle check ===
 function toggleCheck(el) {
   el.classList.toggle('checked');
   updateSummary();
+  g4UpdateOrderState();
 }
 
 // === Regime toggle ===
@@ -1237,11 +1873,12 @@ function calcEV(p) {
   const c = document.getElementById('positions-container');
   if (!c) return;
   if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">無持倉資料</div>'; return; }
-  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>部位</th><th>EV</th><th>Kelly</th><th>狀態</th></tr></thead><tbody id="pos-tbody">';
-  positions.forEach(p => {
+  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>部位</th><th>EV</th><th>Kelly</th><th>狀態</th><th>操作</th></tr></thead><tbody id="pos-tbody">';
+  positions.forEach((p, idx) => {
     const evData = calcEV(p);
     const evClass = evData.evNum > 0 ? 'green' : evData.evNum < 0 ? 'red' : '';
-    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + (p.quantity||'-') + '</td><td class="' + evClass + '">' + evData.ev + '</td><td>' + evData.kelly + '</td><td>' + (p.status||'-') + '</td></tr>';
+    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + (p.quantity||'-') + '</td><td class="' + evClass + '">' + evData.ev + '</td><td>' + evData.kelly + '</td><td>' + (p.status||'-') + '</td>';
+    html += '<td><button class="pos-close-btn profit" onclick="openCloseModal(' + idx + ')">\ud83d\udfe2 平倉</button></td></tr>';
   });
   html += '</tbody></table>';
   c.innerHTML = html;
@@ -2507,16 +3144,16 @@ function renderStudentTable(students) {
 
     let actions = '';
     if (status === 'pending') {
-      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus('' + s.id + '','active')">開通</button> ';
+      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus(\'' + s.id + '\',\'active\')">開通</button> ';
     } else if (status === 'active') {
-      actions += '<button class="btn-sm btn-suspend" onclick="updateStudentStatus('' + s.id + '','suspended')">停用</button> ';
+      actions += '<button class="btn-sm btn-suspend" onclick="updateStudentStatus(\'' + s.id + '\',\'suspended\')">停用</button> ';
     } else if (status === 'suspended') {
-      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus('' + s.id + '','active')">恢復</button> ';
+      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus(\'' + s.id + '\',\'active\')">恢復</button> ';
     }
     if (role === 'admin') {
-      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole('' + s.id + '','student')">設為學生</button>';
+      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole(\'' + s.id + '\',\'student\')">設為學生</button>';
     } else {
-      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole('' + s.id + '','admin')">設為管理員</button>';
+      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole(\'' + s.id + '\',\'admin\')">設為管理員</button>';
     }
 
     return '<tr><td>' + name + '</td><td>' + email + '</td><td>' + roleBadge + '</td><td>' + statusBadge + '</td><td>' + skool + '</td><td>' + date + '</td><td style="white-space:nowrap">' + actions + '</td></tr>';
