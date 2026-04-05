@@ -1,41 +1,73 @@
 {
-  "exported_at": "2026-04-06T03:47:00Z",
+  "exported_at": "2026-04-06T08:51:00Z",
   "version": "v3.4",
+  "release_tag": "v3.4",
+  "release_notes": "9項優化完成：財報日曆、支撐壓力對齊、Vega判斷、成交量確認、產業限制、Theta評估、推薦數限制、盤前盤後區分、勝率追蹤",
+  "optimizations_completed": 9,
+  "optimizations_total": 10,
+  "pending": ["DXLink WebSocket streaming (future upgrade)"],
+  "filter_layers": 21,
+  "data_sources": [
+    "Yahoo Finance (prices, RSI, MA20, MACD, support/resistance, volume, VIX)",
+    "tastytrade market-metrics (IVR, IVP, IV Index)",
+    "CBOE delayed quotes (Greeks, bid/ask, OI, volume)",
+    "Finnhub (earnings calendar)",
+    "Google Sheets (signal tracking & settlement)"
+  ],
   "workflows": [
     {
       "id": "94K8VLorR9VVxgd3",
       "slug": "ev-push-v3.4",
-      "name": "【正EV履約價推播】開盤後即時推播官方LINE",
+      "name": "【正EV履約價推播】v3.4 完整版",
       "active": true,
-      "nodes": 4
+      "schedule": "21:40 + 22:40 TW time",
+      "description": "Core engine: 21-layer filter → LINE/Telegram/Dashboard push",
+      "code_files": [
+        "ev-push-v3.4_code_in_javascript.js (Node1: data fetch + analysis + signal generation)",
+        "ev-push-v3.4_code_in_javascript1.js (Node2: formatting + output)"
+      ]
     },
     {
       "id": "3dNTt3IUZNSE0Mkm",
       "slug": "ev-signals-api",
       "name": "【正EV Signals API】Dashboard webhook",
       "active": true,
-      "nodes": 6
+      "endpoints": ["GET /webhook/ev-signals", "POST /webhook/ev-signals-update"],
+      "code_files": [
+        "ev-signals-api_build_response.js",
+        "ev-signals-api_store_signals.js"
+      ]
     },
     {
       "id": "NMM0ejwlcGKmOhKo",
       "slug": "ev-signal-tracking",
       "name": "【正EV勝率追蹤】Signal Tracking & Stats",
       "active": true,
-      "nodes": 8
+      "endpoints": ["POST /webhook/ev-signal-track", "GET /webhook/ev-signal-stats"],
+      "code_files": [
+        "ev-signal-tracking_build_rows.js",
+        "ev-signal-tracking_calc_stats.js"
+      ]
     },
     {
       "id": "o59CezursWELrfYa",
       "slug": "ev-auto-settle",
       "name": "【正EV自動結算】每日盤後 WIN/LOSS 判斷",
       "active": true,
-      "nodes": 4
+      "schedule": "Daily UTC 06:00 (TW 14:00)",
+      "code_files": [
+        "ev-auto-settle_settle_signals.js"
+      ]
     },
     {
       "id": "sFV6aCeC6AZt4hE2",
       "slug": "ev-weekly-report",
       "name": "【正EV週報】每週一自動勝率報告",
       "active": true,
-      "nodes": 3
+      "schedule": "Weekly Mon UTC 02:00 (TW 10:00)",
+      "code_files": [
+        "ev-weekly-report_build_report.js"
+      ]
     }
   ]
 }
