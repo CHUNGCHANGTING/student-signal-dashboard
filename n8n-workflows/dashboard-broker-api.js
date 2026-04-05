@@ -13,7 +13,7 @@
 const BROKER_WEBHOOKS = {
   order:    'https://chilldove.app.n8n.cloud/webhook/student-order',
   close:    'https://chilldove.app.n8n.cloud/webhook/student-close-position',
-  dashboard:'https://chilldove.app.n8n.cloud/webhook/student-dashboard',
+  dashboard:'https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard',
   bind:     'https://chilldove.app.n8n.cloud/webhook/student-bind-account'
 };
 
