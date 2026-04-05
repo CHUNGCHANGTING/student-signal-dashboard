@@ -1,0 +1,41 @@
+{
+  "exported_at": "2026-04-06T03:47:00Z",
+  "version": "v3.4",
+  "workflows": [
+    {
+      "id": "94K8VLorR9VVxgd3",
+      "slug": "ev-push-v3.4",
+      "name": "【正EV履約價推播】開盤後即時推播官方LINE",
+      "active": true,
+      "nodes": 4
+    },
+    {
+      "id": "3dNTt3IUZNSE0Mkm",
+      "slug": "ev-signals-api",
+      "name": "【正EV Signals API】Dashboard webhook",
+      "active": true,
+      "nodes": 6
+    },
+    {
+      "id": "NMM0ejwlcGKmOhKo",
+      "slug": "ev-signal-tracking",
+      "name": "【正EV勝率追蹤】Signal Tracking & Stats",
+      "active": true,
+      "nodes": 8
+    },
+    {
+      "id": "o59CezursWELrfYa",
+      "slug": "ev-auto-settle",
+      "name": "【正EV自動結算】每日盤後 WIN/LOSS 判斷",
+      "active": true,
+      "nodes": 4
+    },
+    {
+      "id": "sFV6aCeC6AZt4hE2",
+      "slug": "ev-weekly-report",
+      "name": "【正EV週報】每週一自動勝率報告",
+      "active": true,
+      "nodes": 3
+    }
+  ]
+}

@@ -1,0 +1,377 @@
+{
+  "updatedAt": "2026-04-05T18:50:42.815Z",
+  "createdAt": "2026-04-05T18:50:30.097Z",
+  "id": "3dNTt3IUZNSE0Mkm",
+  "name": "【正EV Signals API】Dashboard webhook",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "webhook-get-1",
+      "name": "GET Signals",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "ev-signals",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "ev-signals-get"
+    },
+    {
+      "id": "code-get-1",
+      "name": "Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// ev-signals webhook: return latest EV signals\nconst staticData = $getWorkflowStaticData('global');\nconst signals = staticData.latestSignals || { timestamp: null, signals: [], summary: { symbolCount: 0, totalSignals: 0 } };\n\n// Add CORS headers\nreturn [{\n  json: {\n    ...signals,\n    _served_at: new Date().toISOString(),\n    _endpoint: 'ev-signals'\n  }\n}];\n"
+      }
+    },
+    {
+      "id": "respond-get-1",
+      "name": "Respond GET",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "webhook-post-1",
+      "name": "POST Update",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "path": "ev-signals-update",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "ev-signals-post"
+    },
+    {
+      "id": "code-post-1",
+      "name": "Store Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// ev-signals-update: store new signals from 正EV推播\nconst body = $input.first().json.body || $input.first().json;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.latestSignals = {\n  timestamp: body.timestamp || new Date().toISOString(),\n  signals: body.signals || [],\n  summary: body.summary || {},\n  raw: body.raw || [],\n};\n\nreturn [{ json: { status: 'ok', stored: (body.signals || []).length, timestamp: new Date().toISOString() } }];\n"
+      }
+    },
+    {
+      "id": "respond-post-1",
+      "name": "Respond POST",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        200
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "GET Signals": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Respond GET",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Update": {
+      "main": [
+        [
+          {
+            "node": "Store Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Signals": {
+      "main": [
+        [
+          {
+            "node": "Respond POST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "global": {}
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "9d0db1c4-7ef4-476f-b36c-99883a19a929",
+  "activeVersionId": "9d0db1c4-7ef4-476f-b36c-99883a19a929",
+  "versionCounter": 5,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-04-05T18:50:30.101Z",
+      "createdAt": "2026-04-05T18:50:30.101Z",
+      "role": "workflow:owner",
+      "workflowId": "3dNTt3IUZNSE0Mkm",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-05T18:50:30.134Z",
+    "createdAt": "2026-04-05T18:50:30.134Z",
+    "versionId": "9d0db1c4-7ef4-476f-b36c-99883a19a929",
+    "workflowId": "3dNTt3IUZNSE0Mkm",
+    "nodes": [
+      {
+        "id": "webhook-get-1",
+        "name": "GET Signals",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "path": "ev-signals",
+          "httpMethod": "GET",
+          "responseMode": "responseNode",
+          "options": {
+            "allowedOrigins": "*"
+          }
+        },
+        "webhookId": "ev-signals-get"
+      },
+      {
+        "id": "code-get-1",
+        "name": "Build Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          200,
+          0
+        ],
+        "parameters": {
+          "jsCode": "// ev-signals webhook: return latest EV signals\nconst staticData = $getWorkflowStaticData('global');\nconst signals = staticData.latestSignals || { timestamp: null, signals: [], summary: { symbolCount: 0, totalSignals: 0 } };\n\n// Add CORS headers\nreturn [{\n  json: {\n    ...signals,\n    _served_at: new Date().toISOString(),\n    _endpoint: 'ev-signals'\n  }\n}];\n"
+        }
+      },
+      {
+        "id": "respond-get-1",
+        "name": "Respond GET",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          400,
+          0
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                },
+                {
+                  "name": "Access-Control-Allow-Methods",
+                  "value": "GET, POST, OPTIONS"
+                },
+                {
+                  "name": "Access-Control-Allow-Headers",
+                  "value": "Content-Type"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "webhook-post-1",
+        "name": "POST Update",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {
+          "path": "ev-signals-update",
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "webhookId": "ev-signals-post"
+      },
+      {
+        "id": "code-post-1",
+        "name": "Store Signals",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          200,
+          200
+        ],
+        "parameters": {
+          "jsCode": "// ev-signals-update: store new signals from 正EV推播\nconst body = $input.first().json.body || $input.first().json;\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.latestSignals = {\n  timestamp: body.timestamp || new Date().toISOString(),\n  signals: body.signals || [],\n  summary: body.summary || {},\n  raw: body.raw || [],\n};\n\nreturn [{ json: { status: 'ok', stored: (body.signals || []).length, timestamp: new Date().toISOString() } }];\n"
+        }
+      },
+      {
+        "id": "respond-post-1",
+        "name": "Respond POST",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          400,
+          200
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "GET Signals": {
+        "main": [
+          [
+            {
+              "node": "Build Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Response": {
+        "main": [
+          [
+            {
+              "node": "Respond GET",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "POST Update": {
+        "main": [
+          [
+            {
+              "node": "Store Signals",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Store Signals": {
+        "main": [
+          [
+            {
+              "node": "Respond POST",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-05T18:50:43.207Z",
+        "id": 374,
+        "workflowId": "3dNTt3IUZNSE0Mkm",
+        "versionId": "9d0db1c4-7ef4-476f-b36c-99883a19a929",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}

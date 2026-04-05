@@ -1,0 +1,533 @@
+{
+  "updatedAt": "2026-04-05T19:41:24.555Z",
+  "createdAt": "2026-04-05T19:41:24.555Z",
+  "id": "NMM0ejwlcGKmOhKo",
+  "name": "【正EV勝率追蹤】Signal Tracking & Stats",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "wh-write-1",
+      "name": "Receive Signals",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "ev-signal-track",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "ev-signal-track"
+    },
+    {
+      "id": "code-write-1",
+      "name": "Build Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// 接收正EV推播的信號，寫入 Google Sheet signal_tracking 分頁\nconst body = $input.first().json.body || $input.first().json;\nconst signals = body.signals || [];\nconst tracking = body.tracking || {};\nconst raw = body.raw || [];\n\nif (signals.length === 0) {\n  return [{ json: { status: 'no_signals', timestamp: new Date().toISOString() } }];\n}\n\n// 為每筆信號建立追蹤記錄\nconst rows = [];\nfor (const sig of signals) {\n  // 找到對應的 raw 數據\n  const rawSym = raw.find(r => r.ticker === sig.symbol) || {};\n  const spreads = rawSym.spreads || [];\n  const matchSpread = spreads.find(s => s.strategy === sig.strategy) || {};\n\n  rows.push({\n    tracking_id: tracking.id || `sig-${Date.now()}`,\n    push_time: tracking.pushTime || new Date().toISOString(),\n    symbol: sig.symbol,\n    strategy: sig.strategy,\n    module: sig.module,\n    direction: sig.bias || rawSym.direction || '',\n    direction_score: rawSym.directionScore || 0,\n    market_regime: tracking.marketRegime || '',\n    vix: tracking.vix || '',\n    \n    // 技術面快照\n    rsi: rawSym.rsi || '',\n    ma20: rawSym.ma20 || '',\n    macd_cross: rawSym.macd?.cross || '',\n    iv_skew: rawSym.ivSkew || '',\n    ivr: rawSym.ivr || '',\n    support: rawSym.support || '',\n    resistance: rawSym.resistance || '',\n    volume_ratio: rawSym.volumeRatio || '',\n    volume_spike: rawSym.volumeSpike || false,\n    \n    // 策略參數\n    short_strike: matchSpread.shortStrike || sig.short_strike || '',\n    long_strike: matchSpread.longStrike || sig.long_strike || '',\n    dte: matchSpread.dte || '',\n    exp_date: matchSpread.expDate || '',\n    credit: sig.credit_received || matchSpread.credit || '',\n    debit: sig.debit_paid || matchSpread.debit || '',\n    ev: matchSpread.ev || '',\n    kelly: matchSpread.kelly || '',\n    win_rate: matchSpread.winRate || '',\n    delta: matchSpread.shortDelta || '',\n    take_profit: matchSpread.takeProfit || '',\n    stop_loss: matchSpread.stopLoss || '',\n    support_aligned: matchSpread.supportAligned || false,\n    resistance_aligned: matchSpread.resistanceAligned || false,\n    vega_note: matchSpread.vegaNote || '',\n    \n    // 結果（待填入）\n    outcome: '',           // WIN / LOSS / STOPPED / EXPIRED\n    actual_pnl: '',        // 實際盈虧\n    exit_price: '',        // 出場價格\n    exit_date: '',         // 出場日期\n    exit_reason: '',       // 止盈/止損/到期/手動\n    days_held: '',         // 持有天數\n    \n    // 版本\n    version: 'v3.4',\n  });\n}\n\nreturn rows.map(r => ({ json: r }));\n"
+      }
+    },
+    {
+      "id": "sheet-write-1",
+      "name": "Write to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        400,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "list",
+          "cachedResultName": "Options Dashboard Data"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "signal_tracking",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-write-1",
+      "name": "Respond Write",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'ok', rows: $items().length } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "wh-stats-1",
+      "name": "GET Stats",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "path": "ev-signal-stats",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "ev-signal-stats"
+    },
+    {
+      "id": "sheet-read-all",
+      "name": "Read All Signals",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "list",
+          "cachedResultName": "Options Dashboard Data"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "signal_tracking",
+          "mode": "name"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "code-stats-1",
+      "name": "Calc Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// 計算各層的信號正確率\nconst allSignals = $('Read All Signals').all().map(i => i.json);\nconst settled = allSignals.filter(s => s.outcome && s.outcome !== '');\nconst wins = settled.filter(s => s.outcome === 'WIN');\nconst losses = settled.filter(s => s.outcome === 'LOSS' || s.outcome === 'STOPPED');\n\nconst total = settled.length;\nconst winCount = wins.length;\nconst lossCount = losses.length;\nconst winRate = total > 0 ? (winCount / total * 100).toFixed(1) : 'N/A';\n\n// 按策略分組\nconst byStrategy = {};\nfor (const s of settled) {\n  const key = s.strategy || 'unknown';\n  if (!byStrategy[key]) byStrategy[key] = { wins: 0, losses: 0, total: 0, totalPnl: 0 };\n  byStrategy[key].total++;\n  if (s.outcome === 'WIN') byStrategy[key].wins++;\n  else byStrategy[key].losses++;\n  byStrategy[key].totalPnl += parseFloat(s.actual_pnl) || 0;\n}\n\n// 按方向分組\nconst byDirection = {};\nfor (const s of settled) {\n  const key = s.direction || 'unknown';\n  if (!byDirection[key]) byDirection[key] = { wins: 0, losses: 0, total: 0 };\n  byDirection[key].total++;\n  if (s.outcome === 'WIN') byDirection[key].wins++;\n  else byDirection[key].losses++;\n}\n\n// 按 market regime 分組\nconst byRegime = {};\nfor (const s of settled) {\n  const key = s.market_regime || 'unknown';\n  if (!byRegime[key]) byRegime[key] = { wins: 0, losses: 0, total: 0 };\n  byRegime[key].total++;\n  if (s.outcome === 'WIN') byRegime[key].wins++;\n  else byRegime[key].losses++;\n}\n\n// 各篩選條件的正確率\nconst filterAccuracy = {\n  support_aligned: { yes: { w: 0, l: 0 }, no: { w: 0, l: 0 } },\n  volume_spike: { yes: { w: 0, l: 0 }, no: { w: 0, l: 0 } },\n  vega_favorable: { yes: { w: 0, l: 0 }, no: { w: 0, l: 0 } },\n};\n\nfor (const s of settled) {\n  const isWin = s.outcome === 'WIN';\n  // 支撐對齊\n  const sa = s.support_aligned === true || s.support_aligned === 'true';\n  filterAccuracy.support_aligned[sa ? 'yes' : 'no'][isWin ? 'w' : 'l']++;\n  // 成交量爆量\n  const vs = s.volume_spike === true || s.volume_spike === 'true';\n  filterAccuracy.volume_spike[vs ? 'yes' : 'no'][isWin ? 'w' : 'l']++;\n  // Vega 效益\n  const vf = (s.vega_note || '').includes('✅');\n  filterAccuracy.vega_favorable[vf ? 'yes' : 'no'][isWin ? 'w' : 'l']++;\n}\n\nreturn [{ json: {\n  summary: {\n    total_signals: allSignals.length,\n    settled: total,\n    pending: allSignals.length - total,\n    wins: winCount,\n    losses: lossCount,\n    win_rate: winRate + '%',\n    total_pnl: settled.reduce((sum, s) => sum + (parseFloat(s.actual_pnl) || 0), 0).toFixed(2),\n  },\n  by_strategy: Object.entries(byStrategy).map(([k, v]) => ({\n    strategy: k, ...v, winRate: (v.wins / v.total * 100).toFixed(1) + '%'\n  })),\n  by_direction: Object.entries(byDirection).map(([k, v]) => ({\n    direction: k, ...v, winRate: (v.wins / v.total * 100).toFixed(1) + '%'\n  })),\n  by_regime: Object.entries(byRegime).map(([k, v]) => ({\n    regime: k, ...v, winRate: (v.wins / v.total * 100).toFixed(1) + '%'\n  })),\n  filter_accuracy: filterAccuracy,\n  generated_at: new Date().toISOString(),\n} }];\n"
+      }
+    },
+    {
+      "id": "respond-stats-1",
+      "name": "Respond Stats",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        600,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Signals": {
+      "main": [
+        [
+          {
+            "node": "Build Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rows": {
+      "main": [
+        [
+          {
+            "node": "Write to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Stats": {
+      "main": [
+        [
+          {
+            "node": "Read All Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Signals": {
+      "main": [
+        [
+          {
+            "node": "Calc Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calc Stats": {
+      "main": [
+        [
+          {
+            "node": "Respond Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "d4b93ab9-d747-48c7-9057-5e57b99e93de",
+  "activeVersionId": "d4b93ab9-d747-48c7-9057-5e57b99e93de",
+  "versionCounter": 3,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-04-05T19:41:24.558Z",
+      "createdAt": "2026-04-05T19:41:24.558Z",
+      "role": "workflow:owner",
+      "workflowId": "NMM0ejwlcGKmOhKo",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-05T19:41:24.583Z",
+    "createdAt": "2026-04-05T19:41:24.583Z",
+    "versionId": "d4b93ab9-d747-48c7-9057-5e57b99e93de",
+    "workflowId": "NMM0ejwlcGKmOhKo",
+    "nodes": [
+      {
+        "id": "wh-write-1",
+        "name": "Receive Signals",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "path": "ev-signal-track",
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "webhookId": "ev-signal-track"
+      },
+      {
+        "id": "code-write-1",
+        "name": "Build Rows",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          200,
+          0
+        ],
+        "parameters": {
+          "jsCode": "// 接收正EV推播的信號，寫入 Google Sheet signal_tracking 分頁\nconst body = $input.first().json.body || $input.first().json;\nconst signals = body.signals || [];\nconst tracking = body.tracking || {};\nconst raw = body.raw || [];\n\nif (signals.length === 0) {\n  return [{ json: { status: 'no_signals', timestamp: new Date().toISOString() } }];\n}\n\n// 為每筆信號建立追蹤記錄\nconst rows = [];\nfor (const sig of signals) {\n  // 找到對應的 raw 數據\n  const rawSym = raw.find(r => r.ticker === sig.symbol) || {};\n  const spreads = rawSym.spreads || [];\n  const matchSpread = spreads.find(s => s.strategy === sig.strategy) || {};\n\n  rows.push({\n    tracking_id: tracking.id || `sig-${Date.now()}`,\n    push_time: tracking.pushTime || new Date().toISOString(),\n    symbol: sig.symbol,\n    strategy: sig.strategy,\n    module: sig.module,\n    direction: sig.bias || rawSym.direction || '',\n    direction_score: rawSym.directionScore || 0,\n    market_regime: tracking.marketRegime || '',\n    vix: tracking.vix || '',\n    \n    // 技術面快照\n    rsi: rawSym.rsi || '',\n    ma20: rawSym.ma20 || '',\n    macd_cross: rawSym.macd?.cross || '',\n    iv_skew: rawSym.ivSkew || '',\n    ivr: rawSym.ivr || '',\n    support: rawSym.support || '',\n    resistance: rawSym.resistance || '',\n    volume_ratio: rawSym.volumeRatio || '',\n    volume_spike: rawSym.volumeSpike || false,\n    \n    // 策略參數\n    short_strike: matchSpread.shortStrike || sig.short_strike || '',\n    long_strike: matchSpread.longStrike || sig.long_strike || '',\n    dte: matchSpread.dte || '',\n    exp_date: matchSpread.expDate || '',\n    credit: sig.credit_received || matchSpread.credit || '',\n    debit: sig.debit_paid || matchSpread.debit || '',\n    ev: matchSpread.ev || '',\n    kelly: matchSpread.kelly || '',\n    win_rate: matchSpread.winRate || '',\n    delta: matchSpread.shortDelta || '',\n    take_profit: matchSpread.takeProfit || '',\n    stop_loss: matchSpread.stopLoss || '',\n    support_aligned: matchSpread.supportAligned || false,\n    resistance_aligned: matchSpread.resistanceAligned || false,\n    vega_note: matchSpread.vegaNote || '',\n    \n    // 結果（待填入）\n    outcome: '',           // WIN / LOSS / STOPPED / EXPIRED\n    actual_pnl: '',        // 實際盈虧\n    exit_price: '',        // 出場價格\n    exit_date: '',         // 出場日期\n    exit_reason: '',       // 止盈/止損/到期/手動\n    days_held: '',         // 持有天數\n    \n    // 版本\n    version: 'v3.4',\n  });\n}\n\nreturn rows.map(r => ({ json: r }));\n"
+        }
+      },
+      {
+        "id": "sheet-write-1",
+        "name": "Write to Sheet",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          400,
+          0
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        },
+        "parameters": {
+          "operation": "appendOrUpdate",
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "list",
+            "cachedResultName": "Options Dashboard Data"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "signal_tracking",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {}
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "respond-write-1",
+        "name": "Respond Write",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          600,
+          0
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { status: 'ok', rows: $items().length } }}",
+          "options": {}
+        }
+      },
+      {
+        "id": "wh-stats-1",
+        "name": "GET Stats",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          300
+        ],
+        "parameters": {
+          "path": "ev-signal-stats",
+          "httpMethod": "GET",
+          "responseMode": "responseNode",
+          "options": {
+            "allowedOrigins": "*"
+          }
+        },
+        "webhookId": "ev-signal-stats"
+      },
+      {
+        "id": "sheet-read-all",
+        "name": "Read All Signals",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          200,
+          300
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        },
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "list",
+            "cachedResultName": "Options Dashboard Data"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "signal_tracking",
+            "mode": "name"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "code-stats-1",
+        "name": "Calc Stats",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          400,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// 計算各層的信號正確率\nconst allSignals = $('Read All Signals').all().map(i => i.json);\nconst settled = allSignals.filter(s => s.outcome && s.outcome !== '');\nconst wins = settled.filter(s => s.outcome === 'WIN');\nconst losses = settled.filter(s => s.outcome === 'LOSS' || s.outcome === 'STOPPED');\n\nconst total = settled.length;\nconst winCount = wins.length;\nconst lossCount = losses.length;\nconst winRate = total > 0 ? (winCount / total * 100).toFixed(1) : 'N/A';\n\n// 按策略分組\nconst byStrategy = {};\nfor (const s of settled) {\n  const key = s.strategy || 'unknown';\n  if (!byStrategy[key]) byStrategy[key] = { wins: 0, losses: 0, total: 0, totalPnl: 0 };\n  byStrategy[key].total++;\n  if (s.outcome === 'WIN') byStrategy[key].wins++;\n  else byStrategy[key].losses++;\n  byStrategy[key].totalPnl += parseFloat(s.actual_pnl) || 0;\n}\n\n// 按方向分組\nconst byDirection = {};\nfor (const s of settled) {\n  const key = s.direction || 'unknown';\n  if (!byDirection[key]) byDirection[key] = { wins: 0, losses: 0, total: 0 };\n  byDirection[key].total++;\n  if (s.outcome === 'WIN') byDirection[key].wins++;\n  else byDirection[key].losses++;\n}\n\n// 按 market regime 分組\nconst byRegime = {};\nfor (const s of settled) {\n  const key = s.market_regime || 'unknown';\n  if (!byRegime[key]) byRegime[key] = { wins: 0, losses: 0, total: 0 };\n  byRegime[key].total++;\n  if (s.outcome === 'WIN') byRegime[key].wins++;\n  else byRegime[key].losses++;\n}\n\n// 各篩選條件的正確率\nconst filterAccuracy = {\n  support_aligned: { yes: { w: 0, l: 0 }, no: { w: 0, l: 0 } },\n  volume_spike: { yes: { w: 0, l: 0 }, no: { w: 0, l: 0 } },\n  vega_favorable: { yes: { w: 0, l: 0 }, no: { w: 0, l: 0 } },\n};\n\nfor (const s of settled) {\n  const isWin = s.outcome === 'WIN';\n  // 支撐對齊\n  const sa = s.support_aligned === true || s.support_aligned === 'true';\n  filterAccuracy.support_aligned[sa ? 'yes' : 'no'][isWin ? 'w' : 'l']++;\n  // 成交量爆量\n  const vs = s.volume_spike === true || s.volume_spike === 'true';\n  filterAccuracy.volume_spike[vs ? 'yes' : 'no'][isWin ? 'w' : 'l']++;\n  // Vega 效益\n  const vf = (s.vega_note || '').includes('✅');\n  filterAccuracy.vega_favorable[vf ? 'yes' : 'no'][isWin ? 'w' : 'l']++;\n}\n\nreturn [{ json: {\n  summary: {\n    total_signals: allSignals.length,\n    settled: total,\n    pending: allSignals.length - total,\n    wins: winCount,\n    losses: lossCount,\n    win_rate: winRate + '%',\n    total_pnl: settled.reduce((sum, s) => sum + (parseFloat(s.actual_pnl) || 0), 0).toFixed(2),\n  },\n  by_strategy: Object.entries(byStrategy).map(([k, v]) => ({\n    strategy: k, ...v, winRate: (v.wins / v.total * 100).toFixed(1) + '%'\n  })),\n  by_direction: Object.entries(byDirection).map(([k, v]) => ({\n    direction: k, ...v, winRate: (v.wins / v.total * 100).toFixed(1) + '%'\n  })),\n  by_regime: Object.entries(byRegime).map(([k, v]) => ({\n    regime: k, ...v, winRate: (v.wins / v.total * 100).toFixed(1) + '%'\n  })),\n  filter_accuracy: filterAccuracy,\n  generated_at: new Date().toISOString(),\n} }];\n"
+        }
+      },
+      {
+        "id": "respond-stats-1",
+        "name": "Respond Stats",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          600,
+          300
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Receive Signals": {
+        "main": [
+          [
+            {
+              "node": "Build Rows",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Rows": {
+        "main": [
+          [
+            {
+              "node": "Write to Sheet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write to Sheet": {
+        "main": [
+          [
+            {
+              "node": "Respond Write",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GET Stats": {
+        "main": [
+          [
+            {
+              "node": "Read All Signals",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read All Signals": {
+        "main": [
+          [
+            {
+              "node": "Calc Stats",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calc Stats": {
+        "main": [
+          [
+            {
+              "node": "Respond Stats",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-05T19:41:24.993Z",
+        "id": 381,
+        "workflowId": "NMM0ejwlcGKmOhKo",
+        "versionId": "d4b93ab9-d747-48c7-9057-5e57b99e93de",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,339 @@
+{
+  "updatedAt": "2026-04-05T19:43:58.846Z",
+  "createdAt": "2026-04-05T19:43:58.846Z",
+  "id": "o59CezursWELrfYa",
+  "name": "【正EV自動結算】每日盤後 WIN/LOSS 判斷",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "sched-settle",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 6 * * 2-6"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sheet-read-open",
+      "name": "Read Open Signals",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "list",
+          "cachedResultName": "Options Dashboard Data"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "signal_tracking",
+          "mode": "name"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "code-settle",
+      "name": "Settle Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// 每日盤後自動結算 — 讀取未結信號，查到期價格，判斷 WIN/LOSS\n// 觸發時間：台北 06:00（美股收盤後1小時）\n// ═══════════════════════════════════════════════════════\n\nconst openSignals = $('Read Open Signals').all().map(i => i.json);\nconst today = new Date().toISOString().slice(0, 10);\nconst debugLog = [];\n\nfunction log(msg) { debugLog.push(`[${new Date().toISOString()}] ${msg}`); }\nlog(`開始結算 — 共 ${openSignals.length} 筆信號`);\n\n// 過濾需要結算的信號：outcome 為空 + 有到期日\nconst pending = openSignals.filter(s => \n  !s.outcome && s.exp_date && s.symbol && s.strategy\n);\nlog(`待結算: ${pending.length} 筆`);\n\nif (pending.length === 0) {\n  return [{ json: { status: 'no_pending', date: today, total: openSignals.length, debugLog } }];\n}\n\n// 收集需要查價的 symbols\nconst symbolsToCheck = [...new Set(pending.map(s => s.symbol))];\nlog(`需查價標的: ${symbolsToCheck.join(', ')}`);\n\n// 批量從 Yahoo Finance 查收盤價\nconst priceMap = {};\nfor (const sym of symbolsToCheck) {\n  try {\n    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`;\n    const data = await this.helpers.httpRequest({\n      method: 'GET', url,\n      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },\n    });\n    const result = data?.chart?.result?.[0];\n    if (result) {\n      const timestamps = result.timestamp || [];\n      const closes = result.indicators?.quote?.[0]?.close || [];\n      // Build date→price map\n      for (let i = 0; i < timestamps.length; i++) {\n        if (closes[i] != null) {\n          const d = new Date(timestamps[i] * 1000).toISOString().slice(0, 10);\n          priceMap[`${sym}_${d}`] = closes[i];\n        }\n      }\n      // Also store latest price\n      const validCloses = closes.filter(c => c != null);\n      priceMap[sym] = validCloses[validCloses.length - 1];\n      log(`${sym}: 最新收盤 $${priceMap[sym]?.toFixed(2)}`);\n    }\n  } catch(e) {\n    log(`${sym}: Yahoo Finance error — ${e.message}`);\n  }\n}\n\n// 結算每筆信號\nconst updates = [];\nconst now = new Date();\n\nfor (const sig of pending) {\n  const expDate = sig.exp_date;\n  const symbol = sig.symbol;\n  const strategy = sig.strategy;\n  const shortStrike = parseFloat(sig.short_strike) || 0;\n  const longStrike = parseFloat(sig.long_strike) || 0;\n  const credit = parseFloat(sig.credit) || 0;\n  const debit = parseFloat(sig.debit) || 0;\n  const stopLoss = parseFloat(sig.stop_loss) || 0;\n  const takeProfit = parseFloat(sig.take_profit) || 0;\n  const pushTime = sig.push_time || sig.created_at || '';\n\n  // 到期日的收盤價\n  const expPrice = priceMap[`${symbol}_${expDate}`] || null;\n  // 今天的收盤價\n  const currentPrice = priceMap[symbol] || null;\n  \n  // 判斷是否已到期\n  const isExpired = today >= expDate;\n  \n  // 判斷是否觸發止損（用今天的價格近似）\n  // Credit spread: 如果標的跌破 short strike（PCS）或漲破 short strike（CCS），接近止損\n  // 更精確的判斷需要選擇權即時報價，這裡用標的價格近似\n  \n  let outcome = '';\n  let actualPnl = 0;\n  let exitReason = '';\n  let exitPrice = '';\n  let exitDate = '';\n\n  if (isExpired && expPrice) {\n    // ─── 到期結算 ───\n    exitDate = expDate;\n    exitPrice = expPrice.toFixed(2);\n    \n    if (strategy === 'Bull Put Spread' || strategy === 'Put Credit Spread') {\n      // PCS: WIN if expPrice > shortStrike\n      if (expPrice > shortStrike) {\n        outcome = 'WIN';\n        actualPnl = credit; // 保留全部 credit\n        exitReason = `到期價$${expPrice.toFixed(2)} > 賣腿$${shortStrike} → 全額獲利`;\n      } else if (expPrice <= longStrike) {\n        outcome = 'LOSS';\n        actualPnl = -(shortStrike - longStrike - credit); // max loss\n        exitReason = `到期價$${expPrice.toFixed(2)} ≤ 買腿$${longStrike} → 最大虧損`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -(shortStrike - expPrice) + credit; // partial loss\n        exitReason = `到期價$${expPrice.toFixed(2)} 在兩腿之間 → 部分虧損`;\n      }\n    }\n    else if (strategy === 'Bear Call Spread' || strategy === 'Call Credit Spread') {\n      // CCS: WIN if expPrice < shortStrike\n      if (expPrice < shortStrike) {\n        outcome = 'WIN';\n        actualPnl = credit;\n        exitReason = `到期價$${expPrice.toFixed(2)} < 賣腿$${shortStrike} → 全額獲利`;\n      } else if (expPrice >= longStrike) {\n        outcome = 'LOSS';\n        actualPnl = -(longStrike - shortStrike - credit);\n        exitReason = `到期價$${expPrice.toFixed(2)} ≥ 買腿$${longStrike} → 最大虧損`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -(expPrice - shortStrike) + credit;\n        exitReason = `到期價$${expPrice.toFixed(2)} 在兩腿之間 → 部分虧損`;\n      }\n    }\n    else if (strategy === 'Bull Call Spread' || strategy === 'Call Debit Spread') {\n      // BCS debit: WIN if expPrice > longStrike + debit (breakeven)\n      const breakeven = longStrike + debit;\n      if (expPrice > longStrike) {\n        const gain = Math.min(expPrice - longStrike, shortStrike - longStrike) - debit;\n        outcome = gain > 0 ? 'WIN' : 'LOSS';\n        actualPnl = gain;\n        exitReason = `到期價$${expPrice.toFixed(2)} ${gain > 0 ? '>' : '<'} 損益兩平$${breakeven.toFixed(2)}`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -debit; // lose full debit\n        exitReason = `到期價$${expPrice.toFixed(2)} < 買腿$${longStrike} → 全額虧損`;\n      }\n    }\n    else if (strategy === 'Bear Put Spread' || strategy === 'Put Debit Spread') {\n      // BPS debit: WIN if expPrice < longStrike - debit\n      const breakeven = longStrike - debit;\n      if (expPrice < longStrike) {\n        const gain = Math.min(longStrike - expPrice, longStrike - shortStrike) - debit;\n        outcome = gain > 0 ? 'WIN' : 'LOSS';\n        actualPnl = gain;\n        exitReason = `到期價$${expPrice.toFixed(2)} ${gain > 0 ? '<' : '>'} 損益兩平$${breakeven.toFixed(2)}`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -debit;\n        exitReason = `到期價$${expPrice.toFixed(2)} > 買腿$${longStrike} → 全額虧損`;\n      }\n    }\n    else if (strategy === 'Iron Condor') {\n      // IC: WIN if expPrice between put short and call short\n      const putShort = parseFloat(sig.put_short_strike || sig.short_strike) || 0;\n      const callShort = parseFloat(sig.call_short_strike || sig.long_strike) || 0;\n      if (expPrice > putShort && expPrice < callShort) {\n        outcome = 'WIN';\n        actualPnl = credit;\n        exitReason = `到期價$${expPrice.toFixed(2)} 在翼內(${putShort}~${callShort}) → 全額獲利`;\n      } else {\n        outcome = 'LOSS';\n        const width = parseFloat(sig.max_loss) || 0;\n        actualPnl = -(width > 0 ? width : credit * 2);\n        exitReason = `到期價$${expPrice.toFixed(2)} 突破翼外 → 虧損`;\n      }\n    }\n\n    const daysHeld = Math.round((new Date(expDate) - new Date(pushTime)) / 86400000);\n    \n    updates.push({\n      ...sig,\n      outcome,\n      actual_pnl: actualPnl.toFixed(2),\n      exit_price: exitPrice,\n      exit_date: exitDate,\n      exit_reason: exitReason,\n      days_held: daysHeld,\n    });\n    \n    log(`${symbol} ${strategy}: ${outcome} | P&L $${actualPnl.toFixed(2)} | ${exitReason}`);\n  }\n  else if (!isExpired && currentPrice) {\n    // ─── 未到期：檢查是否應該觸發止損 ───\n    // 這裡只做標記，不自動結算（因為沒有選擇權即時報價）\n    // 但可以計算「標的距離 short strike 的百分比」作為預警\n    const distPct = shortStrike > 0 ? Math.abs(currentPrice - shortStrike) / shortStrike * 100 : 0;\n    if (distPct < 3) {\n      log(`⚠️ ${symbol} ${strategy}: 標的$${currentPrice.toFixed(2)} 距賣腿$${shortStrike} 僅${distPct.toFixed(1)}%`);\n    }\n  }\n}\n\nlog(`結算完成: ${updates.length} 筆更新`);\n\nif (updates.length === 0) {\n  return [{ json: { status: 'no_expirations_today', date: today, pending: pending.length, debugLog } }];\n}\n\nreturn updates.map(u => ({ json: u }));\n"
+      }
+    },
+    {
+      "id": "sheet-update",
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        600,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "list",
+          "cachedResultName": "Options Dashboard Data"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "signal_tracking",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Open Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Open Signals": {
+      "main": [
+        [
+          {
+            "node": "Settle Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settle Signals": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "2de97e44-e501-4b74-a875-d4091ad0f1be",
+  "activeVersionId": "2de97e44-e501-4b74-a875-d4091ad0f1be",
+  "versionCounter": 4,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-05T19:43:58.848Z",
+      "createdAt": "2026-04-05T19:43:58.848Z",
+      "role": "workflow:owner",
+      "workflowId": "o59CezursWELrfYa",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-05T19:43:58.872Z",
+    "createdAt": "2026-04-05T19:43:58.872Z",
+    "versionId": "2de97e44-e501-4b74-a875-d4091ad0f1be",
+    "workflowId": "o59CezursWELrfYa",
+    "nodes": [
+      {
+        "id": "sched-settle",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 0 6 * * 2-6"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "sheet-read-open",
+        "name": "Read Open Signals",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          200,
+          0
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        },
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "list",
+            "cachedResultName": "Options Dashboard Data"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "signal_tracking",
+            "mode": "name"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "code-settle",
+        "name": "Settle Signals",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          400,
+          0
+        ],
+        "parameters": {
+          "jsCode": "// ═══════════════════════════════════════════════════════\n// 每日盤後自動結算 — 讀取未結信號，查到期價格，判斷 WIN/LOSS\n// 觸發時間：台北 06:00（美股收盤後1小時）\n// ═══════════════════════════════════════════════════════\n\nconst openSignals = $('Read Open Signals').all().map(i => i.json);\nconst today = new Date().toISOString().slice(0, 10);\nconst debugLog = [];\n\nfunction log(msg) { debugLog.push(`[${new Date().toISOString()}] ${msg}`); }\nlog(`開始結算 — 共 ${openSignals.length} 筆信號`);\n\n// 過濾需要結算的信號：outcome 為空 + 有到期日\nconst pending = openSignals.filter(s => \n  !s.outcome && s.exp_date && s.symbol && s.strategy\n);\nlog(`待結算: ${pending.length} 筆`);\n\nif (pending.length === 0) {\n  return [{ json: { status: 'no_pending', date: today, total: openSignals.length, debugLog } }];\n}\n\n// 收集需要查價的 symbols\nconst symbolsToCheck = [...new Set(pending.map(s => s.symbol))];\nlog(`需查價標的: ${symbolsToCheck.join(', ')}`);\n\n// 批量從 Yahoo Finance 查收盤價\nconst priceMap = {};\nfor (const sym of symbolsToCheck) {\n  try {\n    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`;\n    const data = await this.helpers.httpRequest({\n      method: 'GET', url,\n      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },\n    });\n    const result = data?.chart?.result?.[0];\n    if (result) {\n      const timestamps = result.timestamp || [];\n      const closes = result.indicators?.quote?.[0]?.close || [];\n      // Build date→price map\n      for (let i = 0; i < timestamps.length; i++) {\n        if (closes[i] != null) {\n          const d = new Date(timestamps[i] * 1000).toISOString().slice(0, 10);\n          priceMap[`${sym}_${d}`] = closes[i];\n        }\n      }\n      // Also store latest price\n      const validCloses = closes.filter(c => c != null);\n      priceMap[sym] = validCloses[validCloses.length - 1];\n      log(`${sym}: 最新收盤 $${priceMap[sym]?.toFixed(2)}`);\n    }\n  } catch(e) {\n    log(`${sym}: Yahoo Finance error — ${e.message}`);\n  }\n}\n\n// 結算每筆信號\nconst updates = [];\nconst now = new Date();\n\nfor (const sig of pending) {\n  const expDate = sig.exp_date;\n  const symbol = sig.symbol;\n  const strategy = sig.strategy;\n  const shortStrike = parseFloat(sig.short_strike) || 0;\n  const longStrike = parseFloat(sig.long_strike) || 0;\n  const credit = parseFloat(sig.credit) || 0;\n  const debit = parseFloat(sig.debit) || 0;\n  const stopLoss = parseFloat(sig.stop_loss) || 0;\n  const takeProfit = parseFloat(sig.take_profit) || 0;\n  const pushTime = sig.push_time || sig.created_at || '';\n\n  // 到期日的收盤價\n  const expPrice = priceMap[`${symbol}_${expDate}`] || null;\n  // 今天的收盤價\n  const currentPrice = priceMap[symbol] || null;\n  \n  // 判斷是否已到期\n  const isExpired = today >= expDate;\n  \n  // 判斷是否觸發止損（用今天的價格近似）\n  // Credit spread: 如果標的跌破 short strike（PCS）或漲破 short strike（CCS），接近止損\n  // 更精確的判斷需要選擇權即時報價，這裡用標的價格近似\n  \n  let outcome = '';\n  let actualPnl = 0;\n  let exitReason = '';\n  let exitPrice = '';\n  let exitDate = '';\n\n  if (isExpired && expPrice) {\n    // ─── 到期結算 ───\n    exitDate = expDate;\n    exitPrice = expPrice.toFixed(2);\n    \n    if (strategy === 'Bull Put Spread' || strategy === 'Put Credit Spread') {\n      // PCS: WIN if expPrice > shortStrike\n      if (expPrice > shortStrike) {\n        outcome = 'WIN';\n        actualPnl = credit; // 保留全部 credit\n        exitReason = `到期價$${expPrice.toFixed(2)} > 賣腿$${shortStrike} → 全額獲利`;\n      } else if (expPrice <= longStrike) {\n        outcome = 'LOSS';\n        actualPnl = -(shortStrike - longStrike - credit); // max loss\n        exitReason = `到期價$${expPrice.toFixed(2)} ≤ 買腿$${longStrike} → 最大虧損`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -(shortStrike - expPrice) + credit; // partial loss\n        exitReason = `到期價$${expPrice.toFixed(2)} 在兩腿之間 → 部分虧損`;\n      }\n    }\n    else if (strategy === 'Bear Call Spread' || strategy === 'Call Credit Spread') {\n      // CCS: WIN if expPrice < shortStrike\n      if (expPrice < shortStrike) {\n        outcome = 'WIN';\n        actualPnl = credit;\n        exitReason = `到期價$${expPrice.toFixed(2)} < 賣腿$${shortStrike} → 全額獲利`;\n      } else if (expPrice >= longStrike) {\n        outcome = 'LOSS';\n        actualPnl = -(longStrike - shortStrike - credit);\n        exitReason = `到期價$${expPrice.toFixed(2)} ≥ 買腿$${longStrike} → 最大虧損`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -(expPrice - shortStrike) + credit;\n        exitReason = `到期價$${expPrice.toFixed(2)} 在兩腿之間 → 部分虧損`;\n      }\n    }\n    else if (strategy === 'Bull Call Spread' || strategy === 'Call Debit Spread') {\n      // BCS debit: WIN if expPrice > longStrike + debit (breakeven)\n      const breakeven = longStrike + debit;\n      if (expPrice > longStrike) {\n        const gain = Math.min(expPrice - longStrike, shortStrike - longStrike) - debit;\n        outcome = gain > 0 ? 'WIN' : 'LOSS';\n        actualPnl = gain;\n        exitReason = `到期價$${expPrice.toFixed(2)} ${gain > 0 ? '>' : '<'} 損益兩平$${breakeven.toFixed(2)}`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -debit; // lose full debit\n        exitReason = `到期價$${expPrice.toFixed(2)} < 買腿$${longStrike} → 全額虧損`;\n      }\n    }\n    else if (strategy === 'Bear Put Spread' || strategy === 'Put Debit Spread') {\n      // BPS debit: WIN if expPrice < longStrike - debit\n      const breakeven = longStrike - debit;\n      if (expPrice < longStrike) {\n        const gain = Math.min(longStrike - expPrice, longStrike - shortStrike) - debit;\n        outcome = gain > 0 ? 'WIN' : 'LOSS';\n        actualPnl = gain;\n        exitReason = `到期價$${expPrice.toFixed(2)} ${gain > 0 ? '<' : '>'} 損益兩平$${breakeven.toFixed(2)}`;\n      } else {\n        outcome = 'LOSS';\n        actualPnl = -debit;\n        exitReason = `到期價$${expPrice.toFixed(2)} > 買腿$${longStrike} → 全額虧損`;\n      }\n    }\n    else if (strategy === 'Iron Condor') {\n      // IC: WIN if expPrice between put short and call short\n      const putShort = parseFloat(sig.put_short_strike || sig.short_strike) || 0;\n      const callShort = parseFloat(sig.call_short_strike || sig.long_strike) || 0;\n      if (expPrice > putShort && expPrice < callShort) {\n        outcome = 'WIN';\n        actualPnl = credit;\n        exitReason = `到期價$${expPrice.toFixed(2)} 在翼內(${putShort}~${callShort}) → 全額獲利`;\n      } else {\n        outcome = 'LOSS';\n        const width = parseFloat(sig.max_loss) || 0;\n        actualPnl = -(width > 0 ? width : credit * 2);\n        exitReason = `到期價$${expPrice.toFixed(2)} 突破翼外 → 虧損`;\n      }\n    }\n\n    const daysHeld = Math.round((new Date(expDate) - new Date(pushTime)) / 86400000);\n    \n    updates.push({\n      ...sig,\n      outcome,\n      actual_pnl: actualPnl.toFixed(2),\n      exit_price: exitPrice,\n      exit_date: exitDate,\n      exit_reason: exitReason,\n      days_held: daysHeld,\n    });\n    \n    log(`${symbol} ${strategy}: ${outcome} | P&L $${actualPnl.toFixed(2)} | ${exitReason}`);\n  }\n  else if (!isExpired && currentPrice) {\n    // ─── 未到期：檢查是否應該觸發止損 ───\n    // 這裡只做標記，不自動結算（因為沒有選擇權即時報價）\n    // 但可以計算「標的距離 short strike 的百分比」作為預警\n    const distPct = shortStrike > 0 ? Math.abs(currentPrice - shortStrike) / shortStrike * 100 : 0;\n    if (distPct < 3) {\n      log(`⚠️ ${symbol} ${strategy}: 標的$${currentPrice.toFixed(2)} 距賣腿$${shortStrike} 僅${distPct.toFixed(1)}%`);\n    }\n  }\n}\n\nlog(`結算完成: ${updates.length} 筆更新`);\n\nif (updates.length === 0) {\n  return [{ json: { status: 'no_expirations_today', date: today, pending: pending.length, debugLog } }];\n}\n\nreturn updates.map(u => ({ json: u }));\n"
+        }
+      },
+      {
+        "id": "sheet-update",
+        "name": "Update Sheet",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          600,
+          0
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        },
+        "parameters": {
+          "operation": "appendOrUpdate",
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "list",
+            "cachedResultName": "Options Dashboard Data"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "signal_tracking",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {}
+          },
+          "options": {
+            "cellFormat": "USER_ENTERED"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Read Open Signals",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Open Signals": {
+        "main": [
+          [
+            {
+              "node": "Settle Signals",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Settle Signals": {
+        "main": [
+          [
+            {
+              "node": "Update Sheet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-05T19:43:59.286Z",
+        "id": 384,
+        "workflowId": "o59CezursWELrfYa",
+        "versionId": "2de97e44-e501-4b74-a875-d4091ad0f1be",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}
