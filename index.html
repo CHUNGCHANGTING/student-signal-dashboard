@@ -719,7 +719,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
     <!-- Path 2: Stripe Payment -->
     <div class="activation-card stripe">
-      <h3>💳 付費訂閱 <span class="badge-price">STRIPE_MONTHLY_PRICE/月</span></h3>
+      <h3>💳 付費訂閱</h3>
       <p>不是 Skool 會員？可以直接訂閱使用 Options Strategy Engine</p>
       <div class="stripe-features">
         <span>即時訊號推播</span>
@@ -727,7 +727,10 @@ a, button, [role=button] { transition: color var(--transition), background var(-
         <span>AI 風控判斷</span>
         <span>學生持倉 Dashboard</span>
       </div>
-      <button class="btn-stripe" onclick="goToStripePayment()">前往付費</button>
+      <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3)">
+        <button class="btn-stripe" style="flex:1" onclick="goToStripePayment('monthly')">月費 US$99/月</button>
+        <button class="btn-stripe" style="flex:1;background:var(--color-primary)" onclick="goToStripePayment('yearly')">年費 US$999/年 <span style="font-size:10px;opacity:0.8">省 $189</span></button>
+      </div>
       <div class="stripe-secure">安全付款由 Stripe 處理 🔒</div>
     </div>
 
@@ -2571,8 +2574,12 @@ async function verifySkoolMember() {
   }
 }
 
-function goToStripePayment() {
-  const paymentUrl = 'STRIPE_PAYMENT_LINK_PLACEHOLDER';
+function goToStripePayment(plan) {
+  const links = {
+    monthly: 'https://buy.stripe.com/7sYaER5L32Vg350c00dfG0Z',
+    yearly: 'https://buy.stripe.com/3cIeV71uN53obCk7JKdfG10'
+  };
+  const paymentUrl = links[plan] || links.monthly;
   const url = paymentUrl + '?client_reference_id=' + encodeURIComponent(currentUser.id) + '&prefilled_email=' + encodeURIComponent(currentUser.email);
   window.open(url, '_blank');
 }
