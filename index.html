@@ -245,6 +245,36 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .load-status.ok { color: var(--color-success); }
 .load-status.err { color: var(--color-error); }
 .section-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); }
+/* Signal Payload Panel */
+.sp-panel { margin-bottom: var(--space-5); }
+.sp-toggle { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); font-size: var(--text-sm); font-weight: 600; color: var(--color-text); cursor: pointer; transition: background var(--transition), border-color var(--transition); }
+.sp-toggle:hover { background: var(--color-surface-dynamic); border-color: var(--color-primary); }
+.sp-toggle .sp-arrow { margin-left: auto; transition: transform var(--transition); font-size: var(--text-xs); color: var(--color-text-muted); }
+.sp-toggle.open .sp-arrow { transform: rotate(180deg); }
+.sp-body { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.25s ease; opacity: 0; }
+.sp-body.open { max-height: 2000px; opacity: 1; }
+.sp-inner { padding: var(--space-4) 0; }
+.sp-textarea { width: 100%; min-height: 5rem; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: var(--text-xs); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); color: var(--color-text); resize: vertical; line-height: 1.5; tab-size: 2; }
+.sp-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-highlight); }
+.sp-textarea::placeholder { color: var(--color-text-faint); }
+.sp-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap; }
+.sp-result { margin-top: var(--space-4); border-radius: var(--radius-lg); border: 1px solid var(--color-border); background: var(--color-surface); overflow: hidden; animation: spFadeIn 0.3s ease; }
+@keyframes spFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.sp-result-header { padding: var(--space-3) var(--space-4); font-size: var(--text-sm); font-weight: 700; display: flex; align-items: center; gap: var(--space-2); }
+.sp-result-header.approved { background: var(--color-success-highlight); color: var(--color-success); }
+.sp-result-header.blocked { background: var(--color-error-highlight); color: var(--color-error); }
+.sp-result-header.review { background: var(--color-warning-highlight); color: var(--color-warning); }
+.sp-result-header.unknown { background: var(--color-surface-offset); color: var(--color-text-muted); }
+.sp-result-body { padding: var(--space-3) 0; }
+.sp-result-body .param-table { margin: 0; }
+.sp-decision-badge { font-size: var(--text-xs); font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-left: auto; }
+.sp-decision-badge.approved { background: var(--color-success); color: #fff; }
+.sp-decision-badge.blocked { background: var(--color-error); color: #fff; }
+.sp-decision-badge.review { background: var(--color-warning); color: #fff; }
+/* Highlight classes for module cards & strategy rows */
+.module-card.sp-highlight { box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md); border-color: var(--color-primary); }
+.strategy-row.sp-highlight { background: var(--color-primary-highlight); border-color: var(--color-primary); }
+.regime-card.sp-highlight { box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md); border-color: var(--color-primary); }
 @media (max-width: 768px) {
   .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .sidebar { display: none; }
@@ -254,6 +284,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   .summary-bar { grid-column: 1/-1; flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .positions-table { font-size: 11px; }
+  .sp-actions { flex-direction: column; }
 }
 </style>
 </head>
@@ -298,435 +329,768 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- GATE 0: 策略分流 -->
 <section class="gate" id="gate0">
 <div class="gate-header"><div class="gate-num g0">0</div><div><div class="gate-title">策略分流</div><div class="gate-subtitle">先選戰術，再用對應規則 — 不先決定這件事，後面所有條件都會互相打架</div></div></div>
+<!-- Signal Payload 自動判斷 Panel -->
+<div class="sp-panel" id="sp-panel">
+  <button class="sp-toggle" id="sp-toggle" onclick="toggleSignalPanel()">
+    <span>📋 貼上訊號自動判斷</span>
+    <span class="sp-arrow">▼</span>
+  </button>
+  <div class="sp-body" id="sp-body">
+    <div class="sp-inner">
+      <textarea class="sp-textarea" id="sp-textarea" placeholder='貼上訊號 JSON，例如：&#10;{"strategy":"IC","symbol":"SPX","dte":35,"ivRank":52,"regime":"range","delta_short":0.16}' rows="4"></textarea>
+      <div class="sp-actions">
+        <button class="btn-primary" onclick="analyzeSignalPayload()">🔍 分析</button>
+        <button class="btn-secondary" onclick="clearSignalPanel()">清除</button>
+        <button class="btn-secondary" onclick="loadSamplePayload('IC')">範例 IC</button>
+        <button class="btn-secondary" onclick="loadSamplePayload('BCDS')">範例 BCDS</button>
+        <button class="btn-secondary" onclick="loadSamplePayload('BPCS')">範例 BPCS</button>
+      </div>
+      <div id="sp-result"></div>
+    </div>
+  </div>
+</div>
 <div class="module-grid">
-  <div class="module-card income"><h3><span class="module-icon income">收</span> 收租模組</h3>
-    <div class="strategy-list">
-      <div class="strategy-row"><span class="strategy-tag tag-ic">IC</span><div><div class="strategy-desc">Iron Condor</div><div class="strategy-cond">→ <span>中性偏震盪 + IVR ≥ 30 + SPX/QQQ (IC_INDEX) 或個股 (IC_EQUITY)</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bpcs">BPCS</span><div><div class="strategy-desc">Bull Put Credit Spread</div><div class="strategy-cond">→ <span>偏多 + 非強趨勢 + IVR ≥ 27</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bccs">BCCS</span><div><div class="strategy-desc">Bear Call Credit Spread</div><div class="strategy-cond">→ <span>偏空 + 非崩跌 + IVR ≥ 27</span></div></div></div>
-    </div>
-  </div>
-  <div class="module-card offense"><h3><span class="module-icon offense">攻</span> 進攻模組</h3>
-    <div class="strategy-list">
-      <div class="strategy-row"><span class="strategy-tag tag-bcds">BCDS</span><div><div class="strategy-desc">Bull Call Debit Spread</div><div class="strategy-cond">→ <span>偏多突破 + IV 低到中 + 趨勢確認</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bpds">BPDS</span><div><div class="strategy-desc">Bear Put Debit Spread</div><div class="strategy-cond">→ <span>偏空跌破 + IV 低到中 + 趨勢確認</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-cv">CV</span><div><div class="strategy-desc">Credit Vertical（次要）</div><div class="strategy-cond">→ <span>IV 很高 + 方向極明確 + 個股</span></div></div></div>
-    </div>
+<div class="module-card income" id="card-income">
+  <h3><span class="module-icon income">收</span> 收租模組 Income</h3>
+  <div class="strategy-list">
+    <div class="strategy-row" id="row-IC"><span class="strategy-tag tag-ic">IC</span><div><div class="strategy-desc">Iron Condor — 區間震盪，雙向收租</div><div class="strategy-cond">VIX <span>15–30</span>｜IVR <span>≥40</span>｜Regime <span>Range / Mild</span></div></div></div>
+    <div class="strategy-row" id="row-BPCS"><span class="strategy-tag tag-bpcs">BPCS</span><div><div class="strategy-desc">Bull Put Credit Spread — 偏多收租</div><div class="strategy-cond">趨勢偏多，支撐明確｜IVR <span>≥35</span></div></div></div>
+    <div class="strategy-row" id="row-BCCS"><span class="strategy-tag tag-bccs">BCCS</span><div><div class="strategy-desc">Bear Call Credit Spread — 偏空收租</div><div class="strategy-cond">趨勢偏空，壓力明確｜IVR <span>≥35</span></div></div></div>
   </div>
 </div>
+<div class="module-card offense" id="card-offense">
+  <h3><span class="module-icon offense">攻</span> 進攻模組 Offense</h3>
+  <div class="strategy-list">
+    <div class="strategy-row" id="row-BCDS"><span class="strategy-tag tag-bcds">BCDS</span><div><div class="strategy-desc">Bull Call Debit Spread — 強勢突破做多</div><div class="strategy-cond">趨勢明確向上｜IVR <span>≤50</span>｜動能確認</div></div></div>
+    <div class="strategy-row" id="row-BPDS"><span class="strategy-tag tag-bpds">BPDS</span><div><div class="strategy-desc">Bear Put Debit Spread — 強勢突破做空</div><div class="strategy-cond">趨勢明確向下｜IVR <span>≤50</span>｜動能確認</div></div></div>
+    <div class="strategy-row" id="row-CV"><span class="strategy-tag tag-cv">CV</span><div><div class="strategy-desc">Credit Vertical — 次要，特定條件限用</div><div class="strategy-cond">IV 結構扭曲｜風報比 <span>≥1:2</span></div></div></div>
+  </div>
+</div>
+</div>
+<div class="info-block note"><p><strong>分流邏輯：</strong>先看大盤 Regime（趨勢/區間/高波動），再對照 IVR 水位，最後選策略模組。收租模組優先，進攻模組作為補充。每次交易只選一個主策略。</p></div>
+<!-- Regime Matrix -->
+<div class="section-title">📊 Regime × 策略矩陣</div>
 <div class="regime-grid">
-  <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-success)">SPX / QQQ</div><div class="regime-tags"><span class="rt tag-ic">IC_INDEX</span><span class="rt tag-bpcs">BPCS_INDEX</span><span class="rt tag-bccs">BCCS_INDEX</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">收租</div></div>
-  <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-orange)">個股</div><div class="regime-tags"><span class="rt tag-ic">IC_EQUITY</span><span class="rt tag-bpcs">BPCS_EQUITY</span><span class="rt tag-bccs">BCCS_EQUITY</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">收租</div><div class="regime-tags" style="margin-top:var(--space-2)"><span class="rt tag-bcds">BCDS</span><span class="rt tag-bpds">BPDS</span><span class="rt tag-cv">CV</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">進攻</div></div>
-  <div class="regime-card"><div class="regime-label">主要禁止</div><div class="regime-name" style="color:var(--color-error)">混用規則</div><div class="regime-tags"><span class="rt" style="background:var(--color-error-highlight);color:var(--color-error)">SPX收租模組 ≠ 個股進攻模組</span></div></div>
+  <div class="regime-card" id="regime-range"><div class="regime-label">Regime</div><div class="regime-name">區間震盪</div><div class="regime-tags"><span class="rt tag-ic">IC</span><span class="rt tag-bpcs">BPCS</span><span class="rt tag-bccs">BCCS</span></div></div>
+  <div class="regime-card" id="regime-bull"><div class="regime-label">Regime</div><div class="regime-name">多頭趨勢</div><div class="regime-tags"><span class="rt tag-bpcs">BPCS</span><span class="rt tag-bcds">BCDS</span></div></div>
+  <div class="regime-card" id="regime-bear"><div class="regime-label">Regime</div><div class="regime-name">空頭趨勢</div><div class="regime-tags"><span class="rt tag-bccs">BCCS</span><span class="rt tag-bpds">BPDS</span></div></div>
+  <div class="regime-card" id="regime-highvol"><div class="regime-label">Regime</div><div class="regime-name">高波動</div><div class="regime-tags"><span class="rt tag-bpcs">BPCS</span><span class="rt tag-bccs">BCCS</span><span class="rt tag-cv">CV</span></div></div>
+  <div class="regime-card" id="regime-mild"><div class="regime-label">Regime</div><div class="regime-name">溫和上漲</div><div class="regime-tags"><span class="rt tag-ic">IC</span><span class="rt tag-bpcs">BPCS</span></div></div>
+  <div class="regime-card" id="regime-event"><div class="regime-label">Regime</div><div class="regime-name">事件前夕</div><div class="regime-tags"><span style="font-size:10px;color:var(--color-text-faint)">暫停進場</span></div></div>
 </div>
-<div class="info-block note"><p><strong>n8n 對應：</strong>Code node 第一步 <code>pickModule()</code> 根據 <code>strategy</code> + <code>is_index</code> 自動分流：IRON_CONDOR → IC_INDEX / IC_EQUITY、BULL_PUT_CREDIT_SPREAD → BPCS_INDEX / BPCS_EQUITY、BEAR_CALL_CREDIT_SPREAD → BCCS_INDEX / BCCS_EQUITY。若 <code>resolved_module === 'unknown'</code>，<code>module_resolved</code> 為 false，整筆會在 IF node 被濾掉。</p></div>
 </section>
-<!-- GATE 1-4 簡化版 -->
+<!-- GATE 1: 盤前訊號 -->
 <section class="gate" id="gate1" style="display:none">
-<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號</div><div class="gate-subtitle">regime 判斷、篩選條件、事件風險排除</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件，或在本地開啟 <code>options-strategy-engine.html</code> 查看完整篩選條件表。</p></div>
-</section>
-<section class="gate" id="gate2" style="display:none">
-<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上確認 Delta、DTE、Wing 寬度、Credit/Width 比</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。包含 IC / Credit Spread / Debit Spread / CV 分頁籤參數表。</p></div>
-</section>
-<section class="gate" id="gate3" style="display:none">
-<div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位確認</div><div class="gate-subtitle">帳戶風險、相關性、BP使用率</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。</p></div>
-</section>
-<section class="gate" id="gate4" style="display:none">
-<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終核查清單與送單確認詞</div></div></div>
-<div class="checklist" id="gate4-checklist">
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">策略分流已完成</div><div class="check-detail">Module 已鎖定（收租 or 進攻）</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">盤前訊號確認</div><div class="check-detail">IVR / Regime / 事件風險已排除</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">TOS 試算完成</div><div class="check-detail">Delta / DTE / Credit / Width 符合標準</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">BP 使用率 ≤ 50%</div><div class="check-detail">單筆 BP ≤ 5%，總部位 BP ≤ 50%</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">相關性 ≤ 3 個標的</div><div class="check-detail">不重複押注同方向</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">停損點已設定</div><div class="check-detail">收租: 2×Credit / 進攻: 50% Debit</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">EV 為正</div><div class="check-detail">期望值 > 0，Kelly > 0%</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">送單確認詞唸出</div><div class="check-detail">「我已完成所有確認，這筆符合系統規則」</div></div>
-  </div>
+<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號確認</div><div class="gate-subtitle">進場前必須全部通過 — 任何一項紅燈即暫停</div></div></div>
+<div class="progress-label"><span>進度</span><span id="g1-progress-text">0 / 7</span></div>
+<div class="progress-bar"><div class="progress-fill" id="g1-progress-fill"></div></div>
+<div class="checklist" id="g1-checklist">
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">VIX 水位確認</div><div class="check-detail">VIX 15–35（收租）；VIX ≤ 50（進攻）；VIX > 35 時收租模組暫停</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">IVR / IVP 水位</div><div class="check-detail">收租：IVR ≥ 40 / IVP ≥ 50；進攻 Debit：IVR ≤ 50</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">大盤 Regime 確認</div><div class="check-detail">SPX / SPY 確認目前是趨勢、區間或高波動，對應第0關策略分流</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">近期重大事件排查</div><div class="check-detail">未來 5 個交易日內：Fed 會議、CPI、財報（成分股）→ 有則延後或縮小部位</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">DTE 範圍確認</div><div class="check-detail">IC / Credit：21–45 DTE；Debit Spread：14–30 DTE；避開到期日前 5 天進場</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">流動性確認</div><div class="check-detail">標的 OI > 500、Bid-Ask spread ≤ 0.10（SPX/SPY 可放寬至 ≤ 0.20）</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g1')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">帳戶可用保證金</div><div class="check-detail">單筆風險 ≤ 帳戶 2%；所有未平倉合計保證金 ≤ 帳戶 40%</div></div></div>
 </div>
-<div class="progress-label" style="margin-top:var(--space-4)"><span>確認進度</span><span id="gate4-progress-text">0 / 8</span></div>
-<div class="progress-bar"><div class="progress-fill" id="gate4-progress-fill"></div></div>
+</section>
+<!-- GATE 2: TOS 試算 -->
+<section class="gate" id="gate2" style="display:none">
+<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算 & 參數設定</div><div class="gate-subtitle">進 TOS 建倉前先對照下表，確認各項參數符合規格</div></div></div>
+<div class="param-tabs">
+  <button class="param-tab active" onclick="switchParamTab(this,'pt-ic')">Iron Condor</button>
+  <button class="param-tab" onclick="switchParamTab(this,'pt-bpcs')">BPCS</button>
+  <button class="param-tab" onclick="switchParamTab(this,'pt-bccs')">BCCS</button>
+  <button class="param-tab" onclick="switchParamTab(this,'pt-bcds')">BCDS</button>
+  <button class="param-tab" onclick="switchParamTab(this,'pt-bpds')">BPDS</button>
+</div>
+<div class="param-panel active" id="pt-ic">
+  <table class="param-table">
+    <thead><tr><th>參數</th><th>目標值</th><th>警戒值</th><th>停損值</th></tr></thead>
+    <tbody>
+      <tr><td>Short Delta</td><td class="val">0.15–0.20</td><td class="val-warn">> 0.22</td><td class="val-stop">> 0.25</td></tr>
+      <tr><td>Wing Width</td><td class="val">$5–$10（SPX $25–50）</td><td class="val-warn">< $5</td><td class="val-stop">–</td></tr>
+      <tr><td>Credit Received</td><td class="val">≥ Wing × 25%</td><td class="val-warn">< 20%</td><td class="val-stop">< 15%</td></tr>
+      <tr><td>Max Loss</td><td class="val">≤ 帳戶 2%</td><td class="val-warn">2–3%</td><td class="val-stop">> 3%</td></tr>
+      <tr><td>P50 / P75</td><td class="val">P50 ≥ 50%</td><td class="val-warn">P50 40–50%</td><td class="val-stop">P50 < 40%</td></tr>
+      <tr><td>出場目標</td><td class="val">50% 利潤了結</td><td class="val-warn">持倉至 21 DTE</td><td class="val-stop">損失 = 2× Credit</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="pt-bpcs">
+  <table class="param-table">
+    <thead><tr><th>參數</th><th>目標值</th><th>警戒值</th><th>停損值</th></tr></thead>
+    <tbody>
+      <tr><td>Short Put Delta</td><td class="val">0.25–0.35</td><td class="val-warn">> 0.38</td><td class="val-stop">> 0.40</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$10</td><td class="val-warn">< $5</td><td class="val-stop">–</td></tr>
+      <tr><td>Credit Received</td><td class="val">≥ Width × 30%</td><td class="val-warn">< 25%</td><td class="val-stop">< 20%</td></tr>
+      <tr><td>Max Loss</td><td class="val">≤ 帳戶 2%</td><td class="val-warn">2–3%</td><td class="val-stop">> 3%</td></tr>
+      <tr><td>出場目標</td><td class="val">50% 利潤 / 21 DTE</td><td class="val-warn">損失達 Credit × 1.5</td><td class="val-stop">損失 = 2× Credit</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="pt-bccs">
+  <table class="param-table">
+    <thead><tr><th>參數</th><th>目標值</th><th>警戒值</th><th>停損值</th></tr></thead>
+    <tbody>
+      <tr><td>Short Call Delta</td><td class="val">0.25–0.35</td><td class="val-warn">> 0.38</td><td class="val-stop">> 0.40</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$10</td><td class="val-warn">< $5</td><td class="val-stop">–</td></tr>
+      <tr><td>Credit Received</td><td class="val">≥ Width × 30%</td><td class="val-warn">< 25%</td><td class="val-stop">< 20%</td></tr>
+      <tr><td>Max Loss</td><td class="val">≤ 帳戶 2%</td><td class="val-warn">2–3%</td><td class="val-stop">> 3%</td></tr>
+      <tr><td>出場目標</td><td class="val">50% 利潤 / 21 DTE</td><td class="val-warn">損失達 Credit × 1.5</td><td class="val-stop">損失 = 2× Credit</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="pt-bcds">
+  <table class="param-table">
+    <thead><tr><th>參數</th><th>目標值</th><th>警戒值</th><th>停損值</th></tr></thead>
+    <tbody>
+      <tr><td>Long Call Delta</td><td class="val">0.40–0.55</td><td class="val-warn">< 0.38</td><td class="val-stop">< 0.35</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$15</td><td class="val-warn">< $5</td><td class="val-stop">–</td></tr>
+      <tr><td>Debit Paid</td><td class="val">≤ Width × 50%</td><td class="val-warn">50–60%</td><td class="val-stop">> 60%</td></tr>
+      <tr><td>Max Loss</td><td class="val">≤ 帳戶 1.5%</td><td class="val-warn">1.5–2%</td><td class="val-stop">> 2%</td></tr>
+      <tr><td>出場目標</td><td class="val">獲利 80% / 動能消失</td><td class="val-warn">損失 50% Debit</td><td class="val-stop">損失 = 全部 Debit</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="pt-bpds">
+  <table class="param-table">
+    <thead><tr><th>參數</th><th>目標值</th><th>警戒值</th><th>停損值</th></tr></thead>
+    <tbody>
+      <tr><td>Long Put Delta</td><td class="val">-0.40 ~ -0.55</td><td class="val-warn">> -0.38</td><td class="val-stop">> -0.35</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$15</td><td class="val-warn">< $5</td><td class="val-stop">–</td></tr>
+      <tr><td>Debit Paid</td><td class="val">≤ Width × 50%</td><td class="val-warn">50–60%</td><td class="val-stop">> 60%</td></tr>
+      <tr><td>Max Loss</td><td class="val">≤ 帳戶 1.5%</td><td class="val-warn">1.5–2%</td><td class="val-stop">> 2%</td></tr>
+      <tr><td>出場目標</td><td class="val">獲利 80% / 動能消失</td><td class="val-warn">損失 50% Debit</td><td class="val-stop">損失 = 全部 Debit</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+<!-- GATE 3: 部位確認 -->
+<section class="gate" id="gate3" style="display:none">
+<div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位 & 風控確認</div><div class="gate-subtitle">送單前最後一道防線 — 確保整體帳戶風險在控制內</div></div></div>
+<div class="progress-label"><span>進度</span><span id="g3-progress-text">0 / 6</span></div>
+<div class="progress-bar"><div class="progress-fill" id="g3-progress-fill"></div></div>
+<div class="checklist" id="g3-checklist">
+  <div class="check-item" onclick="toggleCheck(this,'g3')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">單筆最大損失確認</div><div class="check-detail">此筆最大損失 ≤ 帳戶淨值 2%（Debit Spread ≤ 1.5%）</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g3')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">總保證金佔用</div><div class="check-detail">加入此筆後，所有未平倉合計保證金 ≤ 帳戶 40%</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g3')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">同標的重複曝險</div><div class="check-detail">同一標的持倉 ≤ 2 筆；方向不得重疊（不能同時 BPCS + BCDS 同標的）</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g3')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">月度虧損上限</div><div class="check-detail">本月已實現虧損 < 帳戶 6%；若已達 4% 則縮小部位至 50%</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g3')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">Greeks 整體敞口</div><div class="check-detail">Portfolio Delta 淨值 < ±0.30（收租目標接近 Delta 中性）</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g3')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">出場計畫已設定</div><div class="check-detail">目標價位、停損條件、最長持倉時間三項已明確，TOS 條件單已掛好</div></div></div>
+</div>
+</section>
+<!-- GATE 4: 人工確認送單 -->
+<section class="gate" id="gate4" style="display:none">
+<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終送單確認 — 口頭覆誦交易計畫，確認無誤後執行</div></div></div>
 <div class="confirm-box">
-  <div class="confirm-title">🔒 送單確認詞</div>
-  <div class="confirm-phrase">「我已完成所有確認，這筆符合系統規則」</div>
-  <div class="forbidden-list">
-    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可「感覺今天會漲」就進場</div>
-    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可跳過 IVR 閾值</div>
-    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可在財報 / FOMC 前進場</div>
-    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可超出 BP 上限</div>
-    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可用收租邏輯做進攻部位</div>
+  <div class="confirm-title">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg>
+    送單前口頭確認短語
   </div>
+  <div class="confirm-phrase">「我知道我的最大風險是 ＿＿＿，我接受這個損失」</div>
+  <div class="info-block note" style="margin-bottom:0"><p>覆誦這句話，填入實際金額。若說不出口或感到猶豫，<strong>請勿送單</strong>。</p></div>
+</div>
+<div class="section-divider"></div>
+<div class="section-title">🚫 絕對禁止清單</div>
+<div class="forbidden-list">
+  <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>裸賣 Call / Put（無保護腿）</div>
+  <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>財報發布當天進場（含前後各1天）</div>
+  <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>VIX > 40 時做收租策略</div>
+  <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>DTE < 7 時新建倉位</div>
+  <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>情緒化加碼（追損、報復性交易）</div>
+  <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>未設停損條件單直接送出</div>
+</div>
+<div class="section-divider"></div>
+<div class="section-title">📋 送單 Checklist</div>
+<div class="progress-label"><span>進度</span><span id="g4-progress-text">0 / 5</span></div>
+<div class="progress-bar"><div class="progress-fill" id="g4-progress-fill"></div></div>
+<div class="checklist" id="g4-checklist">
+  <div class="check-item" onclick="toggleCheck(this,'g4')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">口頭覆誦完成</div><div class="check-detail">已說出確認短語，金額明確</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g4')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">TOS 訂單細節覆核</div><div class="check-detail">標的、方向、數量、執行價、到期日 — 全部正確</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g4')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">停損條件單已掛</div><div class="check-detail">GTC 條件單設定完成，觸發條件與停損金額正確</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g4')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">交易日誌已預填</div><div class="check-detail">日誌欄位：策略/標的/方向/Credit or Debit/預期出場條件</div></div></div>
+  <div class="check-item" onclick="toggleCheck(this,'g4')"><div class="check-box"><svg class="check-icon" width="10" height="10" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="currentColor" stroke-width="2" fill="none"/></svg></div><div class="check-content"><div class="check-label">送單</div><div class="check-detail">確認以上全部完成後，點擊 TOS「Send Order」</div></div></div>
 </div>
 </section>
 <!-- Live Dashboard -->
 <section class="live-section" id="live-dashboard" style="display:none">
 <div class="live-topbar">
   <div>
-    <h2 class="section-title">📊 即時持倉 Dashboard</h2>
-    <div class="live-status"><div class="live-dot" id="live-dot"></div><span id="live-time">未連線</span></div>
+    <div class="section-title" style="margin-bottom:4px">📊 即時持倉 Dashboard</div>
+    <div class="live-status"><div class="live-dot" id="live-dot"></div><span id="live-status-text">離線 — 請載入資料</span></div>
   </div>
   <div class="live-actions">
-    <button class="btn-secondary" onclick="loadDemo()">載入範例</button>
-    <button class="btn-primary" onclick="loadWebhook()">🔄 刷新</button>
-    <button class="btn-excel" onclick="exportExcel()">📥 匯出 CSV</button>
+    <button class="btn-excel" onclick="exportToExcel()">⬇ 匯出 Excel</button>
+    <button class="btn-primary" onclick="refreshDashboard()">↺ 刷新</button>
+    <button class="btn-secondary" onclick="clearDashboard()">清除</button>
   </div>
 </div>
+<!-- Load Box -->
 <div class="load-box">
-  <label>Webhook URL（n8n GET endpoint）</label>
-  <input type="text" id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-positions" placeholder="https://...">
-  <label>或貼上 JSON 資料</label>
-  <textarea id="json-input" placeholder='{"positions":[...],"signals":[...],"risk":{}}'></textarea>
+  <label>載入方式 A — 貼上 JSON 資料</label>
+  <textarea id="json-input" placeholder='[{"symbol":"SPX","strategy":"IC","expiry":"2025-08-15","short_call":5650,"long_call":5700,"short_put":5200,"long_put":5150,"credit":4.80,"qty":1,"status":"active"}]'></textarea>
   <div class="load-row">
-    <button class="btn-primary" onclick="loadWebhook()">載入 Webhook</button>
-    <button class="btn-secondary" onclick="parseJSON()">解析 JSON</button>
-    <button class="btn-secondary" onclick="loadDemo()">載入範例資料</button>
+    <button class="btn-primary" onclick="loadJSON()">載入 JSON</button>
+    <button class="btn-secondary" onclick="loadSample()">載入範例</button>
   </div>
   <div class="load-status" id="load-status"></div>
 </div>
-<div class="stats-grid">
-  <div class="stat-card"><div class="stat-label">持倉數</div><div class="stat-value" id="stat-pos">—</div><div class="stat-sub">Active Positions</div></div>
-  <div class="stat-card"><div class="stat-label">新訊號</div><div class="stat-value" id="stat-sig">—</div><div class="stat-sub">Pending Signals</div></div>
-  <div class="stat-card"><div class="stat-label">風險預算使用</div><div class="stat-value" id="stat-risk">—</div><div class="stat-sub">Risk Budget Used</div></div>
-  <div class="stat-card"><div class="stat-label">未實現損益</div><div class="stat-value" id="stat-pnl">—</div><div class="stat-sub">Unrealized P&L</div></div>
+<!-- Stats -->
+<div class="stats-grid" id="stats-grid">
+  <div class="stat-card"><div class="stat-label">總持倉數</div><div class="stat-value" id="stat-count">—</div><div class="stat-sub">筆進場中</div><div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-count" style="width:0%"></div></div></div>
+  <div class="stat-card"><div class="stat-label">未實現損益</div><div class="stat-value" id="stat-pnl">—</div><div class="stat-sub">USD</div><div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-pnl" style="width:0%;background:var(--color-success)"></div></div></div>
+  <div class="stat-card"><div class="stat-label">保證金佔用</div><div class="stat-value" id="stat-margin">—</div><div class="stat-sub">佔帳戶 %</div><div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-margin" style="width:0%;background:var(--color-warning)"></div></div></div>
+  <div class="stat-card"><div class="stat-label">最高風險部位</div><div class="stat-value" id="stat-risk">—</div><div class="stat-sub">需注意</div><div class="stat-bar"><div class="stat-bar-fill" id="stat-bar-risk" style="width:0%;background:var(--color-error)"></div></div></div>
 </div>
-<div class="section-title">📋 持倉列表</div>
-<div id="positions-container"><div style="text-align:center;padding:2rem;color:var(--color-text-faint)">尚未載入資料</div></div>
-<div class="section-title" style="margin-top:var(--space-6)">⚡ 訊號審核</div>
-<div id="signals-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
-<div class="section-title" style="margin-top:var(--space-6)">💰 風險概覽</div>
-<div id="risk-container"></div>
-<div class="section-title" style="margin-top:var(--space-6)">📬 建議下單</div>
-<div id="orders-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
+<!-- Positions Table -->
+<div class="section-title">持倉明細</div>
+<table class="positions-table" id="positions-table">
+  <thead><tr><th>標的</th><th>策略</th><th>模組</th><th>到期</th><th>執行價</th><th>Credit/Debit</th><th>EV%</th><th>狀態</th></tr></thead>
+  <tbody id="positions-body"><tr><td colspan="8" style="text-align:center;color:var(--color-text-faint);padding:2rem">尚無資料 — 請載入 JSON 或使用範例</td></tr></tbody>
+</table>
+<!-- Risk Alerts -->
+<div id="risk-alerts"></div>
+<!-- Signal Queue -->
+<div class="section-title">訊號佇列（待審核）</div>
+<div id="signal-queue"><div style="color:var(--color-text-faint);font-size:var(--text-xs)">尚無待審核訊號</div></div>
 </section>
-<!-- Strategy detail pages (simplified) -->
-<section class="gate" id="s-ic" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">IC</div><div><div class="gate-title">Iron Condor</div><div class="gate-subtitle">SPX / QQQ 專用 • IVR ≥ 30</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bpcs" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BPCS</div><div><div class="gate-title">Bull Put Credit Spread</div><div class="gate-subtitle">SPX/QQQ • IVR ≥ 27</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bccs" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BCCS</div><div><div class="gate-title">Bear Call Credit Spread</div><div class="gate-subtitle">SPX/QQQ • IVR ≥ 27</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bcds" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-orange-highlight);color:var(--color-orange);font-size:var(--text-xs)">BCDS</div><div><div class="gate-title">Bull Call Debit Spread</div><div class="gate-subtitle">個股 • IV 低到中</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bpds" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-error-highlight);color:var(--color-error);font-size:var(--text-xs)">BPDS</div><div><div class="gate-title">Bear Put Debit Spread</div><div class="gate-subtitle">個股 • IV 低到中</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-cv" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-gold-highlight);color:var(--color-gold);font-size:var(--text-xs)">CV</div><div><div class="gate-title">Credit Vertical（次要）</div><div class="gate-subtitle">高 IV 環境專用</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-</div><!-- end main-wrapper -->
-<!-- Summary bar -->
-<div class="summary-bar" id="summary-bar">
-  <div class="summary-item"><div class="summary-key">模組</div><div class="summary-val blue" id="sum-module">—</div></div>
-  <div class="summary-item"><div class="summary-key">策略</div><div class="summary-val" id="sum-strategy">—</div></div>
-  <div class="summary-item"><div class="summary-key">確認清單</div><div class="summary-val red" id="sum-checks">0 / 8</div></div>
-  <div class="summary-item"><div class="summary-key">送單狀態</div><div class="summary-val red" id="sum-status">未完成</div></div>
-  <button class="btn-reset" onclick="resetAll()">↺ 重置</button>
+<!-- Individual Strategy Pages -->
+<!-- IC -->
+<section class="gate" id="s-ic" style="display:none">
+<div class="gate-header"><div class="gate-num g0">IC</div><div><div class="gate-title">Iron Condor</div><div class="gate-subtitle">收租模組 — 區間震盪雙向收租</div></div></div>
+<div class="module-card income" style="margin-bottom:var(--space-5)">
+  <h3><span class="module-icon income">收</span> 適用條件</h3>
+  <div class="strategy-list">
+    <div class="strategy-row"><span class="strategy-tag tag-ic">必要</span><div><div class="strategy-desc">VIX 15–30，IVR ≥ 40，Regime = Range 或 Mild Trend</div></div></div>
+    <div class="strategy-row"><span class="strategy-tag tag-ic">建議</span><div><div class="strategy-desc">無重大事件干擾，DTE 25–45，流動性充足</div></div></div>
+  </div>
 </div>
-
-  <script>
-// === Theme Toggle ===
-(function() {
-  var btn = document.querySelector('[data-theme-toggle]');
-  if (btn) {
-    btn.addEventListener('click', function() {
-      var html = document.documentElement;
-      var current = html.getAttribute('data-theme');
-      var next = current === 'dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', next);
-      try { window['local'+'Storage'].setItem('theme', next); } catch(e) {}
-    });
-  }
-  try { var s = window['local'+'Storage'].getItem('theme'); if (s) document.documentElement.setAttribute('data-theme', s); } catch(e) {}
-})();
-
-// === Navigation ===
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   updateSummary(); } let currentGate = 'gate0';
-let currentStrategy = null;
-
-function showGate(id) {
-  document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');
-  const el = document.getElementById(id);
-  if (el) { el.style.display = 'block'; currentGate = id; }
-  updateSummary();
+<div class="param-tabs">
+  <button class="param-tab active" onclick="switchParamTab(this,'ic-entry')">進場</button>
+  <button class="param-tab" onclick="switchParamTab(this,'ic-manage')">管理</button>
+  <button class="param-tab" onclick="switchParamTab(this,'ic-exit')">出場</button>
+</div>
+<div class="param-panel active" id="ic-entry">
+  <table class="param-table">
+    <thead><tr><th>項目</th><th>規格</th></tr></thead>
+    <tbody>
+      <tr><td>Short Strike Delta</td><td class="val">0.15–0.20（Call & Put 各一）</td></tr>
+      <tr><td>Wing Width</td><td class="val">$5–$10（SPX $25–$50）</td></tr>
+      <tr><td>Credit Target</td><td class="val">≥ Wing × 25%</td></tr>
+      <tr><td>DTE</td><td class="val">25–45 天</td></tr>
+      <tr><td>Max Loss / 筆</td><td class="val">帳戶 ≤ 2%</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="ic-manage">
+  <table class="param-table">
+    <thead><tr><th>情況</th><th>動作</th></tr></thead>
+    <tbody>
+      <tr><td>達 50% 獲利</td><td class="val">了結整筆</td></tr>
+      <tr><td>剩 21 DTE</td><td class="val">評估是否提前了結</td></tr>
+      <tr><td>單腿被觸及</td><td class="val">評估 Roll 或平倉被觸腿</td></tr>
+      <tr><td>損失達 2× Credit</td><td class="val">強制平倉</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="ic-exit">
+  <table class="param-table">
+    <thead><tr><th>出場條件</th><th>優先級</th></tr></thead>
+    <tbody>
+      <tr><td>獲利 50%</td><td class="val">★★★ 首選</td></tr>
+      <tr><td>DTE ≤ 21</td><td class="val">★★ 次選</td></tr>
+      <tr><td>損失 2× Credit</td><td class="val-stop">強制停損</td></tr>
+      <tr><td>黑天鵝/跳空</td><td class="val-stop">即時平倉</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+<!-- BPCS -->
+<section class="gate" id="s-bpcs" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="background:var(--color-success-highlight);color:var(--color-success)">BP</div><div><div class="gate-title">Bull Put Credit Spread</div><div class="gate-subtitle">收租模組 — 偏多收租</div></div></div>
+<div class="module-card income" style="margin-bottom:var(--space-5)">
+  <h3><span class="module-icon income">收</span> 適用條件</h3>
+  <div class="strategy-list">
+    <div class="strategy-row"><span class="strategy-tag tag-bpcs">必要</span><div><div class="strategy-desc">趨勢偏多或區間下緣支撐明確，IVR ≥ 35</div></div></div>
+    <div class="strategy-row"><span class="strategy-tag tag-bpcs">建議</span><div><div class="strategy-desc">VIX 15–35，DTE 21–45，近期無利空催化</div></div></div>
+  </div>
+</div>
+<div class="param-tabs">
+  <button class="param-tab active" onclick="switchParamTab(this,'bpcs-entry')">進場</button>
+  <button class="param-tab" onclick="switchParamTab(this,'bpcs-exit')">出場</button>
+</div>
+<div class="param-panel active" id="bpcs-entry">
+  <table class="param-table">
+    <thead><tr><th>項目</th><th>規格</th></tr></thead>
+    <tbody>
+      <tr><td>Short Put Delta</td><td class="val">0.25–0.35</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$10</td></tr>
+      <tr><td>Credit Target</td><td class="val">≥ Width × 30%</td></tr>
+      <tr><td>DTE</td><td class="val">21–45 天</td></tr>
+      <tr><td>Max Loss / 筆</td><td class="val">帳戶 ≤ 2%</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="bpcs-exit">
+  <table class="param-table">
+    <thead><tr><th>出場條件</th><th>動作</th></tr></thead>
+    <tbody>
+      <tr><td>獲利 50%</td><td class="val">了結</td></tr>
+      <tr><td>DTE ≤ 21</td><td class="val">評估了結</td></tr>
+      <tr><td>損失 2× Credit</td><td class="val-stop">強制停損</td></tr>
+      <tr><td>趨勢反轉確認</td><td class="val-stop">立即平倉</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+<!-- BCCS -->
+<section class="gate" id="s-bccs" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="background:var(--color-error-highlight);color:var(--color-error)">BC</div><div><div class="gate-title">Bear Call Credit Spread</div><div class="gate-subtitle">收租模組 — 偏空收租</div></div></div>
+<div class="module-card income" style="margin-bottom:var(--space-5)">
+  <h3><span class="module-icon income">收</span> 適用條件</h3>
+  <div class="strategy-list">
+    <div class="strategy-row"><span class="strategy-tag tag-bccs">必要</span><div><div class="strategy-desc">趨勢偏空或壓力明確，IVR ≥ 35</div></div></div>
+    <div class="strategy-row"><span class="strategy-tag tag-bccs">建議</span><div><div class="strategy-desc">VIX 15–35，DTE 21–45，近期無利多催化</div></div></div>
+  </div>
+</div>
+<div class="param-tabs">
+  <button class="param-tab active" onclick="switchParamTab(this,'bccs-entry')">進場</button>
+  <button class="param-tab" onclick="switchParamTab(this,'bccs-exit')">出場</button>
+</div>
+<div class="param-panel active" id="bccs-entry">
+  <table class="param-table">
+    <thead><tr><th>項目</th><th>規格</th></tr></thead>
+    <tbody>
+      <tr><td>Short Call Delta</td><td class="val">0.25–0.35</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$10</td></tr>
+      <tr><td>Credit Target</td><td class="val">≥ Width × 30%</td></tr>
+      <tr><td>DTE</td><td class="val">21–45 天</td></tr>
+      <tr><td>Max Loss / 筆</td><td class="val">帳戶 ≤ 2%</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="bccs-exit">
+  <table class="param-table">
+    <thead><tr><th>出場條件</th><th>動作</th></tr></thead>
+    <tbody>
+      <tr><td>獲利 50%</td><td class="val">了結</td></tr>
+      <tr><td>DTE ≤ 21</td><td class="val">評估了結</td></tr>
+      <tr><td>損失 2× Credit</td><td class="val-stop">強制停損</td></tr>
+      <tr><td>趨勢反轉確認</td><td class="val-stop">立即平倉</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+<!-- BCDS -->
+<section class="gate" id="s-bcds" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="background:var(--color-orange-highlight);color:var(--color-orange)">BCD</div><div><div class="gate-title">Bull Call Debit Spread</div><div class="gate-subtitle">進攻模組 — 強勢突破做多</div></div></div>
+<div class="module-card offense" style="margin-bottom:var(--space-5)">
+  <h3><span class="module-icon offense">攻</span> 適用條件</h3>
+  <div class="strategy-list">
+    <div class="strategy-row"><span class="strategy-tag tag-bcds">必要</span><div><div class="strategy-desc">趨勢明確向上，動能確認，IVR ≤ 50</div></div></div>
+    <div class="strategy-row"><span class="strategy-tag tag-bcds">建議</span><div><div class="strategy-desc">突破關鍵壓力位，成交量放大，DTE 14–30</div></div></div>
+  </div>
+</div>
+<div class="param-tabs">
+  <button class="param-tab active" onclick="switchParamTab(this,'bcds-entry')">進場</button>
+  <button class="param-tab" onclick="switchParamTab(this,'bcds-exit')">出場</button>
+</div>
+<div class="param-panel active" id="bcds-entry">
+  <table class="param-table">
+    <thead><tr><th>項目</th><th>規格</th></tr></thead>
+    <tbody>
+      <tr><td>Long Call Delta</td><td class="val">0.40–0.55</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$15</td></tr>
+      <tr><td>Debit Paid</td><td class="val">≤ Width × 50%</td></tr>
+      <tr><td>DTE</td><td class="val">14–30 天</td></tr>
+      <tr><td>Max Loss / 筆</td><td class="val">帳戶 ≤ 1.5%</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="bcds-exit">
+  <table class="param-table">
+    <thead><tr><th>出場條件</th><th>動作</th></tr></thead>
+    <tbody>
+      <tr><td>獲利 80%</td><td class="val">了結</td></tr>
+      <tr><td>動能消失 / 反轉</td><td class="val">評估了結</td></tr>
+      <tr><td>損失 50% Debit</td><td class="val-warn">警戒</td></tr>
+      <tr><td>損失 = 全部 Debit</td><td class="val-stop">強制停損</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+<!-- BPDS -->
+<section class="gate" id="s-bpds" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="background:var(--color-error-highlight);color:var(--color-error)">BPD</div><div><div class="gate-title">Bear Put Debit Spread</div><div class="gate-subtitle">進攻模組 — 強勢突破做空</div></div></div>
+<div class="module-card offense" style="margin-bottom:var(--space-5)">
+  <h3><span class="module-icon offense">攻</span> 適用條件</h3>
+  <div class="strategy-list">
+    <div class="strategy-row"><span class="strategy-tag tag-bpds">必要</span><div><div class="strategy-desc">趨勢明確向下，動能確認，IVR ≤ 50</div></div></div>
+    <div class="strategy-row"><span class="strategy-tag tag-bpds">建議</span><div><div class="strategy-desc">跌破關鍵支撐位，成交量放大，DTE 14–30</div></div></div>
+  </div>
+</div>
+<div class="param-tabs">
+  <button class="param-tab active" onclick="switchParamTab(this,'bpds-entry')">進場</button>
+  <button class="param-tab" onclick="switchParamTab(this,'bpds-exit')">出場</button>
+</div>
+<div class="param-panel active" id="bpds-entry">
+  <table class="param-table">
+    <thead><tr><th>項目</th><th>規格</th></tr></thead>
+    <tbody>
+      <tr><td>Long Put Delta</td><td class="val">-0.40 ~ -0.55</td></tr>
+      <tr><td>Spread Width</td><td class="val">$5–$15</td></tr>
+      <tr><td>Debit Paid</td><td class="val">≤ Width × 50%</td></tr>
+      <tr><td>DTE</td><td class="val">14–30 天</td></tr>
+      <tr><td>Max Loss / 筆</td><td class="val">帳戶 ≤ 1.5%</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="param-panel" id="bpds-exit">
+  <table class="param-table">
+    <thead><tr><th>出場條件</th><th>動作</th></tr></thead>
+    <tbody>
+      <tr><td>獲利 80%</td><td class="val">了結</td></tr>
+      <tr><td>動能消失 / 反轉</td><td class="val">評估了結</td></tr>
+      <tr><td>損失 50% Debit</td><td class="val-warn">警戒</td></tr>
+      <tr><td>損失 = 全部 Debit</td><td class="val-stop">強制停損</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+<!-- CV -->
+<section class="gate" id="s-cv" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="background:var(--color-gold-highlight);color:var(--color-gold)">CV</div><div><div class="gate-title">Credit Vertical（次要）</div><div class="gate-subtitle">進攻模組 — 特定條件限用，IV 結構扭曲時使用</div></div></div>
+<div class="module-card offense" style="margin-bottom:var(--space-5)">
+  <h3><span class="module-icon offense">攻</span> 適用條件</h3>
+  <div class="strategy-list">
+    <div class="strategy-row"><span class="strategy-tag tag-cv">必要</span><div><div class="strategy-desc">IV 結構扭曲，風報比 ≥ 1:2，有明確方向偏向</div></div></div>
+    <div class="strategy-row"><span class="strategy-tag tag-cv">警告</span><div><div class="strategy-desc">此策略為次要策略，每月使用次數 ≤ 2 次</div></div></div>
+  </div>
+</div>
+<div class="info-block warn"><p><strong>注意：</strong>Credit Vertical 在方向判斷錯誤時損失較大，須嚴格控制部位大小（≤ 帳戶 1%）並確保有明確的技術面依據。</p></div>
+</section>
+</div><!-- end main-wrapper -->
+<!-- Summary Bar -->
+<div class="summary-bar" id="summary-bar">
+  <div class="summary-item"><div class="summary-key">Gate 1</div><div class="summary-val blue" id="sb-g1">0/7</div></div>
+  <div class="summary-item"><div class="summary-key">Gate 3</div><div class="summary-val blue" id="sb-g3">0/6</div></div>
+  <div class="summary-item"><div class="summary-key">Gate 4</div><div class="summary-val blue" id="sb-g4">0/5</div></div>
+  <div class="summary-item"><div class="summary-key">狀態</div><div class="summary-val amber" id="sb-status">準備中</div></div>
+  <button class="btn-reset" onclick="resetAll()">↺ 重置全部</button>
+</div>
+</div><!-- end .app -->
+<script>
+// ── Section Navigation ──
+function showSection(id, btn) {
+  document.querySelectorAll('#main-wrapper > section, #main-wrapper .live-section').forEach(s => s.style.display = 'none');
+  const target = document.getElementById(id);
+  if (target) target.style.display = '';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (btn) btn.classList.add('active');
 }
-
-function showStrategy(id) {
-  document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');
-  const el = document.getElementById('s-' + id);
-  if (el) { el.style.display = 'block'; currentStrategy = id; }
-}
-
-function backToGate(gateId) {
-  currentStrategy = null;
-  showGate(gateId);
-}
-
-function nextGate(from, to) { showGate(to); }
-function prevGate(from, to) { showGate(to); }
-
-// === Sidebar nav ===
-function showDashboard() {
-  document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');
-  document.getElementById('live-dashboard').style.display = 'block';
-  currentGate = 'live-dashboard';
-  loadDashboard();
-}
-
-document.querySelectorAll('.sidebar-item').forEach(item => {
-  item.addEventListener('click', function() {
-    document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
-    this.classList.add('active');
-  });
+// ── Theme Toggle ──
+document.querySelector('[data-theme-toggle]').addEventListener('click', () => {
+  const html = document.documentElement;
+  html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
-
-// === Toggle check ===
-function toggleCheck(el) {
+// ── Checklist ──
+function toggleCheck(el, gate) {
   el.classList.toggle('checked');
-  updateSummary();
+  updateProgress(gate);
 }
-
-// === Regime toggle ===
-function toggleRegime(el) {
-  el.classList.toggle('active');
+function updateProgress(gate) {
+  const list = document.getElementById(gate + '-checklist');
+  if (!list) return;
+  const items = list.querySelectorAll('.check-item');
+  const checked = list.querySelectorAll('.check-item.checked').length;
+  const fill = document.getElementById(gate + '-progress-fill');
+  const text = document.getElementById(gate + '-progress-text');
+  if (fill) fill.style.width = (checked / items.length * 100) + '%';
+  if (text) text.textContent = checked + ' / ' + items.length;
+  updateSummaryBar();
 }
-
-// === Summary bar ===
-function updateSummary() {
-  const totalChecks = document.querySelectorAll('#gate4 .check-item').length;
-  const doneChecks = document.querySelectorAll('#gate4 .check-item.checked').length;
-  const checkEl = document.getElementById('summary-checklist');
-  if (checkEl) {
-    checkEl.textContent = doneChecks + '/' + totalChecks;
-    checkEl.className = 'summary-val ' + (doneChecks === totalChecks && totalChecks > 0 ? 'green' : 'red');
+function updateSummaryBar() {
+  const gates = [
+    {id:'g1', total:7, sb:'sb-g1'},
+    {id:'g3', total:6, sb:'sb-g3'},
+    {id:'g4', total:5, sb:'sb-g4'}
+  ];
+  let allReady = true;
+  gates.forEach(g => {
+    const list = document.getElementById(g.id + '-checklist');
+    const checked = list ? list.querySelectorAll('.check-item.checked').length : 0;
+    const el = document.getElementById(g.sb);
+    if (el) {
+      el.textContent = checked + '/' + g.total;
+      el.className = 'summary-val ' + (checked === g.total ? 'green' : checked > 0 ? 'amber' : 'blue');
+    }
+    if (checked < g.total) allReady = false;
+  });
+  const status = document.getElementById('sb-status');
+  if (status) {
+    status.textContent = allReady ? '✓ 可送單' : '準備中';
+    status.className = 'summary-val ' + (allReady ? 'green' : 'amber');
   }
 }
-
 function resetAll() {
   document.querySelectorAll('.check-item').forEach(i => i.classList.remove('checked'));
-  document.querySelectorAll('.regime-card').forEach(i => i.classList.remove('active'));
-  showGate('gate0');
-  updateSummary();
+  ['g1','g3','g4'].forEach(g => updateProgress(g));
 }
-
-    // === Live Dashboard ===
-const WEBHOOK_URL = 'https://chilldove.app.n8n.cloud/webhook/student-positions';
-let dashboardData = null;
-
-async function loadDashboard() {
-  const posC = document.getElementById('positions-container');
-  const sigC = document.getElementById('signals-container');
-  const ordC = document.getElementById('orders-container');
-  const riskC = document.getElementById('risk-container');
-  if (posC) posC.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">載入中...</div>';
+// ── Param Tabs ──
+function switchParamTab(btn, panelId) {
+  const container = btn.closest('.gate, .live-section');
+  container.querySelectorAll('.param-tab').forEach(t => t.classList.remove('active'));
+  container.querySelectorAll('.param-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  const panel = document.getElementById(panelId);
+  if (panel) panel.classList.add('active');
+}
+// ── Signal Payload Panel ──
+function toggleSignalPanel() {
+  const toggle = document.getElementById('sp-toggle');
+  const body = document.getElementById('sp-body');
+  toggle.classList.toggle('open');
+  body.classList.toggle('open');
+}
+function clearSignalPanel() {
+  document.getElementById('sp-textarea').value = '';
+  document.getElementById('sp-result').innerHTML = '';
+  clearSpHighlights();
+}
+function loadSamplePayload(type) {
+  const samples = {
+    IC: '{"strategy":"IC","symbol":"SPX","dte":35,"ivRank":52,"regime":"range","delta_short":0.16,"vix":18}',
+    BCDS: '{"strategy":"BCDS","symbol":"SPY","dte":21,"ivRank":38,"regime":"bull","delta_long":0.48,"vix":16}',
+    BPCS: '{"strategy":"BPCS","symbol":"QQQ","dte":30,"ivRank":45,"regime":"range","delta_short":0.28,"vix":22}'
+  };
+  const ta = document.getElementById('sp-textarea');
+  if (!document.getElementById('sp-body').classList.contains('open')) toggleSignalPanel();
+  ta.value = samples[type] || '';
+}
+function clearSpHighlights() {
+  document.querySelectorAll('.sp-highlight').forEach(el => el.classList.remove('sp-highlight'));
+}
+function analyzeSignalPayload() {
+  const raw = document.getElementById('sp-textarea').value.trim();
+  const resultEl = document.getElementById('sp-result');
+  if (!raw) { resultEl.innerHTML = '<div style="color:var(--color-text-faint);font-size:var(--text-xs);padding:var(--space-3)">請先貼上訊號 JSON</div>'; return; }
+  let payload;
+  try { payload = JSON.parse(raw); } catch(e) { resultEl.innerHTML = '<div style="color:var(--color-error);font-size:var(--text-xs);padding:var(--space-3)">JSON 格式錯誤：' + e.message + '</div>'; return; }
+  clearSpHighlights();
+  const strategy = (payload.strategy || '').toUpperCase();
+  const ivRank = payload.ivRank ?? payload.iv_rank ?? null;
+  const dte = payload.dte ?? null;
+  const vix = payload.vix ?? null;
+  const regime = (payload.regime || '').toLowerCase();
+  const deltaShort = payload.delta_short ?? null;
+  const deltaLong = payload.delta_long ?? null;
+  // Evaluate conditions
+  const checks = [];
+  let decision = 'approved';
+  // Strategy recognition
+  const knownStrategies = ['IC','BPCS','BCCS','BCDS','BPDS','CV'];
+  if (!strategy || !knownStrategies.includes(strategy)) {
+    checks.push({label:'策略識別', val: strategy || '未指定', status:'blocked', note:'無法識別策略類型'});
+    decision = 'blocked';
+  } else {
+    checks.push({label:'策略', val: strategy, status:'ok', note:''});
+  }
+  // IVR check
+  if (ivRank !== null) {
+    const creditStrats = ['IC','BPCS','BCCS','CV'];
+    const debitStrats = ['BCDS','BPDS'];
+    if (creditStrats.includes(strategy)) {
+      const minIVR = strategy === 'IC' ? 40 : 35;
+      if (ivRank >= minIVR) checks.push({label:'IVR', val: ivRank, status:'ok', note:'≥ ' + minIVR + ' ✓'});
+      else { checks.push({label:'IVR', val: ivRank, status:'blocked', note:'需 ≥ ' + minIVR + '，目前不足'}); decision = decision !== 'blocked' ? 'review' : 'blocked'; }
+    } else if (debitStrats.includes(strategy)) {
+      if (ivRank <= 50) checks.push({label:'IVR', val: ivRank, status:'ok', note:'≤ 50 ✓'});
+      else { checks.push({label:'IVR', val: ivRank, status:'warn', note:'IVR > 50，Debit 成本偏高'}); if (decision === 'approved') decision = 'review'; }
+    }
+  }
+  // VIX check
+  if (vix !== null) {
+    const creditStrats = ['IC','BPCS','BCCS','CV'];
+    if (creditStrats.includes(strategy)) {
+      if (vix > 40) { checks.push({label:'VIX', val: vix, status:'blocked', note:'VIX > 40，收租策略禁止進場'}); decision = 'blocked'; }
+      else if (vix > 35) { checks.push({label:'VIX', val: vix, status:'warn', note:'VIX 35–40，謹慎'}); if (decision === 'approved') decision = 'review'; }
+      else if (vix < 15) { checks.push({label:'VIX', val: vix, status:'warn', note:'VIX 過低，IV 溢價不足'}); if (decision === 'approved') decision = 'review'; }
+      else checks.push({label:'VIX', val: vix, status:'ok', note:'範圍正常 ✓'});
+    } else {
+      if (vix > 50) { checks.push({label:'VIX', val: vix, status:'blocked', note:'VIX > 50，極端波動'}); decision = 'blocked'; }
+      else checks.push({label:'VIX', val: vix, status:'ok', note:'可接受 ✓'});
+    }
+  }
+  // DTE check
+  if (dte !== null) {
+    const creditStrats = ['IC','BPCS','BCCS','CV'];
+    const debitStrats = ['BCDS','BPDS'];
+    if (creditStrats.includes(strategy)) {
+      if (dte < 7) { checks.push({label:'DTE', val: dte, status:'blocked', note:'DTE < 7，禁止新建倉'}); decision = 'blocked'; }
+      else if (dte < 21 || dte > 60) { checks.push({label:'DTE', val: dte, status:'warn', note:'建議 21–45 DTE'}); if (decision === 'approved') decision = 'review'; }
+      else checks.push({label:'DTE', val: dte, status:'ok', note:'範圍正常 ✓'});
+    } else if (debitStrats.includes(strategy)) {
+      if (dte < 7) { checks.push({label:'DTE', val: dte, status:'blocked', note:'DTE < 7，禁止新建倉'}); decision = 'blocked'; }
+      else if (dte < 14 || dte > 30) { checks.push({label:'DTE', val: dte, status:'warn', note:'建議 14–30 DTE'}); if (decision === 'approved') decision = 'review'; }
+      else checks.push({label:'DTE', val: dte, status:'ok', note:'範圍正常 ✓'});
+    }
+  }
+  // Regime check
+  if (regime) {
+    const regimeMap = {
+      IC: ['range','mild'],
+      BPCS: ['range','bull','mild'],
+      BCCS: ['range','bear','highvol'],
+      BCDS: ['bull'],
+      BPDS: ['bear'],
+      CV: ['highvol','range']
+    };
+    const allowed = regimeMap[strategy] || [];
+    if (allowed.length && !allowed.some(r => regime.includes(r))) {
+      checks.push({label:'Regime', val: regime, status:'warn', note:'與策略適用 Regime 不符'}); if (decision === 'approved') decision = 'review';
+    } else if (allowed.length) {
+      checks.push({label:'Regime', val: regime, status:'ok', note:'符合 ✓'});
+    }
+  }
+  // Delta check
+  if (deltaShort !== null && ['IC','BPCS','BCCS'].includes(strategy)) {
+    if (deltaShort > 0.25) { checks.push({label:'Delta Short', val: deltaShort, status:'warn', note:'> 0.25，風險偏高'}); if (decision === 'approved') decision = 'review'; }
+    else checks.push({label:'Delta Short', val: deltaShort, status:'ok', note:'正常範圍 ✓'});
+  }
+  if (deltaLong !== null && ['BCDS','BPDS'].includes(strategy)) {
+    const d = Math.abs(deltaLong);
+    if (d < 0.38) { checks.push({label:'Delta Long', val: deltaLong, status:'warn', note:'Delta 偏低，Gamma 收益有限'}); if (decision === 'approved') decision = 'review'; }
+    else checks.push({label:'Delta Long', val: deltaLong, status:'ok', note:'正常範圍 ✓'});
+  }
+  // Highlight relevant elements
+  const strategyHighlightMap = {
+    IC: ['card-income','row-IC','regime-range','regime-mild'],
+    BPCS: ['card-income','row-BPCS','regime-range','regime-bull','regime-mild'],
+    BCCS: ['card-income','row-BCCS','regime-range','regime-bear','regime-highvol'],
+    BCDS: ['card-offense','row-BCDS','regime-bull'],
+    BPDS: ['card-offense','row-BPDS','regime-bear'],
+    CV: ['card-offense','row-CV','regime-highvol']
+  };
+  (strategyHighlightMap[strategy] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('sp-highlight');
+  });
+  // Regime highlight
+  if (regime) {
+    const regimeIdMap = {range:'regime-range',bull:'regime-bull',bear:'regime-bear',highvol:'regime-highvol',mild:'regime-mild',event:'regime-event'};
+    Object.entries(regimeIdMap).forEach(([k,id]) => { if (regime.includes(k)) { const el = document.getElementById(id); if (el) el.classList.add('sp-highlight'); }});
+  }
+  // Build result HTML
+  const statusIcon = {ok:'✓', warn:'⚠', blocked:'✗'};
+  const statusColor = {ok:'var(--color-success)', warn:'var(--color-warning)', blocked:'var(--color-error)'};
+  const rows = checks.map(c => `<tr><td>${c.label}</td><td style="color:${statusColor[c.status]};font-weight:600">${statusIcon[c.status]} ${c.val}</td><td>${c.note}</td></tr>`).join('');
+  const headerClass = decision;
+  const headerText = {approved:'✓ 訊號通過 — 可進入第1關確認', blocked:'✗ 訊號被阻擋 — 條件不符，請勿進場', review:'⚠ 需人工審核 — 部分條件警戒'}[decision];
+  const badgeText = {approved:'通過', blocked:'阻擋', review:'審核'}[decision];
+  resultEl.innerHTML = `<div class="sp-result">
+    <div class="sp-result-header ${headerClass}">${headerText}<span class="sp-decision-badge ${decision}">${badgeText}</span></div>
+    <div class="sp-result-body">
+      <table class="param-table"><thead><tr><th>檢核項目</th><th>數值</th><th>說明</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+// ── Live Dashboard ──
+let dashboardData = [];
+function loadJSON() {
+  const raw = document.getElementById('json-input').value.trim();
+  const statusEl = document.getElementById('load-status');
+  if (!raw) { statusEl.textContent = '請輸入 JSON 資料'; statusEl.className = 'load-status err'; return; }
   try {
-    const res = await fetch(WEBHOOK_URL);
-    const data = await res.json();
-    dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
+    dashboardData = JSON.parse(raw);
+    if (!Array.isArray(dashboardData)) dashboardData = [dashboardData];
+    renderDashboard();
+    statusEl.textContent = '✓ 載入成功 — ' + dashboardData.length + ' 筆資料';
+    statusEl.className = 'load-status ok';
+    document.getElementById('live-dot').className = 'live-dot online';
+    document.getElementById('live-status-text').textContent = '已載入 — ' + new Date().toLocaleTimeString('zh-TW');
   } catch(e) {
-    if (posC) posC.innerHTML = '<div style="text-align:center;padding:2rem;color:#e74c3c">載入失敗: ' + e.message + '</div>';
+    statusEl.textContent = 'JSON 格式錯誤：' + e.message;
+    statusEl.className = 'load-status err';
   }
 }
-
-function calcEV(p) {
-  const pop = parseFloat(p.pop);
-  const cr = parseFloat(p.credit_received || 0);
-  const dp = parseFloat(p.debit_paid || 0);
-  const tv = parseFloat(p.target_value || 0);
-  const ml = parseFloat(p.max_loss || 0);
-  if (isNaN(pop) || pop === 0) return { ev: 'N/A', kelly: 'N/A' };
-  const netCredit = cr - dp;
-  const maxProfit = netCredit > 0 ? netCredit * 100 : (tv - dp) * 100;
-  const maxLoss = ml > 0 ? ml * 100 : Math.abs(netCredit) * 100;
-  const ev = (pop / 100) * maxProfit - (1 - pop / 100) * maxLoss;
-  const b = maxProfit / (maxLoss || 1);
-  const kelly = (pop / 100) - ((1 - pop / 100) / b);
-  return { ev: '$' + ev.toFixed(0), kelly: (kelly * 100).toFixed(1) + '%', evNum: ev, kellyNum: kelly };
+function loadSample() {
+  document.getElementById('json-input').value = JSON.stringify([
+    {"symbol":"SPX","strategy":"IC","module":"income","expiry":"2025-08-15","strikes":"5200/5250P 5650/5700C","credit":4.80,"qty":1,"status":"active","ev_pct":62,"margin_pct":8},
+    {"symbol":"SPY","strategy":"BPCS","module":"income","expiry":"2025-08-01","strikes":"520/515P","credit":0.95,"qty":2,"status":"active","ev_pct":71,"margin_pct":5},
+    {"symbol":"QQQ","strategy":"BCDS","module":"offense","expiry":"2025-07-25","strikes":"460/470C","debit":3.20,"qty":1,"status":"warning","ev_pct":38,"margin_pct":3},
+    {"symbol":"NVDA","strategy":"BPDS","module":"offense","expiry":"2025-07-18","strikes":"110/105P","debit":1.85,"qty":2,"status":"active","ev_pct":55,"margin_pct":4}
+  ], null, 2);
+  loadJSON();
 }
-
-    function renderPositions(positions) {
-  const c = document.getElementById('positions-container');
-  if (!c) return;
-  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">無持倉資料</div>'; return; }
-  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>部位</th><th>EV</th><th>Kelly</th><th>狀態</th></tr></thead><tbody id="pos-tbody">';
-  positions.forEach(p => {
-    const evData = calcEV(p);
-    const evClass = evData.evNum > 0 ? 'green' : evData.evNum < 0 ? 'red' : '';
-    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + (p.quantity||'-') + '</td><td class="' + evClass + '">' + evData.ev + '</td><td>' + evData.kelly + '</td><td>' + (p.status||'-') + '</td></tr>';
-  });
-  html += '</tbody></table>';
-  c.innerHTML = html;
+function renderDashboard() {
+  const tbody = document.getElementById('positions-body');
+  const signalQueue = document.getElementById('signal-queue');
+  const riskAlerts = document.getElementById('risk-alerts');
+  if (!dashboardData.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--color-text-faint);padding:2rem">尚無資料</td></tr>'; return; }
+  let totalMargin = 0, totalPnL = 0, highRisk = null, highRiskEV = 100;
+  tbody.innerHTML = dashboardData.map(p => {
+    const isIncome = p.module === 'income';
+    const ev = p.ev_pct ?? 0;
+    const evClass = ev >= 60 ? 'ev-positive' : ev >= 40 ? 'ev-neutral' : 'ev-negative';
+    const statusClass = p.status === 'active' ? 'status-active' : p.status === 'warning' ? 'status-warning' : 'status-stop';
+    const creditDebit = p.credit ? '+$' + p.credit.toFixed(2) : p.debit ? '-$' + p.debit.toFixed(2) : '—';
+    totalMargin += p.margin_pct || 0;
+    if (ev < highRiskEV) { highRiskEV = ev; highRisk = p.symbol; }
+    return `<tr>
+      <td><div class="pos-symbol">${p.symbol}</div><div class="pos-strategy">${p.qty || 1} 口</div></td>
+      <td>${p.strategy}</td>
+      <td><span class="module-badge ${p.module || 'income'}">${isIncome ? '收租' : '進攻'}</span></td>
+      <td>${p.expiry || '—'}</td>
+      <td style="font-size:10px;color:var(--color-text-muted)">${p.strikes || '—'}</td>
+      <td style="font-weight:600">${creditDebit}</td>
+      <td class="${evClass}">${ev}%</td>
+      <td><span class="status-badge ${statusClass}">${p.status === 'active' ? '正常' : p.status === 'warning' ? '警戒' : '停損'}</span></td>
+    </tr>`;
+  }).join('');
+  // Stats
+  document.getElementById('stat-count').textContent = dashboardData.length;
+  document.getElementById('stat-bar-count').style.width = Math.min(dashboardData.length / 10 * 100, 100) + '%';
+  document.getElementById('stat-margin').textContent = totalMargin + '%';
+  document.getElementById('stat-bar-margin').style.width = Math.min(totalMargin / 40 * 100, 100) + '%';
+  document.getElementById('stat-bar-margin').style.background = totalMargin > 35 ? 'var(--color-error)' : totalMargin > 25 ? 'var(--color-warning)' : 'var(--color-success)';
+  document.getElementById('stat-risk').textContent = highRisk || '—';
+  document.getElementById('stat-bar-risk').style.width = highRisk ? Math.min((100 - highRiskEV), 100) + '%' : '0%';
+  // Risk alerts
+  const alerts = dashboardData.filter(p => p.status === 'warning' || p.status === 'stop' || (p.ev_pct < 40));
+  if (alerts.length) {
+    riskAlerts.innerHTML = `<div class="risk-box"><h4>⚠ 風險警示（${alerts.length} 筆）</h4>${alerts.map(p => `<div class="risk-item">• ${p.symbol} ${p.strategy}：EV ${p.ev_pct}% — ${p.status === 'stop' ? '觸及停損' : p.status === 'warning' ? '進入警戒' : 'EV 偏低'}</div>`).join('')}</div>`;
+  } else { riskAlerts.innerHTML = ''; }
+  // Signal queue — show as order cards
+  const approved = dashboardData.filter(p => p.ev_pct >= 60 && p.status === 'active');
+  signalQueue.innerHTML = approved.length ? approved.map(p => `
+    <div class="signal-card approved">
+      <div><div class="signal-symbol">${p.symbol}</div><div class="signal-strategy">${p.strategy} · ${p.expiry}</div></div>
+      <div style="font-size:var(--text-xs);color:var(--color-text-muted)">EV ${p.ev_pct}%</div>
+      <span class="signal-decision decision-approved">通過</span>
+    </div>`).join('') : '<div style="color:var(--color-text-faint);font-size:var(--text-xs)">尚無符合條件訊號</div>';
 }
-
-function renderSignals(signals) {
-  const c = document.getElementById('signals-container');
-  if (!c) return;
-  if (!signals.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無新訊號</div>'; return; }
-  let html = '';
-  signals.forEach(s => {
-    const evData = calcEV(s);
-    html += '<div class="signal-card"><div class="signal-header"><span class="signal-symbol">' + (s.symbol||'') + '</span><span class="signal-strategy">' + (s.strategy||'') + '</span></div><div class="signal-details">EV: <span class="' + (evData.evNum > 0 ? 'green' : 'red') + '">' + evData.ev + '</span> | Kelly: ' + evData.kelly + ' | POP: ' + (s.pop||'N/A') + '%</div></div>';
-  });
-  c.innerHTML = html;
+function refreshDashboard() { if (dashboardData.length) renderDashboard(); }
+function clearDashboard() {
+  dashboardData = [];
+  document.getElementById('positions-body').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--color-text-faint);padding:2rem">尚無資料 — 請載入 JSON 或使用範例</td></tr>';
+  document.getElementById('signal-queue').innerHTML = '<div style="color:var(--color-text-faint);font-size:var(--text-xs)">尚無待審核訊號</div>';
+  document.getElementById('risk-alerts').innerHTML = '';
+  document.getElementById('load-status').textContent = '';
+  ['stat-count','stat-pnl','stat-margin','stat-risk'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('live-dot').className = 'live-dot';
+  document.getElementById('live-status-text').textContent = '離線 — 請載入資料';
 }
-
-function renderRisk(risk) {
-  const c = document.getElementById('risk-container');
-  if (!c) return;
-  const bp = risk.buying_power || 'N/A';
-  const nl = risk.net_liq || 'N/A';
-  const delta = risk.portfolio_delta || 'N/A';
-  c.innerHTML = '<div class="risk-bar"><div class="risk-item"><span class="risk-label">購買力</span><span class="risk-val">' + bp + '</span></div><div class="risk-item"><span class="risk-label">Net Liq</span><span class="risk-val">' + nl + '</span></div><div class="risk-item"><span class="risk-label">Portfolio Δ</span><span class="risk-val">' + delta + '</span></div></div>';
-}
-
-function renderOrders(positions) {
-  const c = document.getElementById('orders-container');
-  if (!c) return;
-  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無建議下單</div>'; return; }
-  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>建議</th></tr></thead><tbody>';
-  positions.forEach(p => {
-    const evData = calcEV(p);
-    const action = evData.evNum > 0 ? '✅ 正EV - 可下單' : '⚠️ 負EV - 請評估';
-    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + action + '</td></tr>';
-  });
-  html += '</tbody></table>';
-  c.innerHTML = html;
-}
-
-    // === Excel Export ===
-function exportExcel() {
-  if (!dashboardData || !dashboardData.positions) { alert('請先載入 Dashboard 資料'); return; }
-  const positions = dashboardData.positions;
-  let csv = '\uFEFF個股,策略,到期日,部位,POP,Credit,Debit,EV,Kelly,狀態
-';
-  positions.forEach(p => {
-    const evData = calcEV(p);
-    csv += [p.symbol, p.strategy, p.expiration, p.quantity, p.pop, p.credit_received, p.debit_paid, evData.ev, evData.kelly, p.status].join(',') + '
-';
-  });
-  if (dashboardData.signals && dashboardData.signals.length) {
-    csv += '
-訊號
-個股,策略,POP,Credit,Debit,EV,Kelly
-';
-    dashboardData.signals.forEach(s => {
-      const evData = calcEV(s);
-      csv += [s.symbol, s.strategy, s.pop, s.credit_received, s.debit_paid, evData.ev, evData.kelly].join(',') + '
-';
-    });
-  }
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+function exportToExcel() {
+  if (!dashboardData.length) { alert('尚無資料可匯出'); return; }
+  const headers = ['標的','策略','模組','到期','執行價','Credit/Debit','EV%','狀態'];
+  const rows = dashboardData.map(p => [p.symbol, p.strategy, p.module, p.expiry, p.strikes, p.credit ? '+'+p.credit : '-'+(p.debit||0), (p.ev_pct||0)+'%', p.status]);
+  const csv = [headers, ...rows].map(r => r.map(c => '"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'options-dashboard-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
+  const a = document.createElement('a'); a.href = url; a.download = 'positions_' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
   URL.revokeObjectURL(url);
 }
-
-// === Auto refresh ===
-let refreshInterval = null;
-function startAutoRefresh() {
-  if (refreshInterval) clearInterval(refreshInterval);
-  refreshInterval = setInterval(() => {
-    if (currentGate === 'live-dashboard') loadDashboard();
-  }, 60000);
-}
-
-// === Webhook/Demo/Parse ===
-function loadWebhook() {
-  const url = document.getElementById('webhook-url').value;
-  const statusEl = document.getElementById('load-status');
-  const dotEl = document.getElementById('live-dot');
-  const timeEl = document.getElementById('live-time');
-  if (statusEl) statusEl.textContent = '載入中...';
-  fetch(url).then(r => r.json()).then(data => {
-    dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
-    updateStats(data);
-    if (dotEl) dotEl.classList.add('online');
-    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
-    if (statusEl) { statusEl.textContent = '✅ 載入成功 (' + new Date().toLocaleTimeString() + ')'; statusEl.className = 'load-status ok'; }
-  }).catch(e => {
-    if (statusEl) { statusEl.textContent = '❌ 載入失敗: ' + e.message; statusEl.className = 'load-status err'; }
-  });
-}
-
-function loadDemo() {
-  const demo = {positions:[{symbol:'SPX',strategy:'IC',expiration:'2025-05-16',quantity:2,pop:72,credit_received:1.2,debit_paid:0,max_loss:3.8,status:'active'},{symbol:'QQQ',strategy:'BPCS',expiration:'2025-05-09',quantity:1,pop:68,credit_received:0.85,debit_paid:0,max_loss:4.15,status:'active'},{symbol:'AAPL',strategy:'BCDS',expiration:'2025-05-23',quantity:1,pop:45,credit_received:0,debit_paid:2.5,target_value:5,max_loss:2.5,status:'active'}],signals:[{symbol:'MSFT',strategy:'BPCS',pop:70,credit_received:1.1,debit_paid:0,max_loss:3.9},{symbol:'AMZN',strategy:'BCDS',pop:48,credit_received:0,debit_paid:3.0,target_value:6,max_loss:3.0},{symbol:'SPX',strategy:'IC',pop:75,credit_received:1.5,debit_paid:0,max_loss:3.5}],risk:{buying_power:'$45,000',net_liq:'$52,300',portfolio_delta:'-0.15'}};
-  dashboardData = demo;
-  renderPositions(demo.positions);
-  renderSignals(demo.signals);
-  renderRisk(demo.risk);
-  renderOrders(demo.positions);
-  updateStats(demo);
-  const dotEl = document.getElementById('live-dot');
-  const timeEl = document.getElementById('live-time');
-  const statusEl = document.getElementById('load-status');
-  if (dotEl) dotEl.classList.add('online');
-  if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
-  if (statusEl) { statusEl.textContent = '✅ 範例資料已載入'; statusEl.className = 'load-status ok'; }
-}
-
-function parseJSON() {
-  const input = document.getElementById('json-input').value;
-  const statusEl = document.getElementById('load-status');
-  try {
-    const data = JSON.parse(input);
-    dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
-    updateStats(data);
-    if (statusEl) { statusEl.textContent = '✅ JSON 解析成功'; statusEl.className = 'load-status ok'; }
-  } catch(e) {
-    if (statusEl) { statusEl.textContent = '❌ JSON 解析失敗: ' + e.message; statusEl.className = 'load-status err'; }
-  }
-}
-
-function updateStats(data) {
-  const pos = data.positions || [];
-  const sig = data.signals || [];
-  const el1 = document.getElementById('stat-pos');
-  const el2 = document.getElementById('stat-sig');
-  if (el1) el1.textContent = pos.length;
-  if (el2) el2.textContent = sig.length;
-        const el3 = document.getElementById('stat-risk');
-      const el4 = document.getElementById('stat-pnl');
-      if (el3) el3.textContent = data.risk_budget_used_pct !== undefined ? data.risk_budget_used_pct + '%' : '--';
-      if (el4) el4.textContent = data.unrealized_pnl !== undefined ? '$' + data.unrealized_pnl : '--';
-}
-    
-    // === Init ===
-showGate('gate0');
-updateSummary();
-startAutoRefresh();
 </script>
 </body>
 </html>
-</div><!-- end .app -->
