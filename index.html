@@ -338,6 +338,51 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .sp-history-detail { font-size: 10px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-history-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
 .sp-history-empty { text-align: center; padding: var(--space-6); color: var(--color-text-faint); font-size: var(--text-xs); }
+/* LINE Signal Parser */
+.line-textarea { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace !important; font-size: var(--text-xs) !important; line-height: 1.6 !important; }
+.line-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-3); transition: border-color var(--transition), box-shadow var(--transition); }
+.line-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+.line-card-top { display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: flex-start; }
+.line-card-left { min-width: 80px; }
+.line-card-symbol { font-size: var(--text-lg); font-weight: 700; color: var(--color-text); line-height: 1.2; }
+.line-card-price { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+.line-card-iv { font-size: var(--text-xs); color: var(--color-text-faint); }
+.line-card-mid { flex: 1; min-width: 160px; }
+.line-card-strategy { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); font-weight: 700; padding: 2px 10px; border-radius: 999px; margin-bottom: var(--space-1); }
+.line-card-strategy.bullish { background: var(--color-success-highlight); color: var(--color-success); }
+.line-card-strategy.bearish { background: var(--color-error-highlight); color: var(--color-error); }
+.line-card-strategy.neutral { background: var(--color-blue-highlight); color: var(--color-blue); }
+.line-card-order { font-size: var(--text-xs); color: var(--color-text-muted); font-family: 'SF Mono', 'Fira Code', monospace; margin-top: var(--space-1); }
+.line-card-signal-desc { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+.line-card-right { min-width: 120px; text-align: right; }
+.line-card-ev { font-size: var(--text-xs); font-weight: 600; }
+.line-card-ev.positive { color: var(--color-success); }
+.line-card-ev.negative { color: var(--color-error); }
+.line-card-pop { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: var(--space-1); }
+.line-card-pnl { font-size: var(--text-xs); color: var(--color-text-faint); margin-top: var(--space-1); }
+.line-card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-divider); flex-wrap: wrap; gap: var(--space-2); }
+.line-card-meta { font-size: 11px; color: var(--color-text-faint); display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.line-card-meta span { white-space: nowrap; }
+.line-card-actions { display: flex; gap: var(--space-2); }
+.line-card-actions .btn-sm { font-size: 11px; padding: 3px 12px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text); font-weight: 600; transition: all var(--transition); }
+.line-card-actions .btn-sm:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.line-card-actions .btn-sm.primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.line-card-actions .btn-sm.primary:hover { background: var(--color-primary-hover); }
+/* LINE summary table */
+.line-summary { margin-top: var(--space-4); }
+.line-summary h4 { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-3); }
+.line-summary-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+.line-summary-table th { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 2px solid var(--color-border); color: var(--color-text-muted); font-weight: 600; white-space: nowrap; }
+.line-summary-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-divider); white-space: nowrap; }
+.line-summary-table tr.row-approved { background: color-mix(in srgb, var(--color-success) 6%, transparent); }
+.line-summary-table tr.row-blocked { background: color-mix(in srgb, var(--color-error) 6%, transparent); }
+.line-analyze-all-wrap { margin-top: var(--space-4); text-align: center; }
+.line-analyze-all-wrap .btn-primary { width: 100%; }
+@media (max-width: 768px) {
+  .line-card-top { flex-direction: column; }
+  .line-card-right { text-align: left; }
+  .line-card-meta { flex-direction: column; gap: var(--space-1); }
+}
 </style>
 </head>
 <body>
@@ -394,6 +439,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
         <button class="sp-tab active" onclick="switchSpTab('manual',this)">✍️ 手動輸入</button>
         <button class="sp-tab" onclick="switchSpTab('auto',this)">📡 自動接收</button>
         <button class="sp-tab" onclick="switchSpTab('json',this)">📋 貼上 JSON</button>
+        <button class="sp-tab" onclick="switchSpTab('line',this)">📱 LINE 訊號</button>
       </div>
 
       <!-- Tab 1: Manual Input Form -->
@@ -508,6 +554,18 @@ a, button, [role=button] { transition: color var(--transition), background var(-
           <button class="btn-secondary" onclick="clearSignal()">清除</button>
           <button class="btn-secondary" onclick="fillSamplePayload()">範例</button>
         </div>
+      </div>
+
+      <!-- Tab 4: LINE Signal Parser -->
+      <div class="sp-tab-panel" id="sp-tab-line">
+        <textarea class="sp-textarea line-textarea" id="line-textarea" rows="8" placeholder="貼上 LINE 收到的訊號文字..."></textarea>
+        <div class="sp-actions" style="margin-bottom:var(--space-4)">
+          <button class="btn-primary" onclick="parseAllLINESignals()">🔍 解析全部</button>
+          <button class="btn-secondary" onclick="clearLINEPanel()">清除</button>
+          <button class="btn-secondary" onclick="fillLINESample()">範例</button>
+        </div>
+        <div id="line-parsed-list"></div>
+        <div id="line-summary-table"></div>
       </div>
 
       <!-- Shared result area -->
@@ -835,22 +893,16 @@ function renderOrders(positions) {
 function exportExcel() {
   if (!dashboardData || !dashboardData.positions) { alert('請先載入 Dashboard 資料'); return; }
   const positions = dashboardData.positions;
-  let csv = '\uFEFF個股,策略,到期日,部位,POP,Credit,Debit,EV,Kelly,狀態
-';
+  let csv = '\uFEFF個股,策略,到期日,部位,POP,Credit,Debit,EV,Kelly,狀態\n';
   positions.forEach(p => {
     const evData = calcEV(p);
-    csv += [p.symbol, p.strategy, p.expiration, p.quantity, p.pop, p.credit_received, p.debit_paid, evData.ev, evData.kelly, p.status].join(',') + '
-';
+    csv += [p.symbol, p.strategy, p.expiration, p.quantity, p.pop, p.credit_received, p.debit_paid, evData.ev, evData.kelly, p.status].join(',') + '\n';
   });
   if (dashboardData.signals && dashboardData.signals.length) {
-    csv += '
-訊號
-個股,策略,POP,Credit,Debit,EV,Kelly
-';
+    csv += '\n訊號\n個股,策略,POP,Credit,Debit,EV,Kelly\n';
     dashboardData.signals.forEach(s => {
       const evData = calcEV(s);
-      csv += [s.symbol, s.strategy, s.pop, s.credit_received, s.debit_paid, evData.ev, evData.kelly].join(',') + '
-';
+      csv += [s.symbol, s.strategy, s.pop, s.credit_received, s.debit_paid, evData.ev, evData.kelly].join(',') + '\n';
     });
   }
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1204,8 +1256,8 @@ function getReasonLabel(reason) {
   var map = {
     'module_unknown': '無法辨識模組（strategy 不在已知清單）',
     'event_risk': '事件風險（財報 / FOMC 等）',
-    'ivr_too_low': '收租模組 IVR < 27，不符合門滝',
-    'ic_ivr_below_30': 'Iron Condor IVR < 30，不符合門滝',
+    'ivr_too_low': '收租模組 IVR < 27，不符合門檻',
+    'ic_ivr_below_30': 'Iron Condor IVR < 30，不符合門檻',
     'dte_out_of_range': 'DTE 不在 21–60 天範圍'
   };
   return map[reason] || reason;
@@ -1361,6 +1413,223 @@ function analyzePayload(payload) {
     sumStr.textContent = symbol + ' / ' + strategy;
     sumStr.className = 'summary-val ' + (decision === 'approved' ? 'green' : decision === 'blocked' ? 'red' : 'amber');
   }
+}
+
+// === LINE Signal Parser ===
+var parsedLINESignals = [];
+
+function parseLINESignals(text) {
+  var blocks = text.split(/(?=\u3010[A-Z]+\u3011)/);
+  var signals = [];
+  for (var i = 0; i < blocks.length; i++) {
+    var block = blocks[i];
+    if (!block.trim()) continue;
+    var symbolMatch = block.match(/\u3010([A-Z]+)\u3011/);
+    if (!symbolMatch) continue;
+    var symbol = symbolMatch[1];
+    var priceMatch = block.match(/\u73fe\u50f9[\uff1a:]([0-9.]+)/);
+    var price = priceMatch ? parseFloat(priceMatch[1]) : 0;
+    var ivMatch = block.match(/IV[\uff1a:]([0-9.]+)%/);
+    var ivr = ivMatch ? parseFloat(ivMatch[1]) : 0;
+    var signalMatch = block.match(/\u8a0a\u865f[\uff1a:]\s*(.+)/);
+    var signalDesc = signalMatch ? signalMatch[1].trim() : '';
+    var strategyMatch = block.match(/\u7b56\u7565[\uff1a:]\s*(.+)/);
+    var strategyText = strategyMatch ? strategyMatch[1].trim() : '';
+    var orderMatch = block.match(/\u6307\u4ee4[\uff1a:]\s*(.+)/);
+    var orderText = orderMatch ? orderMatch[1].trim() : '';
+    var strategy = 'unknown';
+    var bias = 'neutral';
+    var buyCallIdx = orderText.indexOf('BUY CALL');
+    var sellCallIdx = orderText.indexOf('SELL CALL');
+    var buyPutIdx = orderText.indexOf('BUY PUT');
+    var sellPutIdx = orderText.indexOf('SELL PUT');
+    if (buyCallIdx !== -1 && sellCallIdx !== -1 && buyCallIdx < sellCallIdx) {
+      strategy = 'BULL_CALL_DEBIT_SPREAD'; bias = 'bullish';
+    } else if (buyPutIdx !== -1 && sellPutIdx !== -1 && buyPutIdx < sellPutIdx) {
+      strategy = 'BEAR_PUT_DEBIT_SPREAD'; bias = 'bearish';
+    } else if (sellPutIdx !== -1 && buyPutIdx !== -1 && sellPutIdx < buyPutIdx) {
+      strategy = 'BULL_PUT_CREDIT_SPREAD'; bias = 'bullish';
+    } else if (sellCallIdx !== -1 && buyCallIdx !== -1 && sellCallIdx < buyCallIdx) {
+      strategy = 'BEAR_CALL_CREDIT_SPREAD'; bias = 'bearish';
+    }
+    if (strategyText.includes('\u770b\u6f32') && bias === 'neutral') bias = 'bullish';
+    if (strategyText.includes('\u770b\u8dcc') && bias === 'neutral') bias = 'bearish';
+    if (strategyText.includes('\u6536\u79df') || strategyText.includes('\u4e2d\u6027')) bias = 'neutral';
+    var evMatch = block.match(/EV[\uff1a:]\s*([0-9.-]+)/);
+    var ev = evMatch ? parseFloat(evMatch[1]) : 0;
+    var popMatch = block.match(/\u52dd\u7387[\uff1a:]\s*([0-9.]+)%/);
+    var pop = popMatch ? parseFloat(popMatch[1]) / 100 : 0;
+    var pnlMatch = block.match(/\u76c8\u8667[\uff1a:]\s*\+([0-9.]+)\/-([0-9.]+)/);
+    var maxProfit = pnlMatch ? parseFloat(pnlMatch[1]) : 0;
+    var maxLoss = pnlMatch ? parseFloat(pnlMatch[2]) : 0;
+    var expiryMatch = block.match(/\u5230\u671f[\uff1a:]\s*([0-9-]+)\s*\(\u5269(\d+)\u5929\)/);
+    var expiry = expiryMatch ? expiryMatch[1] : '';
+    var dte = expiryMatch ? parseInt(expiryMatch[2]) : 0;
+    var supportMatch = block.match(/\u652f\u6490[\uff1a:]([0-9.]+)/);
+    var resistMatch = block.match(/\u58d3\u529b[\uff1a:]([0-9.]+)/);
+    var support = supportMatch ? parseFloat(supportMatch[1]) : 0;
+    var resistance = resistMatch ? parseFloat(resistMatch[1]) : 0;
+    var creditReceived = 0;
+    var debitPaid = 0;
+    if (strategy.includes('DEBIT')) {
+      debitPaid = maxLoss / 100;
+      creditReceived = 0;
+    } else if (strategy !== 'unknown') {
+      creditReceived = maxProfit / 100;
+      debitPaid = 0;
+    }
+    signals.push({
+      symbol: symbol, price: price, ivr: ivr, signalDesc: signalDesc, strategyText: strategyText, orderText: orderText,
+      strategy: strategy, bias: bias, ev: ev, pop: pop, maxProfit: maxProfit, maxLoss: maxLoss,
+      expiry: expiry, dte: dte, support: support, resistance: resistance,
+      credit_received: creditReceived, debit_paid: debitPaid, max_loss: maxLoss, event_risk: false
+    });
+  }
+  return signals;
+}
+
+function renderLINECards(signals) {
+  var container = document.getElementById('line-parsed-list');
+  if (!container) return;
+  if (!signals.length) { container.innerHTML = '<div class="sp-history-empty">\u672a\u89e3\u6790\u5230\u4efb\u4f55\u8a0a\u865f</div>'; return; }
+  var html = '';
+  for (var i = 0; i < signals.length; i++) {
+    var s = signals[i];
+    var biasClass = s.bias === 'bullish' ? 'bullish' : s.bias === 'bearish' ? 'bearish' : 'neutral';
+    var biasEmoji = s.bias === 'bullish' ? '\ud83d\udcc8' : s.bias === 'bearish' ? '\ud83d\udcc9' : '\u2696\ufe0f';
+    var evClass = s.ev > 0 ? 'positive' : s.ev < 0 ? 'negative' : '';
+    html += '<div class="line-card">';
+    html += '<div class="line-card-top">';
+    // Left: Symbol + price + IV
+    html += '<div class="line-card-left">';
+    html += '<div class="line-card-symbol">' + s.symbol + '</div>';
+    html += '<div class="line-card-price">$' + s.price.toFixed(2) + '</div>';
+    html += '<div class="line-card-iv">IV: ' + s.ivr.toFixed(1) + '%</div>';
+    html += '</div>';
+    // Middle: Strategy + order
+    html += '<div class="line-card-mid">';
+    html += '<div class="line-card-strategy ' + biasClass + '">' + biasEmoji + ' ' + s.strategyText + '</div>';
+    html += '<div class="line-card-order">' + s.orderText + '</div>';
+    html += '<div class="line-card-signal-desc">' + s.signalDesc + '</div>';
+    html += '</div>';
+    // Right: EV + POP + PnL
+    html += '<div class="line-card-right">';
+    html += '<div class="line-card-ev ' + evClass + '">EV: ' + s.ev.toFixed(2) + '</div>';
+    html += '<div class="line-card-pop">\u52dd\u7387: ' + (s.pop * 100).toFixed(1) + '%</div>';
+    html += '<div class="line-card-pnl">+' + s.maxProfit.toFixed(0) + ' / -' + s.maxLoss.toFixed(0) + '</div>';
+    html += '</div>';
+    html += '</div>';
+    // Bottom: DTE + expiry + support/resistance + analyze button
+    html += '<div class="line-card-bottom">';
+    html += '<div class="line-card-meta">';
+    if (s.expiry) html += '<span>\ud83d\udcc5 ' + s.expiry + ' (\u5269' + s.dte + '\u5929)</span>';
+    if (s.support) html += '<span>\ud83d\udee1\ufe0f \u652f\u6490: ' + s.support.toFixed(2) + '</span>';
+    if (s.resistance) html += '<span>\u2694\ufe0f \u58d3\u529b: ' + s.resistance.toFixed(2) + '</span>';
+    html += '</div>';
+    html += '<div class="line-card-actions">';
+    html += '<button class="btn-sm primary" onclick="analyzeLINESignal(' + i + ')">' + '\u5224\u65b7</button>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+  }
+  // Add "Analyze All" button
+  html += '<div class="line-analyze-all-wrap">';
+  html += '<button class="btn-primary" onclick="analyzeAllLINESignals()">\ud83d\udcca \u5168\u90e8\u5224\u65b7</button>';
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function parseAllLINESignals() {
+  var text = document.getElementById('line-textarea').value.trim();
+  if (!text) {
+    document.getElementById('line-parsed-list').innerHTML = '<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>\u8acb\u5148\u8cbc\u4e0a LINE \u8a0a\u865f\u6587\u5b57</strong></p></div>';
+    return;
+  }
+  parsedLINESignals = parseLINESignals(text);
+  renderLINECards(parsedLINESignals);
+  document.getElementById('line-summary-table').innerHTML = '';
+}
+
+function clearLINEPanel() {
+  document.getElementById('line-textarea').value = '';
+  document.getElementById('line-parsed-list').innerHTML = '';
+  document.getElementById('line-summary-table').innerHTML = '';
+  document.getElementById('sp-result').innerHTML = '';
+  parsedLINESignals = [];
+  clearSignalHighlights();
+  var sumMod = document.getElementById('sum-module');
+  var sumStr = document.getElementById('sum-strategy');
+  if (sumMod) { sumMod.textContent = '\u2014'; sumMod.className = 'summary-val blue'; }
+  if (sumStr) { sumStr.textContent = '\u2014'; sumStr.className = 'summary-val'; }
+}
+
+function analyzeLINESignal(index) {
+  var s = parsedLINESignals[index];
+  if (!s) return;
+  var payload = {
+    symbol: s.symbol,
+    strategy: s.strategy,
+    ivr: s.ivr,
+    dte: s.dte,
+    pop: s.pop,
+    bias: s.bias,
+    credit_received: s.credit_received,
+    debit_paid: s.debit_paid,
+    max_loss: s.max_loss,
+    event_risk: s.event_risk ? 'true' : 'false'
+  };
+  analyzePayload(payload);
+}
+
+function analyzeAllLINESignals() {
+  if (!parsedLINESignals.length) return;
+  var results = [];
+  for (var i = 0; i < parsedLINESignals.length; i++) {
+    var s = parsedLINESignals[i];
+    var pm = pickModuleSP(s.symbol, s.strategy);
+    var rf = riskFilterSP(pm.module, s.strategy, s.ivr, s.dte, s.event_risk);
+    results.push({
+      symbol: s.symbol,
+      strategy: s.strategy,
+      module: pm.module,
+      ivr: s.ivr,
+      dte: s.dte,
+      pop: s.pop,
+      ev: s.ev,
+      decision: rf.decision,
+      reason: rf.reason
+    });
+  }
+  var container = document.getElementById('line-summary-table');
+  var html = '<div class="line-summary">';
+  html += '<h4>\ud83d\udcca \u5168\u90e8\u5224\u65b7\u7d50\u679c</h4>';
+  html += '<div style="overflow-x:auto">';
+  html += '<table class="line-summary-table">';
+  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>Decision</th></tr></thead>';
+  html += '<tbody>';
+  for (var j = 0; j < results.length; j++) {
+    var r = results[j];
+    var rowClass = r.decision === 'approved' ? 'row-approved' : r.decision === 'blocked' ? 'row-blocked' : '';
+    var decBadge = r.decision === 'approved' ? '<span class="badge decision-approved" style="font-size:10px;padding:2px 8px">\u2705 APPROVED</span>' : '<span class="badge decision-blocked" style="font-size:10px;padding:2px 8px">\ud83d\udeab BLOCKED</span>';
+    if (r.reason) decBadge += '<div style="font-size:10px;color:var(--color-text-muted);margin-top:2px">' + getReasonLabel(r.reason) + '</div>';
+    html += '<tr class="' + rowClass + '">';
+    html += '<td><strong>' + r.symbol + '</strong></td>';
+    html += '<td>' + r.strategy + '</td>';
+    html += '<td>' + r.module + '</td>';
+    html += '<td>' + r.ivr.toFixed(1) + '</td>';
+    html += '<td>' + r.dte + '</td>';
+    html += '<td>' + (r.pop * 100).toFixed(1) + '%</td>';
+    html += '<td class="' + (r.ev > 0 ? 'val' : r.ev < 0 ? 'val-stop' : '') + '">' + r.ev.toFixed(2) + '</td>';
+    html += '<td>' + decBadge + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+  container.innerHTML = html;
+}
+
+function fillLINESample() {
+  var sample = '\u3010KO\u3011 \u73fe\u50f9:76.72 (IV:14.63%)\n\u8a0a\u865f: \u8da8\u52e2\u7a69\u5b9a (2/3)\n\u7b56\u7565: \ud83d\udcc8 \u770b\u6f32\u9032\u653b\n\u6307\u4ee4: BUY CALL 76.0 / SELL CALL 81.0\nEV: 1.45 | \u52dd\u7387: 61.0%\n\u76c8\u8667: +340.0/-160.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:74.07 | \u58d3\u529b:78.43\n\n\u3010JNJ\u3011 \u73fe\u50f9:156.54 (IV:23.17%)\n\u8a0a\u865f: \u8da8\u52e2\u5f37\u52c1 (3/3)\n\u7b56\u7565: \ud83d\udcc8 \u770b\u6f32\u9032\u653b\n\u6307\u4ee4: BUY CALL 155.0 / SELL CALL 162.5\nEV: 2.18 | \u52dd\u7387: 58.0%\n\u76c8\u8667: +430.0/-320.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:152.30 | \u58d3\u529b:159.80\n\n\u3010CBOE\u3011 \u73fe\u50f9:217.80 (IV:19.45%)\n\u8a0a\u865f: \u8da8\u52e2\u7a69\u5b9a (2/3)\n\u7b56\u7565: \ud83d\udcc9 \u770b\u8dcc\u9032\u653b\n\u6307\u4ee4: BUY PUT 220.0 / SELL PUT 215.0\nEV: 0.87 | \u52dd\u7387: 54.0%\n\u76c8\u8667: +280.0/-220.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:214.50 | \u58d3\u529b:221.00\n\n\u3010SPY\u3011 \u73fe\u50f9:549.01 (IV:26.88%)\n\u8a0a\u865f: \u8da8\u52e2\u4e2d\u6027 (1/3)\n\u7b56\u7565: \u2696\ufe0f \u4e2d\u6027\u6536\u79df\n\u6307\u4ee4: SELL PUT 540.0 / BUY PUT 535.0\nEV: 1.12 | \u52dd\u7387: 72.0%\n\u76c8\u8667: +180.0/-320.0\n\ud83d\udcc5 \u5230\u671f: 2026-05-01 (\u526928\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:541.20 | \u58d3\u529b:556.80\n\n\u3010QQQ\u3011 \u73fe\u50f9:462.35 (IV:30.12%)\n\u8a0a\u865f: \u8da8\u52e2\u4e2d\u6027 (1/3)\n\u7b56\u7565: \u2696\ufe0f \u4e2d\u6027\u6536\u79df\n\u6307\u4ee4: SELL CALL 475.0 / BUY CALL 480.0\nEV: 0.95 | \u52dd\u7387: 68.0%\n\u76c8\u8667: +160.0/-340.0\n\ud83d\udcc5 \u5230\u671f: 2026-05-01 (\u526928\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:455.10 | \u58d3\u529b:470.50';
+  document.getElementById('line-textarea').value = sample;
 }
 
 // === Init ===
