@@ -383,83 +383,71 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   .line-card-right { text-align: left; }
   .line-card-meta { flex-direction: column; gap: var(--space-1); }
 }
-/* === Gate 1: Pre-Market Signal Dashboard === */
-.g1-status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
-.g1-status-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); transition: background var(--transition), border-color var(--transition), box-shadow var(--transition); }
-.g1-status-card .sc-title { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
-.g1-status-card .sc-title .sc-emoji { font-size: var(--text-sm); }
-.g1-status-card .sc-input select, .g1-status-card .sc-input input[type=number] { width: 100%; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); color: var(--color-text); font-size: var(--text-sm); font-weight: 600; font-family: inherit; outline: none; transition: border-color var(--transition); appearance: none; }
-.g1-status-card .sc-input select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23797876' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; cursor: pointer; }
-.g1-status-card .sc-input input:focus, .g1-status-card .sc-input select:focus { border-color: var(--color-primary); }
-.g1-status-card .sc-hint { font-size: 11px; color: var(--color-text-faint); margin-top: var(--space-2); }
-.g1-status-card.tint-green { border-color: var(--color-success); background: var(--color-success-highlight); }
-.g1-status-card.tint-red { border-color: var(--color-error); background: var(--color-error-highlight); }
-.g1-status-card.tint-blue { border-color: var(--color-blue); background: var(--color-blue-highlight); }
-.g1-status-card.tint-amber { border-color: var(--color-warning); background: var(--color-warning-highlight); }
-/* IVR visual bar */
-.ivr-bar { height: 8px; border-radius: 999px; background: var(--color-divider); margin-top: var(--space-2); position: relative; overflow: hidden; display: flex; }
-.ivr-bar .ivr-seg { height: 100%; transition: opacity var(--transition); }
-.ivr-bar .ivr-seg.low { flex: 27; background: var(--color-error); opacity: 0.35; }
-.ivr-bar .ivr-seg.ideal { flex: 18; background: var(--color-success); opacity: 0.35; }
-.ivr-bar .ivr-seg.high { flex: 55; background: var(--color-warning); opacity: 0.35; }
-.ivr-bar .ivr-seg.active { opacity: 1; }
-.ivr-marker { position: absolute; top: -3px; width: 3px; height: 14px; background: var(--color-text); border-radius: 999px; transition: left 0.3s cubic-bezier(0.16,1,0.3,1); }
-.ivr-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
-/* Toggle buttons */
-.g1-toggle-group { display: flex; gap: var(--space-1); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--color-border); }
-.g1-toggle-btn { flex: 1; padding: var(--space-2) var(--space-3); font-size: var(--text-xs); font-weight: 600; text-align: center; color: var(--color-text-muted); background: var(--color-surface-2); border: none; cursor: pointer; transition: all var(--transition); }
-.g1-toggle-btn:not(:last-child) { border-right: 1px solid var(--color-border); }
-.g1-toggle-btn.active-green { background: var(--color-success); color: #fff; }
-.g1-toggle-btn.active-red { background: var(--color-error); color: #fff; }
-/* Section titles */
-.g1-section-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); letter-spacing: -0.01em; }
-.g1-section-title .g1-st-icon { font-size: var(--text-sm); }
-/* Prompt message */
-.g1-prompt { text-align: center; padding: var(--space-8) var(--space-4); color: var(--color-text-faint); font-size: var(--text-sm); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-.g1-prompt .g1-prompt-icon { font-size: var(--text-xl); display: block; margin-bottom: var(--space-2); }
-/* Recommendation cards */
-.g1-rec-list { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-6); }
-.g1-rec-card { display: flex; align-items: stretch; gap: var(--space-4); padding: var(--space-4) var(--space-5); border-radius: var(--radius-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--color-border); transition: all 0.3s cubic-bezier(0.16,1,0.3,1); animation: g1FadeIn 0.35s ease; }
-@keyframes g1FadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.g1-rec-card.income { border-left-color: var(--color-success); }
-.g1-rec-card.offense { border-left-color: var(--color-orange); }
-.g1-rec-card.blocked { border-left-color: var(--color-error); background: var(--color-error-highlight); }
-.g1-rec-card.warning { border-left-color: var(--color-warning); background: var(--color-warning-highlight); }
-.g1-rec-badge { width: 56px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.g1-rec-badge .g1-code { font-size: var(--text-sm); font-weight: 700; padding: var(--space-2) var(--space-2); border-radius: var(--radius-md); text-align: center; min-width: 48px; }
-.g1-rec-body { flex: 1; min-width: 0; }
-.g1-rec-body .g1-rec-name { font-size: var(--text-sm); font-weight: 700; margin-bottom: 2px; }
-.g1-rec-body .g1-rec-reason { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 4px; }
-.g1-rec-body .g1-rec-action { font-size: var(--text-xs); color: var(--color-primary); font-weight: 500; }
-.g1-rec-body .g1-rec-module { font-size: 11px; color: var(--color-text-faint); margin-top: 2px; }
-.g1-rec-priority { display: flex; align-items: center; flex-shrink: 0; font-size: var(--text-xs); font-weight: 600; white-space: nowrap; }
-.g1-rec-priority.primary { color: var(--color-gold); }
-.g1-rec-priority.alt { color: var(--color-text-faint); }
-/* Checklist in Gate 1 */
-.g1-check-columns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-bottom: var(--space-6); }
-.g1-check-col h4 { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
-.g1-check-col h4 .g1-col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.g1-check-col h4 .g1-col-dot.income { background: var(--color-success); }
-.g1-check-col h4 .g1-col-dot.offense { background: var(--color-orange); }
-.g1-check-list { display: flex; flex-direction: column; gap: var(--space-2); }
-.g1-check-item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-divider); transition: all var(--transition); }
-.g1-check-item .g1-ci-box { width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid var(--color-border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--color-surface-2); transition: all var(--transition); }
-.g1-check-item.auto-checked { border-color: var(--color-success); background: var(--color-success-highlight); color: var(--color-text); }
-.g1-check-item.auto-checked .g1-ci-box { background: var(--color-success); border-color: var(--color-success); }
-/* Excluded strategies */
-.g1-excluded { margin-bottom: var(--space-6); }
-.g1-excluded-toggle { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); cursor: pointer; padding: var(--space-2) 0; }
-.g1-excluded-toggle .g1-ex-arrow { transition: transform var(--transition); font-size: 10px; }
-.g1-excluded-toggle.open .g1-ex-arrow { transform: rotate(180deg); }
-.g1-excluded-body { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.16,1,0.3,1), opacity 0.25s ease; opacity: 0; }
-.g1-excluded-body.open { max-height: 600px; opacity: 1; }
-.g1-excluded-list { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); }
-.g1-excluded-item { font-size: var(--text-xs); color: var(--color-text-faint); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--color-surface); border: 1px solid var(--color-divider); display: flex; gap: var(--space-2); align-items: center; }
-.g1-excluded-item .g1-ex-name { text-decoration: line-through; }
-.g1-excluded-item .g1-ex-reason { color: var(--color-text-faint); font-style: italic; }
+/* ============================================================
+   正EV即時信號 Section
+   ============================================================ */
+.ev-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-5); flex-wrap: wrap; gap: var(--space-3); }
+.ev-section-meta { display: flex; align-items: center; gap: var(--space-3); }
+.ev-refresh-status { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }
+.ev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-text-faint); flex-shrink: 0; }
+.ev-dot.active { background: var(--color-success); animation: pulse 2s infinite; }
+.ev-summary-bar { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--text-xs); flex-wrap: wrap; margin-bottom: var(--space-5); }
+.ev-summary-item { display: flex; align-items: center; gap: var(--space-2); }
+.ev-summary-label { color: var(--color-text-muted); }
+.ev-summary-val { font-weight: 700; color: var(--color-primary); }
+.ev-cards-grid { display: flex; flex-direction: column; gap: var(--space-5); }
+.ev-symbol-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-sm); transition: box-shadow var(--transition); }
+.ev-symbol-card:hover { box-shadow: var(--shadow-md); }
+.ev-symbol-card.bullish { border-left: 3px solid var(--color-success); }
+.ev-symbol-card.bearish { border-left: 3px solid var(--color-error); }
+.ev-symbol-card.neutral { border-left: 3px solid var(--color-text-faint); }
+.ev-card-header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); background: var(--color-surface-2); border-bottom: 1px solid var(--color-divider); flex-wrap: wrap; }
+.ev-symbol-name { font-size: var(--text-lg); font-weight: 800; letter-spacing: -0.02em; }
+.ev-direction-badge { font-size: var(--text-xs); font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+.ev-direction-badge.bullish { background: var(--color-success-highlight); color: var(--color-success); }
+.ev-direction-badge.bearish { background: var(--color-error-highlight); color: var(--color-error); }
+.ev-direction-badge.neutral { background: var(--color-surface-dynamic); color: var(--color-text-muted); }
+.ev-card-metrics { display: flex; align-items: center; gap: var(--space-4); margin-left: auto; flex-wrap: wrap; }
+.ev-metric { text-align: center; }
+.ev-metric-label { font-size: 10px; color: var(--color-text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.ev-metric-val { font-size: var(--text-sm); font-weight: 700; }
+.ev-metric-val.bullish { color: var(--color-success); }
+.ev-metric-val.bearish { color: var(--color-error); }
+.ev-metric-val.warn { color: var(--color-warning); }
+.ev-card-body { padding: var(--space-4) var(--space-5); }
+.ev-reasons { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.ev-reason-tag { font-size: 11px; padding: 3px var(--space-3); border-radius: 999px; background: var(--color-surface-offset); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+.ev-reason-tag.bearish { background: var(--color-error-highlight); border-color: transparent; color: var(--color-error); }
+.ev-reason-tag.bullish { background: var(--color-success-highlight); border-color: transparent; color: var(--color-success); }
+.ev-spreads-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
+.ev-spread-card { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); }
+.ev-spread-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.ev-spread-strategy { font-size: var(--text-xs); font-weight: 700; color: var(--color-primary); }
+.ev-spread-dte { font-size: 10px; color: var(--color-text-faint); background: var(--color-surface-offset); padding: 2px 8px; border-radius: 999px; }
+.ev-spread-strikes { font-size: var(--text-sm); font-weight: 800; letter-spacing: -0.01em; margin-bottom: var(--space-3); color: var(--color-text); }
+.ev-spread-row { display: flex; justify-content: space-between; align-items: center; font-size: var(--text-xs); padding: 3px 0; border-bottom: 1px solid var(--color-divider); }
+.ev-spread-row:last-child { border-bottom: none; }
+.ev-spread-key { color: var(--color-text-muted); }
+.ev-spread-val { font-weight: 600; }
+.ev-spread-val.positive { color: var(--color-success); }
+.ev-spread-val.negative { color: var(--color-error); }
+.ev-bar-wrap { margin-top: var(--space-3); }
+.ev-bar-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-muted); margin-bottom: 4px; }
+.ev-bar-track { height: 5px; background: var(--color-divider); border-radius: 999px; overflow: hidden; }
+.ev-bar-fill { height: 100%; background: var(--color-success); border-radius: 999px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+.ev-bar-fill.negative { background: var(--color-error); }
+.ev-empty { text-align: center; padding: var(--space-10) var(--space-4); color: var(--color-text-faint); }
+.ev-empty-icon { font-size: 2rem; margin-bottom: var(--space-3); }
+.ev-empty-text { font-size: var(--text-sm); }
+.ev-loading { text-align: center; padding: var(--space-8); color: var(--color-text-muted); font-size: var(--text-sm); }
+.ev-error { padding: var(--space-4); background: var(--color-error-highlight); border: 1px solid var(--color-error); border-radius: var(--radius-lg); color: var(--color-error); font-size: var(--text-xs); margin-bottom: var(--space-4); }
+.ev-tp-sl { display: flex; gap: var(--space-3); padding: var(--space-3) 0 0; }
+.ev-tp { font-size: 11px; background: var(--color-success-highlight); color: var(--color-success); padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+.ev-sl { font-size: 11px; background: var(--color-error-highlight); color: var(--color-error); padding: 2px 10px; border-radius: 999px; font-weight: 600; }
 @media (max-width: 768px) {
-  .g1-status-grid { grid-template-columns: 1fr 1fr; }
-  .g1-check-columns { grid-template-columns: 1fr; }
+  .ev-card-metrics { margin-left: 0; width: 100%; justify-content: flex-start; }
+  .ev-spreads-grid { grid-template-columns: 1fr; }
+  .ev-summary-bar { gap: var(--space-2); }
 }
 </style>
 </head>
@@ -488,6 +476,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <button class="nav-item" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">即時系統</div>
+  <button class="nav-item" onclick="showSection('ev-signals',this)"><span class="nav-dot live"></span>🎯 正EV即時信號</button>
   <button class="nav-item" onclick="showSection('live-dashboard',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">收租模組</div>
@@ -674,103 +663,47 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 </div>
 <div class="info-block note"><p><strong>n8n 對應：</strong>Code node 第一步 <code>pickModule()</code> 根據 <code>strategy</code> + <code>is_index</code> 自動分流：IRON_CONDOR → IC_INDEX / IC_EQUITY、BULL_PUT_CREDIT_SPREAD → BPCS_INDEX / BPCS_EQUITY、BEAR_CALL_CREDIT_SPREAD → BCCS_INDEX / BCCS_EQUITY。若 <code>resolved_module === 'unknown'</code>，<code>module_resolved</code> 為 false，整筆會在 IF node 被濾掉。</p></div>
 </section>
+<!-- EV Signals Section -->
+<section class="gate" id="ev-signals" style="display:none">
+<div class="gate-header">
+  <div class="gate-num g0" style="width:40px;height:40px;font-size:1.1rem">🎯</div>
+  <div>
+    <div class="gate-title">正EV即時信號 <span id="ev-version-badge" class="badge badge-version" style="font-size:var(--text-xs);vertical-align:middle">v3.2</span></div>
+    <div class="gate-subtitle">n8n WF-03 自動掃描，正EV策略即時推播 — 每 60 秒自動更新</div>
+  </div>
+</div>
+<!-- EV Section Header -->
+<div class="ev-section-header">
+  <div class="ev-section-meta">
+    <div class="ev-refresh-status">
+      <div class="ev-dot" id="ev-dot"></div>
+      <span id="ev-time">未連線</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:var(--space-2);align-items:center">
+    <button class="btn-secondary" onclick="loadEVSignals()">🔄 手動刷新</button>
+    <span id="ev-countdown" style="font-size:var(--text-xs);color:var(--color-text-faint)"></span>
+  </div>
+</div>
+<!-- Summary bar (populated by JS) -->
+<div id="ev-summary-bar" class="ev-summary-bar" style="display:none">
+  <div class="ev-summary-item"><span class="ev-summary-label">訊號總數</span><span class="ev-summary-val" id="ev-sum-signals">—</span></div>
+  <div class="ev-summary-item"><span class="ev-summary-label">標的數</span><span class="ev-summary-val" id="ev-sum-symbols">—</span></div>
+  <div class="ev-summary-item"><span class="ev-summary-label">版本</span><span class="ev-summary-val" id="ev-sum-version">—</span></div>
+  <div class="ev-summary-item" style="margin-left:auto"><span class="ev-summary-label">更新時間</span><span class="ev-summary-val" id="ev-sum-time">—</span></div>
+</div>
+<!-- Cards container -->
+<div id="ev-cards-container">
+  <div class="ev-empty">
+    <div class="ev-empty-icon">⏳</div>
+    <div class="ev-empty-text">等待推播...</div>
+  </div>
+</div>
+</section>
 <!-- GATE 1-4 簡化版 -->
 <section class="gate" id="gate1" style="display:none">
-<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號總覽</div><div class="gate-subtitle">設定今日市場狀態，系統自動推薦適合的策略 — 學生看這頁就知道今天該做什麼</div></div></div>
-
-<!-- Section A: 今日市場狀態 -->
-<div class="g1-section-title"><span class="g1-st-icon">A</span> 今日市場狀態</div>
-<div class="g1-status-grid">
-  <!-- Card 1: 大盤方向 -->
-  <div class="g1-status-card" id="g1-card-bias">
-    <div class="sc-title"><span class="sc-emoji">🧭</span> 大盤方向</div>
-    <div class="sc-input">
-      <select id="g1-bias" onchange="g1Update()">
-        <option value="">— 請選擇 —</option>
-        <option value="bullish">📈 偏多 (Bullish)</option>
-        <option value="bearish">📉 偏空 (Bearish)</option>
-        <option value="neutral">➡️ 中性 (Neutral)</option>
-      </select>
-    </div>
-    <div class="sc-hint">SPX/QQQ 技術面方向</div>
-  </div>
-  <!-- Card 2: IVR 區間 -->
-  <div class="g1-status-card" id="g1-card-ivr">
-    <div class="sc-title"><span class="sc-emoji">📊</span> IVR 區間</div>
-    <div class="sc-input">
-      <input type="number" id="g1-ivr" min="0" max="100" placeholder="輸入 IVR %" oninput="g1Update()">
-    </div>
-    <div class="ivr-bar" id="g1-ivr-bar">
-      <div class="ivr-seg low" id="g1-ivr-low"></div>
-      <div class="ivr-seg ideal" id="g1-ivr-ideal"></div>
-      <div class="ivr-seg high" id="g1-ivr-high"></div>
-      <div class="ivr-marker" id="g1-ivr-marker" style="display:none"></div>
-    </div>
-    <div class="ivr-labels"><span>&lt;27 阻</span><span>27-45 理想</span><span>&gt;45 高</span></div>
-  </div>
-  <!-- Card 3: 事件風險 -->
-  <div class="g1-status-card" id="g1-card-event">
-    <div class="sc-title"><span class="sc-emoji">⚡</span> 事件風險</div>
-    <div class="g1-toggle-group" id="g1-event-toggle">
-      <button class="g1-toggle-btn" data-val="false" onclick="g1SetToggle('event','false',this)">無 (No)</button>
-      <button class="g1-toggle-btn" data-val="true" onclick="g1SetToggle('event','true',this)">有 (Yes)</button>
-    </div>
-    <div class="sc-hint">FOMC、CPI、財報週等</div>
-  </div>
-  <!-- Card 4: 流動性 -->
-  <div class="g1-status-card" id="g1-card-liquidity">
-    <div class="sc-title"><span class="sc-emoji">💧</span> 流動性</div>
-    <div class="g1-toggle-group" id="g1-liq-toggle">
-      <button class="g1-toggle-btn" data-val="true" onclick="g1SetToggle('liquidity','true',this)">充足</button>
-      <button class="g1-toggle-btn" data-val="false" onclick="g1SetToggle('liquidity','false',this)">不足</button>
-    </div>
-    <div class="sc-hint">OI &gt; 500, Bid-Ask &lt; $0.10</div>
-  </div>
-</div>
-
-<!-- Section B: 策略推薦引擎 -->
-<div class="g1-section-title"><span class="g1-st-icon">B</span> 策略推薦引擎</div>
-<div id="g1-rec-container">
-  <div class="g1-prompt"><span class="g1-prompt-icon">👆</span>請先設定今日市場狀態，系統會自動推薦適合的策略</div>
-</div>
-
-<!-- Section C: 條件核對清單 -->
-<div class="g1-section-title"><span class="g1-st-icon">C</span> 條件核對清單</div>
-<div class="g1-check-columns">
-  <div class="g1-check-col">
-    <h4><span class="g1-col-dot income"></span> 收租策略條件</h4>
-    <div class="g1-check-list" id="g1-checklist-income">
-      <div class="g1-check-item" data-key="income-bias"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>大盤方向確認（SPX/QQQ 技術面）</span></div>
-      <div class="g1-check-item" data-key="income-ivr"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>IVR 在 27-45% 區間</span></div>
-      <div class="g1-check-item" data-key="income-event"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>無重大事件風險（FOMC/CPI/財報）</span></div>
-      <div class="g1-check-item" data-key="income-liq"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>流動性充足（OI &gt; 500）</span></div>
-      <div class="g1-check-item" data-key="income-trend"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>個股趨勢與策略方向一致</span></div>
-    </div>
-  </div>
-  <div class="g1-check-col">
-    <h4><span class="g1-col-dot offense"></span> 進攻策略條件</h4>
-    <div class="g1-check-list" id="g1-checklist-offense">
-      <div class="g1-check-item" data-key="offense-direction"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>方向明確（突破/跌破確認）</span></div>
-      <div class="g1-check-item" data-key="offense-iv"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>IV 低到中（進攻成本較低）</span></div>
-      <div class="g1-check-item" data-key="offense-event"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>無重大事件風險</span></div>
-      <div class="g1-check-item" data-key="offense-liq"><div class="g1-ci-box"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div><span>流動性充足</span></div>
-    </div>
-  </div>
-</div>
-
-<!-- Section D: 今日不適用的策略 -->
-<div class="g1-excluded" id="g1-excluded">
-  <button class="g1-excluded-toggle" id="g1-excluded-toggle" onclick="g1ToggleExcluded()">
-    <span class="g1-ex-arrow">▼</span>
-    <span>D 今日不適用的策略</span>
-    <span id="g1-excluded-count" style="font-weight:400;color:var(--color-text-faint)"></span>
-  </button>
-  <div class="g1-excluded-body" id="g1-excluded-body">
-    <div class="g1-excluded-list" id="g1-excluded-list">
-    </div>
-  </div>
-</div>
-
+<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號</div><div class="gate-subtitle">regime 判斷、篩選條件、事件風險排除</div></div></div>
+<div class="info-block note"><p>詳細參數請參考原始 SOP 文件，或在本地開啟 <code>options-strategy-engine.html</code> 查看完整篩選條件表。</p></div>
 </section>
 <section class="gate" id="gate2" style="display:none">
 <div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上確認 Delta、DTE、Wing 寬度、Credit/Width 比</div></div></div>
@@ -904,7 +837,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 })();
 
 // === Navigation ===
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   updateSummary(); } let currentGate = 'gate0';
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'ev-signals') loadEVSignals();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
@@ -1803,279 +1736,195 @@ function fillLINESample() {
   document.getElementById('line-textarea').value = sample;
 }
 
-// === Gate 1: Pre-Market Signal Dashboard ===
-var g1State = { bias: '', ivr: NaN, eventRisk: null, liquidityOk: null };
+// === 正EV即時信號 ===
+var evSignalsInterval = null;
+var evCountdownInterval = null;
+var evCountdownVal = 60;
+var EV_WEBHOOK_URL = 'https://chilldove.app.n8n.cloud/webhook/ev-signals';
 
-function g1SetToggle(type, val, btn) {
-  var group = btn.parentElement;
-  group.querySelectorAll('.g1-toggle-btn').forEach(function(b) {
-    b.classList.remove('active-green', 'active-red');
-  });
-  if (type === 'event') {
-    g1State.eventRisk = val === 'true';
-    btn.classList.add(val === 'true' ? 'active-red' : 'active-green');
-    var card = document.getElementById('g1-card-event');
-    card.className = 'g1-status-card' + (val === 'true' ? ' tint-red' : ' tint-green');
-  } else if (type === 'liquidity') {
-    g1State.liquidityOk = val === 'true';
-    btn.classList.add(val === 'true' ? 'active-green' : 'active-red');
-    var card = document.getElementById('g1-card-liquidity');
-    card.className = 'g1-status-card' + (val === 'true' ? ' tint-green' : ' tint-red');
-  }
-  g1Update();
+function loadEVSignals() {
+  var container = document.getElementById('ev-cards-container');
+  var dotEl = document.getElementById('ev-dot');
+  var timeEl = document.getElementById('ev-time');
+  var summaryBar = document.getElementById('ev-summary-bar');
+  if (!container) return;
+  container.innerHTML = '<div class="ev-loading">載入中...</div>';
+  if (dotEl) dotEl.className = 'ev-dot';
+  if (timeEl) timeEl.textContent = '載入中...';
+  fetch(EV_WEBHOOK_URL, { method: 'GET', headers: { 'Accept': 'application/json' } })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      evRenderSignals(data);
+      // Start 60s countdown
+      evResetCountdown();
+    })
+    .catch(function(err) {
+      container.innerHTML = '<div class="ev-error">無法取得資料：' + err.message + '</div><div class="ev-empty"><div class="ev-empty-icon">⚠️</div><div class="ev-empty-text">請檢查 Webhook 連線狀態</div></div>';
+      if (dotEl) dotEl.className = 'ev-dot';
+      if (timeEl) timeEl.textContent = '連線失敗';
+      if (summaryBar) summaryBar.style.display = 'none';
+    });
 }
 
-function g1Update() {
-  var biasEl = document.getElementById('g1-bias');
-  var ivrEl = document.getElementById('g1-ivr');
-  g1State.bias = biasEl ? biasEl.value : '';
-  g1State.ivr = ivrEl ? parseFloat(ivrEl.value) : NaN;
+function evRenderSignals(data) {
+  var container = document.getElementById('ev-cards-container');
+  var dotEl = document.getElementById('ev-dot');
+  var timeEl = document.getElementById('ev-time');
+  var summaryBar = document.getElementById('ev-summary-bar');
+  if (!container) return;
 
-  // Update bias card tint
-  var biasCard = document.getElementById('g1-card-bias');
-  biasCard.className = 'g1-status-card';
-  if (g1State.bias === 'bullish') biasCard.classList.add('tint-green');
-  else if (g1State.bias === 'bearish') biasCard.classList.add('tint-red');
-  else if (g1State.bias === 'neutral') biasCard.classList.add('tint-blue');
+  // Update dot & time
+  if (dotEl) dotEl.className = 'ev-dot active';
+  var tsRaw = data.timestamp || data.created_at || '';
+  var tsDisplay = tsRaw ? new Date(tsRaw).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : new Date().toLocaleTimeString('zh-TW');
+  if (timeEl) timeEl.textContent = '上次更新: ' + tsDisplay;
 
-  // Update IVR bar
-  g1UpdateIVRBar();
-
-  // Update IVR card tint
-  var ivrCard = document.getElementById('g1-card-ivr');
-  ivrCard.className = 'g1-status-card';
-  if (!isNaN(g1State.ivr)) {
-    if (g1State.ivr < 27) ivrCard.classList.add('tint-red');
-    else if (g1State.ivr <= 45) ivrCard.classList.add('tint-green');
-    else ivrCard.classList.add('tint-amber');
+  // Summary bar
+  var summary = data.summary || {};
+  var rawArr = Array.isArray(data.raw) ? data.raw : [];
+  var signalsArr = Array.isArray(data.signals) ? data.signals : [];
+  if (summaryBar) {
+    document.getElementById('ev-sum-signals').textContent = summary.totalSignals || signalsArr.length || '—';
+    document.getElementById('ev-sum-symbols').textContent = summary.symbolCount || rawArr.length || '—';
+    var ver = summary.version || data.version || '—';
+    document.getElementById('ev-sum-version').textContent = ver;
+    document.getElementById('ev-sum-time').textContent = tsDisplay;
+    // Update version badge in title
+    var badge = document.getElementById('ev-version-badge');
+    if (badge && summary.version) badge.textContent = summary.version;
+    summaryBar.style.display = 'flex';
   }
 
-  // Check if all inputs are set
-  var allSet = g1State.bias !== '' && !isNaN(g1State.ivr) && g1State.eventRisk !== null && g1State.liquidityOk !== null;
-
-  if (!allSet) {
-    document.getElementById('g1-rec-container').innerHTML = '<div class="g1-prompt"><span class="g1-prompt-icon">\ud83d\udc46</span>\u8acb\u5148\u8a2d\u5b9a\u4eca\u65e5\u5e02\u5834\u72c0\u614b\uff0c\u7cfb\u7d71\u6703\u81ea\u52d5\u63a8\u85a6\u9069\u5408\u7684\u7b56\u7565</div>';
-    document.getElementById('g1-excluded-list').innerHTML = '';
-    document.getElementById('g1-excluded-count').textContent = '';
-    g1UpdateChecklist();
+  // Render cards from raw array
+  if (!rawArr.length && !signalsArr.length) {
+    container.innerHTML = '<div class="ev-empty"><div class="ev-empty-icon">⏳</div><div class="ev-empty-text">等待推播...</div></div>';
     return;
   }
 
-  var recs = g1GetRecommendations(g1State.bias, g1State.ivr, g1State.eventRisk, g1State.liquidityOk);
-  g1RenderRecommendations(recs);
-  g1UpdateChecklist();
-  g1UpdateExcluded();
-  g1UpdateSummaryBar(recs);
-}
+  var html = '<div class="ev-cards-grid">';
 
-function g1UpdateIVRBar() {
-  var ivr = g1State.ivr;
-  var marker = document.getElementById('g1-ivr-marker');
-  var segLow = document.getElementById('g1-ivr-low');
-  var segIdeal = document.getElementById('g1-ivr-ideal');
-  var segHigh = document.getElementById('g1-ivr-high');
-  segLow.classList.remove('active');
-  segIdeal.classList.remove('active');
-  segHigh.classList.remove('active');
-  if (isNaN(ivr) || ivr < 0) { marker.style.display = 'none'; return; }
-  marker.style.display = 'block';
-  var clamped = Math.max(0, Math.min(100, ivr));
-  marker.style.left = clamped + '%';
-  if (ivr < 27) segLow.classList.add('active');
-  else if (ivr <= 45) segIdeal.classList.add('active');
-  else segHigh.classList.add('active');
-}
+  rawArr.forEach(function(sym) {
+    var dir = (sym.direction || 'neutral').toLowerCase();
+    var dirIcon = dir === 'bullish' ? '🟢' : dir === 'bearish' ? '🔴' : '⚪';
+    var dirLabel = dir === 'bullish' ? '偏多' : dir === 'bearish' ? '偏空' : '中性';
+    var rsi = typeof sym.rsi === 'number' ? sym.rsi.toFixed(1) : '—';
+    var rsiClass = sym.rsi > 70 ? 'warn' : sym.rsi < 30 ? 'bullish' : '';
+    var ivr = typeof sym.ivr === 'number' ? (sym.ivr * 100).toFixed(1) + '%' : (typeof sym.ivrRaw === 'number' ? sym.ivrRaw.toFixed(1) + '%' : '—');
+    var ma20 = typeof sym.ma20 === 'number' ? sym.ma20.toFixed(2) : '—';
+    var price = typeof sym.underlyingPrice === 'number' ? sym.underlyingPrice.toFixed(2) : '—';
+    var macdCross = sym.macd && sym.macd.cross ? sym.macd.cross : '—';
+    var macdLabel = macdCross === 'golden' ? '金叉 ↑' : macdCross === 'death' ? '死叉 ↓' : macdCross;
+    var macdClass = macdCross === 'golden' ? 'bullish' : macdCross === 'death' ? 'bearish' : '';
+    var reasons = Array.isArray(sym.directionReasons) ? sym.directionReasons : [];
+    var spreads = Array.isArray(sym.spreads) ? sym.spreads : [];
+    var ticker = sym.ticker || sym.name || sym.symbol || '—';
 
-function g1GetRecommendations(bias, ivr, eventRisk, liquidityOk) {
-  var recs = [];
-  if (eventRisk) return [{ strategy: '\u26d4 \u4eca\u65e5\u4e0d\u5efa\u8b70\u9032\u5834', reason: '\u4e8b\u4ef6\u98a8\u96aa\u904e\u9ad8', type: 'blocked' }];
-  if (!liquidityOk) return [{ strategy: '\u26d4 \u7b49\u5f85\u6d41\u52d5\u6027\u6539\u5584', reason: '\u6d41\u52d5\u6027\u4e0d\u8db3', type: 'blocked' }];
-  if (ivr >= 27 && ivr <= 45) {
-    if (bias === 'neutral') {
-      recs.push({ strategy: 'Iron Condor', code: 'IC', type: 'income', priority: 1, reason: '\u4e2d\u6027 + IVR ' + ivr + '% \u2192 \u6700\u9069\u5408\u6536\u79df', action: '\u627e Delta \u2264 0.16 \u7684\u96d9\u908a spread', module: 'IC_INDEX\uff08\u6307\u6578\uff09\u6216 IC_EQUITY\uff08\u500b\u80a1\uff09' });
-    }
-    if (bias === 'bullish') {
-      recs.push({ strategy: 'Bull Put Credit Spread', code: 'BPCS', type: 'income', priority: 1, reason: '\u504f\u591a + IVR ' + ivr + '% \u2192 \u8ce3 Put \u6536\u79df', action: '\u9078\u652f\u6490\u4f4d\u4e0b\u65b9\u7684 Put spread', module: 'BPCS_INDEX \u6216 BPCS_EQUITY' });
-    }
-    if (bias === 'bearish') {
-      recs.push({ strategy: 'Bear Call Credit Spread', code: 'BCCS', type: 'income', priority: 1, reason: '\u504f\u7a7a + IVR ' + ivr + '% \u2192 \u8ce3 Call \u6536\u79df', action: '\u9078\u58d3\u529b\u4f4d\u4e0a\u65b9\u7684 Call spread', module: 'BCCS_INDEX \u6216 BCCS_EQUITY' });
-    }
-  }
-  if (bias === 'bullish') {
-    recs.push({ strategy: 'Bull Call Debit Spread', code: 'BCDS', type: 'offense', priority: ivr < 27 ? 1 : 2, reason: '\u770b\u6f32\u7a81\u7834 \u2192 \u9650\u5236\u98a8\u96aa\u7684\u591a\u982d\u7b56\u7565', action: 'BUY ATM Call / SELL OTM Call', module: 'offense' });
-  }
-  if (bias === 'bearish') {
-    recs.push({ strategy: 'Bear Put Debit Spread', code: 'BPDS', type: 'offense', priority: ivr < 27 ? 1 : 2, reason: '\u770b\u8dcc\u8dcc\u7834 \u2192 \u9650\u5236\u98a8\u96aa\u7684\u7a7a\u982d\u7b56\u7565', action: 'BUY ATM Put / SELL OTM Put', module: 'offense' });
-  }
-  if (ivr < 27 && recs.length === 0) {
-    recs.push({ strategy: '\u26a0\ufe0f IVR \u904e\u4f4e\uff0c\u6536\u79df\u7b56\u7565\u4e0d\u9069\u7528', reason: 'IVR ' + ivr + '% < 27%\uff0c\u9032\u653b\u7b56\u7565\u9700\u660e\u78ba\u65b9\u5411', type: 'warning' });
-  }
-  if (ivr > 45) {
-    recs.unshift({ strategy: '\u26a0\ufe0f IVR \u504f\u9ad8 (' + ivr + '%)', reason: '\u6ce8\u610f\uff1aIV \u53ef\u80fd\u5373\u5c07\u6536\u7e2e\uff0ccredit spread \u53ef\u5feb\u901f\u7372\u5229\u4f46\u4e5f\u53ef\u80fd\u53cd\u8f49', type: 'warning' });
-  }
-  recs.sort(function(a, b) { return (a.priority || 99) - (b.priority || 99); });
-  return recs;
-}
+    html += '<div class="ev-symbol-card ' + dir + '">';
+    // Card header
+    html += '<div class="ev-card-header">';
+    html += '<span class="ev-symbol-name">' + ticker + '</span>';
+    html += '<span class="ev-direction-badge ' + dir + '">' + dirIcon + ' ' + dirLabel + '</span>';
+    html += '<div class="ev-card-metrics">';
+    html += '<div class="ev-metric"><div class="ev-metric-label">Price</div><div class="ev-metric-val">$' + price + '</div></div>';
+    html += '<div class="ev-metric"><div class="ev-metric-label">RSI</div><div class="ev-metric-val ' + rsiClass + '">' + rsi + '</div></div>';
+    html += '<div class="ev-metric"><div class="ev-metric-label">MA20</div><div class="ev-metric-val">' + ma20 + '</div></div>';
+    html += '<div class="ev-metric"><div class="ev-metric-label">MACD</div><div class="ev-metric-val ' + macdClass + '">' + macdLabel + '</div></div>';
+    html += '<div class="ev-metric"><div class="ev-metric-label">IVR</div><div class="ev-metric-val">' + ivr + '</div></div>';
+    html += '</div>'; // metrics
+    html += '</div>'; // card-header
 
-function g1RenderRecommendations(recs) {
-  var container = document.getElementById('g1-rec-container');
-  if (!recs.length) {
-    container.innerHTML = '<div class="g1-prompt"><span class="g1-prompt-icon">\ud83e\udd14</span>\u7121\u5339\u914d\u7684\u7b56\u7565\u2014\u8acb\u8abf\u6574\u5e02\u5834\u72c0\u614b\u8a2d\u5b9a</div>';
-    return;
-  }
-  var html = '<div class="g1-rec-list">';
-  var tagMap = { 'IC': 'tag-ic', 'BPCS': 'tag-bpcs', 'BCCS': 'tag-bccs', 'BCDS': 'tag-bcds', 'BPDS': 'tag-bpds' };
-  for (var i = 0; i < recs.length; i++) {
-    var r = recs[i];
-    var cardClass = 'g1-rec-card';
-    if (r.type === 'income') cardClass += ' income';
-    else if (r.type === 'offense') cardClass += ' offense';
-    else if (r.type === 'blocked') cardClass += ' blocked';
-    else if (r.type === 'warning') cardClass += ' warning';
-    html += '<div class="' + cardClass + '" style="animation-delay:' + (i * 0.08) + 's">';
-    // Badge
-    html += '<div class="g1-rec-badge">';
-    if (r.code) {
-      var tagClass = tagMap[r.code] || '';
-      html += '<div class="g1-code strategy-tag ' + tagClass + '">' + r.code + '</div>';
-    } else if (r.type === 'blocked') {
-      html += '<div class="g1-code" style="font-size:var(--text-lg)">\u26d4</div>';
-    } else if (r.type === 'warning') {
-      html += '<div class="g1-code" style="font-size:var(--text-lg)">\u26a0\ufe0f</div>';
-    }
-    html += '</div>';
-    // Body
-    html += '<div class="g1-rec-body">';
-    html += '<div class="g1-rec-name">' + r.strategy + '</div>';
-    html += '<div class="g1-rec-reason">' + r.reason + '</div>';
-    if (r.action) html += '<div class="g1-rec-action">\u2192 ' + r.action + '</div>';
-    if (r.module) html += '<div class="g1-rec-module">Module: ' + r.module + '</div>';
-    html += '</div>';
-    // Priority
-    if (r.priority) {
-      html += '<div class="g1-rec-priority ' + (r.priority === 1 ? 'primary' : 'alt') + '">';
-      html += r.priority === 1 ? '\u2b50 \u9996\u9078' : '\u5099\u9078';
+    // Card body
+    html += '<div class="ev-card-body">';
+    // Direction reasons
+    if (reasons.length) {
+      html += '<div class="ev-reasons">';
+      reasons.forEach(function(r) {
+        var rClass = r.indexOf('偏空') > -1 || r.indexOf('-') > -1 ? 'bearish' : r.indexOf('偏多') > -1 || r.indexOf('+') > -1 ? 'bullish' : '';
+        html += '<span class="ev-reason-tag ' + rClass + '">' + r + '</span>';
+      });
       html += '</div>';
     }
-    html += '</div>';
-  }
-  html += '</div>';
+
+    // Spread sub-cards
+    if (spreads.length) {
+      html += '<div class="ev-spreads-grid">';
+      spreads.forEach(function(sp) {
+        var ev = typeof sp.ev === 'number' ? sp.ev : null;
+        var evClass = ev !== null ? (ev >= 0 ? 'positive' : 'negative') : '';
+        var evDisplay = ev !== null ? (ev >= 0 ? '+' : '') + ev.toFixed(2) : '—';
+        var kelly = typeof sp.kelly === 'number' ? (sp.kelly * 100).toFixed(0) + '%' : '—';
+        var winRate = typeof sp.winRate === 'number' ? (sp.winRate * 100).toFixed(0) + '%' : '—';
+        var credit = typeof sp.credit === 'number' ? '$' + sp.credit.toFixed(2) : '—';
+        var delta = typeof sp.shortDelta === 'number' ? sp.shortDelta.toFixed(3) : '—';
+        var dte = sp.dte || '—';
+        var tp = typeof sp.takeProfit === 'number' ? '$' + sp.takeProfit.toFixed(3) : '—';
+        var sl = typeof sp.stopLoss === 'number' ? '$' + sp.stopLoss.toFixed(3) : '—';
+        var strikes = (sp.shortStrike || '—') + ' / ' + (sp.longStrike || '—');
+        var expDate = sp.expDate || '';
+        // EV bar width — scale 0-5 to 0-100%
+        var evBarWidth = ev !== null ? Math.min(Math.abs(ev) / 5 * 100, 100).toFixed(1) : 0;
+        var evBarNeg = ev !== null && ev < 0;
+
+        html += '<div class="ev-spread-card">';
+        html += '<div class="ev-spread-header">';
+        html += '<span class="ev-spread-strategy">' + (sp.strategy || '—') + '</span>';
+        html += '<span class="ev-spread-dte">DTE ' + dte + (expDate ? ' | ' + expDate : '') + '</span>';
+        html += '</div>';
+        html += '<div class="ev-spread-strikes">履約 ' + strikes + '</div>';
+        html += '<div class="ev-spread-row"><span class="ev-spread-key">Credit</span><span class="ev-spread-val positive">' + credit + '</span></div>';
+        html += '<div class="ev-spread-row"><span class="ev-spread-key">EV</span><span class="ev-spread-val ' + evClass + '">' + evDisplay + '</span></div>';
+        html += '<div class="ev-spread-row"><span class="ev-spread-key">Kelly</span><span class="ev-spread-val">' + kelly + '</span></div>';
+        html += '<div class="ev-spread-row"><span class="ev-spread-key">Win Rate</span><span class="ev-spread-val">' + winRate + '</span></div>';
+        html += '<div class="ev-spread-row"><span class="ev-spread-key">短肅 δ</span><span class="ev-spread-val">' + delta + '</span></div>';
+        // TP / SL pills
+        html += '<div class="ev-tp-sl"><span class="ev-tp">🟢 止盈 ' + tp + '</span><span class="ev-sl">🔴 止損 ' + sl + '</span></div>';
+        // EV bar
+        html += '<div class="ev-bar-wrap">';
+        html += '<div class="ev-bar-label"><span>EV 視覺化</span><span>' + evDisplay + '</span></div>';
+        html += '<div class="ev-bar-track"><div class="ev-bar-fill' + (evBarNeg ? ' negative' : '') + '" style="width:' + evBarWidth + '%"></div></div>';
+        html += '</div>'; // bar-wrap
+        html += '</div>'; // spread-card
+      });
+      html += '</div>'; // spreads-grid
+    } else {
+      html += '<div style="font-size:var(--text-xs);color:var(--color-text-faint);padding:var(--space-2) 0">未找到符合條件的展期</div>';
+    }
+
+    html += '</div>'; // card-body
+    html += '</div>'; // symbol-card
+  });
+
+  html += '</div>'; // cards-grid
   container.innerHTML = html;
 }
 
-function g1UpdateChecklist() {
-  var bias = g1State.bias;
-  var ivr = g1State.ivr;
-  var eventRisk = g1State.eventRisk;
-  var liquidityOk = g1State.liquidityOk;
-
-  // Income checklist
-  g1SetCheck('income-bias', bias !== '');
-  g1SetCheck('income-ivr', !isNaN(ivr) && ivr >= 27 && ivr <= 45);
-  g1SetCheck('income-event', eventRisk === false);
-  g1SetCheck('income-liq', liquidityOk === true);
-  // income-trend cannot be auto-checked — requires manual confirmation
-
-  // Offense checklist
-  g1SetCheck('offense-direction', bias === 'bullish' || bias === 'bearish');
-  g1SetCheck('offense-iv', !isNaN(ivr) && ivr <= 45);
-  g1SetCheck('offense-event', eventRisk === false);
-  g1SetCheck('offense-liq', liquidityOk === true);
+function evResetCountdown() {
+  evCountdownVal = 60;
+  if (evCountdownInterval) clearInterval(evCountdownInterval);
+  var el = document.getElementById('ev-countdown');
+  if (el) el.textContent = '60s 後自動刷新';
+  evCountdownInterval = setInterval(function() {
+    evCountdownVal--;
+    if (el) el.textContent = evCountdownVal + 's 後自動刷新';
+    if (evCountdownVal <= 0) { clearInterval(evCountdownInterval); }
+  }, 1000);
 }
 
-function g1SetCheck(key, checked) {
-  var item = document.querySelector('.g1-check-item[data-key="' + key + '"]');
-  if (!item) return;
-  if (checked) item.classList.add('auto-checked');
-  else item.classList.remove('auto-checked');
-}
-
-function g1UpdateExcluded() {
-  var bias = g1State.bias;
-  var ivr = g1State.ivr;
-  var excluded = [];
-  var allStrategies = [
-    { name: 'Iron Condor', code: 'IC', needsBias: 'neutral', needsIVR: true },
-    { name: 'Bull Put Credit Spread', code: 'BPCS', needsBias: 'bullish', needsIVR: true },
-    { name: 'Bear Call Credit Spread', code: 'BCCS', needsBias: 'bearish', needsIVR: true },
-    { name: 'Bull Call Debit Spread', code: 'BCDS', needsBias: 'bullish', needsIVR: false },
-    { name: 'Bear Put Debit Spread', code: 'BPDS', needsBias: 'bearish', needsIVR: false }
-  ];
-
-  if (g1State.eventRisk || !g1State.liquidityOk) {
-    // All excluded
-    allStrategies.forEach(function(s) {
-      excluded.push({ name: s.name, reason: g1State.eventRisk ? '\u4e8b\u4ef6\u98a8\u96aa\u904e\u9ad8' : '\u6d41\u52d5\u6027\u4e0d\u8db3' });
-    });
-  } else {
-    allStrategies.forEach(function(s) {
-      var reasons = [];
-      if (s.needsBias !== bias && !(s.needsBias === 'neutral' && bias === 'neutral')) {
-        if (s.needsBias === 'neutral') reasons.push('\u9700\u8981\u4e2d\u6027\u65b9\u5411');
-        else if (s.needsBias === 'bullish' && bias !== 'bullish') reasons.push('\u65b9\u5411\u4e0d\u7b26\uff08\u4eca\u65e5' + (bias === 'bearish' ? '\u504f\u7a7a' : '\u4e2d\u6027') + '\uff09');
-        else if (s.needsBias === 'bearish' && bias !== 'bearish') reasons.push('\u65b9\u5411\u4e0d\u7b26\uff08\u4eca\u65e5' + (bias === 'bullish' ? '\u504f\u591a' : '\u4e2d\u6027') + '\uff09');
-      }
-      if (s.needsIVR && (isNaN(ivr) || ivr < 27 || ivr > 45)) {
-        reasons.push('IVR ' + (isNaN(ivr) ? '--' : ivr) + '% \u4e0d\u5728\u6536\u79df\u7406\u60f3\u5340\u9593 (27-45%)');
-      }
-      if (reasons.length > 0) {
-        excluded.push({ name: s.name, reason: reasons.join('\uff1b') });
-      }
-    });
-  }
-
-  var list = document.getElementById('g1-excluded-list');
-  var countEl = document.getElementById('g1-excluded-count');
-  if (excluded.length === 0) {
-    list.innerHTML = '<div style="padding:var(--space-3);color:var(--color-text-faint);font-size:var(--text-xs)">\u6240\u6709\u7b56\u7565\u7686\u53ef\u7528 \ud83c\udf89</div>';
-    countEl.textContent = '(0)';
-  } else {
-    var html = '';
-    excluded.forEach(function(ex) {
-      html += '<div class="g1-excluded-item"><span class="g1-ex-name">' + ex.name + '</span><span class="g1-ex-reason">\u2014 ' + ex.reason + '</span></div>';
-    });
-    list.innerHTML = html;
-    countEl.textContent = '(' + excluded.length + ')';
-  }
-}
-
-function g1ToggleExcluded() {
-  var toggle = document.getElementById('g1-excluded-toggle');
-  var body = document.getElementById('g1-excluded-body');
-  toggle.classList.toggle('open');
-  body.classList.toggle('open');
-}
-
-function g1UpdateSummaryBar(recs) {
-  var sumMod = document.getElementById('sum-module');
-  var sumStr = document.getElementById('sum-strategy');
-  if (!sumMod || !sumStr) return;
-  var primary = null;
-  for (var i = 0; i < recs.length; i++) {
-    if (recs[i].code && recs[i].priority === 1) { primary = recs[i]; break; }
-  }
-  if (!primary) {
-    for (var i = 0; i < recs.length; i++) {
-      if (recs[i].code) { primary = recs[i]; break; }
-    }
-  }
-  if (primary) {
-    sumMod.textContent = primary.module || primary.code;
-    sumMod.className = 'summary-val ' + (primary.type === 'income' ? 'green' : 'amber');
-    sumStr.textContent = primary.strategy;
-    sumStr.className = 'summary-val ' + (primary.type === 'income' ? 'green' : 'amber');
-  } else if (recs.length > 0 && (recs[0].type === 'blocked' || recs[0].type === 'warning')) {
-    sumMod.textContent = '\u2014';
-    sumMod.className = 'summary-val red';
-    sumStr.textContent = recs[0].strategy;
-    sumStr.className = 'summary-val red';
-  }
+function startEVSignalsAutoRefresh() {
+  if (evSignalsInterval) clearInterval(evSignalsInterval);
+  evSignalsInterval = setInterval(function() {
+    if (currentGate === 'ev-signals') loadEVSignals();
+  }, 60000);
 }
 
 // === Init ===
 showGate('gate0');
 updateSummary();
 startAutoRefresh();
+startEVSignalsAutoRefresh();
 </script>
 </body>
 </html>
