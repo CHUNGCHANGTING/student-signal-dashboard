@@ -478,3 +478,93 @@ function getBrokerAdapter(brokerName) {
 //   const adapter = getBrokerAdapter(input.broker || 'tastytrade');
 //   const token = await adapter.getToken(this, input.refresh_token);
 //   const result = await adapter.placeOrder(this, token, input.account_number, orderData);
+
+
+// ═══════════════════════════════════════════════════════════════
+// IBKR conid Auto-Resolver (OCC symbol → conid)
+// ═══════════════════════════════════════════════════════════════
+
+function parseOCCSymbol(occSymbol) {
+  const s = occSymbol.trim();
+  const root = s.substring(0, 6).trim();
+  const dateStr = s.substring(6, 12);
+  const right = s.substring(12, 13);
+  const strikeRaw = s.substring(13, 21);
+  const yy = parseInt(dateStr.substring(0, 2));
+  const mm = parseInt(dateStr.substring(2, 4));
+  const dd = parseInt(dateStr.substring(4, 6));
+  const year = 2000 + yy;
+  const strike = parseInt(strikeRaw) / 1000;
+  const monthNames = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const ibkrMonth = monthNames[mm - 1] + dateStr.substring(0, 2);
+  const maturityDate = `${year}${String(mm).padStart(2,'0')}${String(dd).padStart(2,'0')}`;
+  return { root, year, month: mm, day: dd, right, strike, ibkrMonth, maturityDate };
+}
+
+// Add resolveConid to ibkr adapter
+ibkr.resolveConid = async function(ctx, token, occSymbol) {
+  const headers = this.authHeaders(token);
+  const parsed = parseOCCSymbol(occSymbol);
+  if (!parsed.root) return { conid: null, error: 'Failed to parse: ' + occSymbol };
+
+  try {
+    // Step 1: /secdef/search → underConid
+    const searchRes = await ctx.helpers.httpRequest({
+      method: 'GET', url: `${this.API}/iserver/secdef/search?symbol=${parsed.root}&secType=STK`,
+      headers, ignoreHttpStatusErrors: true });
+    const items = Array.isArray(searchRes) ? searchRes : [searchRes];
+    let underConid = null, exchange = 'SMART';
+    for (const item of items) {
+      if (item.symbol === parsed.root || item.companyName) {
+        underConid = item.conid;
+        for (const sec of (item.sections || [])) { if (sec.secType === 'OPT') { exchange = sec.exchange || 'SMART'; break; } }
+        break;
+      }
+    }
+    if (!underConid) return { conid: null, error: 'Underlying not found: ' + parsed.root };
+
+    // Step 2: /secdef/strikes (REQUIRED before /info)
+    await ctx.helpers.httpRequest({
+      method: 'GET', url: `${this.API}/iserver/secdef/strikes?conid=${underConid}&secType=OPT&month=${parsed.ibkrMonth}&exchange=${exchange}`,
+      headers, ignoreHttpStatusErrors: true });
+
+    // Step 3: /secdef/info → find conid by maturityDate
+    const infoRes = await ctx.helpers.httpRequest({
+      method: 'GET', url: `${this.API}/iserver/secdef/info?conid=${underConid}&secType=OPT&month=${parsed.ibkrMonth}&right=${parsed.right}&exchange=${exchange}&strike=${parsed.strike}`,
+      headers, ignoreHttpStatusErrors: true });
+    const contracts = Array.isArray(infoRes) ? infoRes : [infoRes];
+    
+    for (const c of contracts) {
+      if (c.maturityDate === parsed.maturityDate) return { conid: c.conid, symbol: c.symbol, resolved: true };
+    }
+    if (contracts[0]?.conid) return { conid: contracts[0].conid, symbol: contracts[0].symbol, resolved: true, note: 'closest match' };
+    return { conid: null, error: 'No matching contract found' };
+  } catch (e) {
+    return { conid: null, error: e.message };
+  }
+};
+
+// Auto-resolve all legs
+ibkr.resolveLegs = async function(ctx, token, legs) {
+  const resolved = [];
+  for (const leg of legs) {
+    if (leg.conid && leg.conid > 0) { resolved.push(leg); continue; }
+    const r = await this.resolveConid(ctx, token, leg.symbol);
+    resolved.push({ ...leg, conid: r.conid, ibkr_symbol: r.symbol, conid_error: r.error || null });
+  }
+  return resolved;
+};
+
+// Override placeOrder to auto-resolve conids
+const _origIbkrOrder = ibkr.placeOrder;
+ibkr.placeOrder = async function(ctx, token, accountId, orderData) {
+  // Auto-resolve conids from OCC symbols
+  if (orderData.legs?.some(l => !l.conid || l.conid === 0)) {
+    orderData.legs = await this.resolveLegs(ctx, token, orderData.legs);
+    const failed = orderData.legs.filter(l => !l.conid);
+    if (failed.length > 0) {
+      return { broker: 'ibkr', success: false, error: 'conid resolution failed for: ' + failed.map(l => l.symbol).join(', '), legs: orderData.legs };
+    }
+  }
+  return _origIbkrOrder.call(this, ctx, token, accountId, orderData);
+};
