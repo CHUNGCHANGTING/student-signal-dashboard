@@ -1237,7 +1237,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="g2-fetch-all-bar" style="display:none;margin-bottom:var(--space-3)">
   <div id="g2-auto-status" style="padding:var(--space-3);border-radius:var(--radius-md);text-align:center">
     <div id="g2-auto-status-text" style="font-size:13px;font-weight:700;color:var(--color-primary)">⚡ 自動篩選中...</div>
-    <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px">CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）| Bid/Ask 僅供參考，下單前請以券商即時報價為準</div>
+    <div id="g2-auto-status-sub" style="font-size:10px;color:var(--color-text-muted);margin-top:2px">CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）| Bid/Ask 僅供參考，下單前請以券商即時報價為準</div>
   </div>
   <button onclick="autoFetchAll()" style="width:100%;padding:var(--space-2);background:var(--color-surface);color:var(--color-text-muted);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:11px;cursor:pointer;margin-top:var(--space-2)">🔄 重新篩選</button>
 </div>
@@ -1245,7 +1245,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- TOS Parameter Reference -->
 <div style="margin-top:var(--space-4)">
 <div class="g1-section-title" style="font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-3)">📋 篩選標準對照表</div>
-<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:var(--space-2);padding:var(--space-2);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm)"><strong>策略：</strong>第一層用 CBOE 延遲數據自動篩選 OI/Delta/流動性（這些盤中幾乎不變）→ 篩選通過後開啟券商確認即時 Bid/Ask 再下單</div>
+<div id="g2-strategy-note" style="font-size:10px;color:var(--color-text-muted);margin-bottom:var(--space-2);padding:var(--space-2);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm)"><strong>策略：</strong>CBOE 篩選 OI/Delta/流動性（盤中幾乎不變）+ 券商即時 Bid/Ask 確認再下單</div>
 <div style="overflow-x:auto">
 <table class="line-summary-table" style="font-size:12px">
 <thead><tr><th>項目</th><th>收租（Credit Spread / IC）</th><th>進攻（Debit Spread）</th><th>標準</th></tr></thead>
@@ -3351,6 +3351,21 @@ function updateBrokerUI(broker) {
       a.innerHTML = info.icon + ' ' + info.label;
     }
   });
+
+  // Update data source labels based on broker
+  var isTasty = (broker === 'tastytrade' && !!localStorage.getItem('broker_tt-session'));
+  var stratNote = document.getElementById('g2-strategy-note');
+  var statusSub = document.getElementById('g2-auto-status-sub');
+  if (stratNote) {
+    stratNote.innerHTML = isTasty
+      ? '<strong>策略：</strong>CBOE 篩選 OI/Delta/流動性 + 🟣 tastytrade 即時 Bid/Ask 確認再下單'
+      : '<strong>策略：</strong>CBOE 篩選 OI/Delta/流動性（盤中幾乎不變）+ 券商即時 Bid/Ask 確認再下單';
+  }
+  if (statusSub) {
+    statusSub.innerHTML = isTasty
+      ? '🟣 tastytrade 即時數據 — Bid/Ask 為券商即時報價'
+      : 'CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）| Bid/Ask 僅供參考，下單前請以券商即時報價為準';
+  }
 }
 
 var BROKER_CONFIG = {
@@ -3421,6 +3436,8 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
   var dataEl = document.getElementById('g2-auto-data-' + symbol);
   if (btn) { btn.textContent = '⏳ 載入中...'; btn.disabled = true; }
 
+  var useTasty = (g2DataSource === 'tastytrade');
+
   try {
     var cboeRoot = symbol.replace(/[^A-Z]/g, '');
     // Use batch cache if available, otherwise single fetch
@@ -3428,15 +3445,13 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
     if (g2BatchCache[cboeRoot] && g2BatchCache[cboeRoot].options) {
       opts = g2BatchCache[cboeRoot].options;
     } else {
-      var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbol=' + cboeRoot);
-      var data = await resp.json();
-      opts = (data && data.options) || [];
-    }
-
-    if (opts.length === 0) {
-      if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ CBOE 無數據，請手動輸入'; }
-      if (btn) { btn.textContent = '❌ 無數據 — 手動輸入'; btn.disabled = false; }
-      return;
+      try {
+        var resp = await fetchWithTimeout('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbol=' + cboeRoot, 15000);
+        var data = await resp.json();
+        opts = (data && data.options) || [];
+      } catch(cboeErr) {
+        opts = []; // CBOE failed, continue — tastytrade may still work
+      }
     }
 
     // Parse strikes from orderText: "BUY CALL 76.0 / SELL CALL 81.0"
@@ -3478,13 +3493,36 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
     }
 
     if (legs.length === 0) {
-      if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ 無法解析下單指令，請手動輸入'; }
-      if (btn) { btn.textContent = '⚡ 重新試算'; btn.disabled = false; }
+      if (opts.length === 0 && !useTasty) {
+        if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ 無數據，請手動輸入'; }
+        if (btn) { btn.textContent = '❌ 無數據 — 手動輸入'; btn.disabled = false; }
+      } else {
+        if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ 無法解析下單指令，請手動輸入'; }
+        if (btn) { btn.textContent = '⚡ 重新試算'; btn.disabled = false; }
+      }
       return;
     }
 
-    // Look up each leg in CBOE data
-    var html = '<table style="width:100%;font-size:11px;border-collapse:collapse">';
+    // If tastytrade is active, fetch real-time quotes for the specific legs
+    var tastyQuotes = {};
+    if (useTasty) {
+      try {
+        var tastySymbols = legs.map(function(leg) {
+          return buildTastyOptionSymbol(cboeRoot, expiry, leg.type, leg.strike);
+        }).filter(function(s) { return !!s; });
+        if (tastySymbols.length > 0) {
+          tastyQuotes = await fetchTastytradeQuotes(tastySymbols);
+        }
+      } catch(tastyErr) {
+        console.log('tastytrade quote fetch failed, falling back to CBOE:', tastyErr.message);
+        useTasty = false; // Fall back to CBOE data for this symbol
+      }
+    }
+
+    // Look up each leg
+    var srcTag = useTasty ? '🟣 即時' : 'CBOE';
+    var html = '<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:4px">數據來源：' + srcTag + '</div>';
+    html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
     html += '<tr style="border-bottom:1px solid var(--color-border);font-weight:600"><td>Leg</td><td>Strike</td><td>Bid</td><td>Ask</td><td>Delta</td><td>OI</td><td>Vol</td><td>狀態</td></tr>';
 
     var allOk = true;
@@ -3493,25 +3531,50 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
     for (var i = 0; i < legs.length; i++) {
       var leg = legs[i];
       var cboeKey = buildCboeSymbol(cboeRoot, expiry, leg.type, leg.strike);
-      var match = opts.filter(function(o) { return (o.option || '') === cboeKey; });
-      var opt = match.length > 0 ? match[0] : null;
+      var tastyKey = buildTastyOptionSymbol(cboeRoot, expiry, leg.type, leg.strike);
 
-      if (!opt) {
+      // Try tastytrade real-time quote first
+      var tastyQ = tastyQuotes[tastyKey] || null;
+
+      // CBOE fallback for OI/Delta
+      var cboeMatch = opts.filter(function(o) { return (o.option || '') === cboeKey; });
+      var cboeOpt = cboeMatch.length > 0 ? cboeMatch[0] : null;
+
+      // Determine bid/ask from best available source
+      var bid, ask, delta, oi, vol;
+      var bidSrc = '', askSrc = '';
+
+      if (useTasty && tastyQ) {
+        bid = parseFloat(tastyQ.bid) || 0;
+        ask = parseFloat(tastyQ.ask) || 0;
+        bidSrc = '即時';
+        askSrc = '即時';
+      } else if (cboeOpt) {
+        bid = parseFloat(cboeOpt.bid) || 0;
+        ask = parseFloat(cboeOpt.ask) || 0;
+      } else {
+        bid = 0; ask = 0;
+      }
+
+      // OI and Delta always from CBOE (tastytrade market-data doesn't include these)
+      if (cboeOpt) {
+        delta = parseFloat(cboeOpt.delta) || 0;
+        oi = parseInt(cboeOpt.open_interest) || 0;
+        vol = parseInt(cboeOpt.volume) || 0;
+      } else {
+        delta = 0; oi = 0; vol = 0;
+      }
+
+      if (!cboeOpt && !tastyQ) {
         html += '<tr><td>' + leg.label + '</td><td>$' + leg.strike + '</td><td colspan="5">❌ 找不到</td><td style="color:var(--color-error)">✗</td></tr>';
         allOk = false;
         continue;
       }
 
-      var bid = parseFloat(opt.bid) || 0;
-      var ask = parseFloat(opt.ask) || 0;
-      var delta = parseFloat(opt.delta) || 0;
-      var oi = parseInt(opt.open_interest) || 0;
-      var vol = parseInt(opt.volume) || 0;
       var spread = ask - bid;
 
       // Color coding
       var oiColor = oi >= 500 ? 'var(--color-success)' : oi >= 100 ? 'var(--color-warning)' : 'var(--color-error)';
-      var spreadColor = spread <= 0.05 ? 'var(--color-success)' : spread <= 0.10 ? 'var(--color-success)' : spread <= 0.15 ? 'var(--color-warning)' : 'var(--color-error)';
       var oiOk = oi >= 500;
       var spreadOk = spread <= 0.10;
 
@@ -3520,14 +3583,17 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
       var status = (oiOk && spreadOk) ? '<span style="color:var(--color-success)">✅</span>' : '<span style="color:var(--color-error)">⚠️</span>';
       if (!oiOk || !spreadOk) allOk = false;
 
+      var bidDisplay = bid > 0 ? '$' + bid.toFixed(2) + (bidSrc ? ' <span style="font-size:9px;color:var(--color-primary)">' + bidSrc + '</span>' : '') : '—';
+      var askDisplay = ask > 0 ? '$' + ask.toFixed(2) + (askSrc ? ' <span style="font-size:9px;color:var(--color-primary)">' + askSrc + '</span>' : '') : '—';
+
       html += '<tr style="border-bottom:1px solid var(--color-border)">';
       html += '<td style="font-weight:600">' + leg.label + '</td>';
       html += '<td>$' + leg.strike.toFixed(1) + '</td>';
-      html += '<td>$' + bid.toFixed(2) + '</td>';
-      html += '<td>$' + ask.toFixed(2) + '</td>';
-      html += '<td>' + Math.abs(delta).toFixed(4) + '</td>';
-      html += '<td style="color:' + oiColor + ';font-weight:600">' + oi + '</td>';
-      html += '<td>' + vol + '</td>';
+      html += '<td>' + bidDisplay + '</td>';
+      html += '<td>' + askDisplay + '</td>';
+      html += '<td>' + (delta !== 0 ? Math.abs(delta).toFixed(4) : '—') + '</td>';
+      html += '<td style="color:' + oiColor + ';font-weight:600">' + (oi > 0 ? oi : '—') + '</td>';
+      html += '<td>' + (vol > 0 ? vol : '—') + '</td>';
       html += '<td>' + status + '</td>';
       html += '</tr>';
     }
@@ -3537,7 +3603,11 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
     if (allOk) {
       g2FetchResults.passed.push(symbol);
       html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-success-highlight);color:var(--color-success);border-radius:var(--radius-sm);font-weight:600">✅ 結構篩選通過 — OI 充足、流動性合格</div>';
-      html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px">💡 Bid/Ask 為延遲報價，下單前請開啟券商確認即時價格</div>';
+      if (useTasty) {
+        html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-primary-highlight);color:var(--color-primary);border-radius:var(--radius-sm);font-size:10px">🟣 Bid/Ask 為 tastytrade 即時報價，可直接參考下單</div>';
+      } else {
+        html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px">💡 Bid/Ask 為延遲報價，下單前請開啟券商確認即時價格</div>';
+      }
     } else {
       g2FetchResults.warned.push(symbol);
       html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-sm);font-weight:600">🚫 流動性不足 — 建議跳過此標的</div>';
@@ -3566,13 +3636,15 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
       updateGate2Progress();
     }
 
-    // Update status badge (not a button anymore)
+    // Update status badge
     if (btn) {
       if (allOk) {
         btn.style.background = 'var(--color-success-highlight)';
         btn.style.color = 'var(--color-success)';
         btn.style.cursor = 'pointer';
-        btn.innerHTML = '✅ 篩選通過 — 點擊開啟券商確認即時報價';
+        btn.innerHTML = useTasty
+          ? '✅ 篩選通過 — Bid/Ask 已為即時報價'
+          : '✅ 篩選通過 — 點擊開啟券商確認即時報價';
         btn.onclick = function() { var config = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab']; window.open(config.optionUrl(symbol), '_blank'); };
       } else {
         btn.style.background = 'var(--color-warning-highlight)';
@@ -3582,40 +3654,104 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
     }
 
   } catch(e) {
-    if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '❌ CBOE API 錯誤: ' + e.message + '<br>請手動輸入 Bid/Ask'; }
+    if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '❌ 數據拉取錯誤: ' + e.message + '<br>請手動輸入 Bid/Ask'; }
     if (btn) { btn.textContent = '⚡ 重新試算'; btn.disabled = false; }
   }
 }
 
 // Fetch all approved symbols at once
 var g2FetchResults = { passed: [], warned: [], failed: [] };
-var g2BatchCache = {}; // Cache batch CBOE data
+var g2BatchCache = {};
+var g2DataSource = 'cboe'; // 'cboe' or 'tastytrade'
+
+// Fetch with timeout helper
+function fetchWithTimeout(url, opts, timeoutMs) {
+  if (typeof opts === 'number') { timeoutMs = opts; opts = undefined; }
+  return Promise.race([
+    fetch(url, opts),
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('timeout')); }, timeoutMs || 15000);
+    })
+  ]);
+}
+
+// Check if tastytrade broker is bound with a valid session
+function isTastytradeActive() {
+  return selectedBroker === 'tastytrade' && !!localStorage.getItem('broker_tt-session');
+}
+
+// Build tastytrade OCC option symbol: "KO    260417C00076000"
+function buildTastyOptionSymbol(rootSym, expStr, type, strike) {
+  if (!expStr) return '';
+  var padded = (rootSym + '      ').slice(0, 6); // pad to 6 chars
+  var exp = expStr.replace(/-/g, '').slice(2); // YYMMDD
+  var t = type === 'C' ? 'C' : 'P';
+  var s = Math.round(strike * 1000).toString().padStart(8, '0');
+  return padded + exp + t + s;
+}
+
+// Fetch real-time quotes from tastytrade API
+async function fetchTastytradeQuotes(optionSymbols) {
+  var token = localStorage.getItem('broker_tt-session');
+  if (!token || optionSymbols.length === 0) return {};
+  var encoded = optionSymbols.map(function(s) { return encodeURIComponent(s); }).join(',');
+  var resp = await fetchWithTimeout(
+    'https://api.tastyworks.com/market-data/by-type?equity-option=' + encoded,
+    { headers: { 'Authorization': token } },
+    15000
+  );
+  if (!resp.ok) {
+    // Session may have expired — clear it
+    if (resp.status === 401) localStorage.removeItem('broker_tt-session');
+    throw new Error('tastytrade API ' + resp.status);
+  }
+  var data = await resp.json();
+  var result = {};
+  if (data.data && data.data.items) {
+    data.data.items.forEach(function(item) {
+      result[item.symbol] = item;
+    });
+  }
+  return result;
+}
 
 async function autoFetchAll() {
   var statusText = document.getElementById('g2-auto-status-text');
+  var statusSub = document.getElementById('g2-auto-status-sub');
   g2FetchResults = { passed: [], warned: [], failed: [] };
-  if (statusText) statusText.innerHTML = '⚡ 一次拉取所有標的數據...';
 
-  // Batch fetch all symbols in one request
+  // Determine data source
+  var useTasty = isTastytradeActive();
+  g2DataSource = useTasty ? 'tastytrade' : 'cboe';
+
+  if (statusText) statusText.innerHTML = useTasty ? '⚡ 拉取 tastytrade 即時報價...' : '⚡ 拉取 CBOE 篩選數據...';
+  if (statusSub) statusSub.innerHTML = useTasty
+    ? '🟣 tastytrade 即時數據 — Bid/Ask 為券商即時報價'
+    : 'CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）| Bid/Ask 僅供參考，下單前請以券商即時報價為準';
+
   var symbols = g2ApprovedSignals.map(function(s) { return s.symbol.replace(/[^A-Z]/g, ''); });
+
+  // Always fetch CBOE for OI/Delta/structure data
   try {
-    var batchResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + symbols.join(','));
+    var batchResp = await fetchWithTimeout('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + symbols.join(','), 20000);
     var batchData = await batchResp.json();
     if (batchData.batch && batchData.results) {
       g2BatchCache = batchData.results;
     } else if (batchData.symbol) {
-      // Single symbol response
       g2BatchCache[batchData.symbol] = { count: batchData.count, options: batchData.options };
     }
   } catch(e) {
-    if (statusText) { statusText.innerHTML = '❌ 數據拉取失敗: ' + e.message; statusText.style.color = 'var(--color-error)'; }
-    return;
+    if (statusText && !useTasty) {
+      statusText.innerHTML = '⚠️ 數據拉取逾時，改用逐檔查詢...';
+      statusText.style.color = 'var(--color-warning)';
+    }
+    g2BatchCache = {};
   }
 
   // Process each symbol using cached data
   for (var i = 0; i < g2ApprovedSignals.length; i++) {
     var s = g2ApprovedSignals[i];
-    if (statusText) statusText.innerHTML = '⚡ 篩選中 ' + s.symbol + '... (' + (i+1) + '/' + g2ApprovedSignals.length + ')';
+    if (statusText) statusText.innerHTML = (useTasty ? '🟣' : '⚡') + ' 篩選中 ' + s.symbol + '... (' + (i+1) + '/' + g2ApprovedSignals.length + ')';
     await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '');
   }
   // Summary
@@ -3623,16 +3759,20 @@ async function autoFetchAll() {
     var brokerConfig = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab'];
     var p = g2FetchResults.passed.length;
     var w = g2FetchResults.warned.length;
+    var srcLabel = useTasty ? '🟣 即時數據' : 'CBOE 延遲';
     if (p > 0 && w === 0) {
-      statusText.innerHTML = '✅ 全部通過 (' + p + '檔) — 點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name + ' 確認即時報價';
+      statusText.innerHTML = '✅ 全部通過 (' + p + '檔) — ' + (useTasty ? 'Bid/Ask 為即時報價' : '點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name + ' 確認即時報價');
       statusText.style.color = 'var(--color-success)';
     } else if (p > 0) {
-      statusText.innerHTML = '✅ ' + p + ' 檔通過，' + w + ' 檔流動性不足建議跳過 — 點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name;
+      statusText.innerHTML = '✅ ' + p + ' 檔通過，' + w + ' 檔流動性不足建議跳過 — ' + (useTasty ? 'Bid/Ask 為即時報價' : '點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name);
       statusText.style.color = 'var(--color-success)';
     } else {
       statusText.innerHTML = '⚠️ 全部標的流動性不足 — 建議今日觀望或換標的';
       statusText.style.color = 'var(--color-warning)';
     }
+    if (statusSub) statusSub.innerHTML = useTasty
+      ? '🟣 數據來源：tastytrade 即時報價'
+      : '數據來源：CBOE 延遲 — 下單前請以券商即時報價為準';
   }
 }
 
