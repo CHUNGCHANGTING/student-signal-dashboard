@@ -788,7 +788,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="sidebar-section">進攻模組</div>
   <button class="nav-item" onclick="showSection('s-bcds',this)"><span class="nav-dot offense"></span>Bull Call Debit Spread</button>
   <button class="nav-item" onclick="showSection('s-bpds',this)"><span class="nav-dot offense"></span>Bear Put Debit Spread</button>
-  <button class="nav-item" onclick="showSection('s-cv',this)"><span class="nav-dot offense"></span>Credit Vertical（次要）</button>
+
   <div class="sidebar-divider" id="admin-nav" style="display:none"></div>
   <div class="sidebar-section" id="admin-nav-label" style="display:none">管理</div>
   <button class="nav-item" id="admin-nav-btn" style="display:none" onclick="showSection('admin-panel',this)"><span class="nav-dot" style="background:var(--color-purple)"></span>👥 學生管理</button>
@@ -948,24 +948,19 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="module-grid" id="module-grid">
   <div class="module-card income"><h3><span class="module-icon income">收</span> 收租模組</h3>
     <div class="strategy-list">
-      <div class="strategy-row"><span class="strategy-tag tag-ic">IC</span><div><div class="strategy-desc">Iron Condor</div><div class="strategy-cond">→ <span>中性偏震盪 + IVR ≥ 30 + SPX/QQQ (IC_INDEX) 或個股 (IC_EQUITY)</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bpcs">BPCS</span><div><div class="strategy-desc">Bull Put Credit Spread</div><div class="strategy-cond">→ <span>偏多 + 非強趨勢 + IVR ≥ 27</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bccs">BCCS</span><div><div class="strategy-desc">Bear Call Credit Spread</div><div class="strategy-cond">→ <span>偏空 + 非崩跌 + IVR ≥ 27</span></div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-ic">IC</span><div><div class="strategy-desc">Iron Condor</div><div class="strategy-cond">盤整收租</div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bpcs">BPCS</span><div><div class="strategy-desc">Put Credit Spread</div><div class="strategy-cond">偏多收租</div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bccs">BCCS</span><div><div class="strategy-desc">Call Credit Spread</div><div class="strategy-cond">偏空收租</div></div></div>
     </div>
   </div>
   <div class="module-card offense"><h3><span class="module-icon offense">攻</span> 進攻模組</h3>
     <div class="strategy-list">
-      <div class="strategy-row"><span class="strategy-tag tag-bcds">BCDS</span><div><div class="strategy-desc">Bull Call Debit Spread</div><div class="strategy-cond">→ <span>偏多突破 + IV 低到中 + 趨勢確認</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bpds">BPDS</span><div><div class="strategy-desc">Bear Put Debit Spread</div><div class="strategy-cond">→ <span>偏空跌破 + IV 低到中 + 趨勢確認</span></div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-cv">CV</span><div><div class="strategy-desc">Credit Vertical（次要）</div><div class="strategy-cond">→ <span>IV 很高 + 方向極明確 + 個股</span></div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bcds">BCDS</span><div><div class="strategy-desc">Call Debit Spread</div><div class="strategy-cond">偏多進攻</div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bpds">BPDS</span><div><div class="strategy-desc">Put Debit Spread</div><div class="strategy-cond">偏空進攻</div></div></div>
     </div>
   </div>
 </div>
-<div class="regime-grid">
-  <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-success)">SPX / QQQ</div><div class="regime-tags"><span class="rt tag-ic">IC_INDEX</span><span class="rt tag-bpcs">BPCS_INDEX</span><span class="rt tag-bccs">BCCS_INDEX</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">收租</div></div>
-  <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-orange)">個股</div><div class="regime-tags"><span class="rt tag-ic">IC_EQUITY</span><span class="rt tag-bpcs">BPCS_EQUITY</span><span class="rt tag-bccs">BCCS_EQUITY</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">收租</div><div class="regime-tags" style="margin-top:var(--space-2)"><span class="rt tag-bcds">BCDS</span><span class="rt tag-bpds">BPDS</span><span class="rt tag-cv">CV</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">進攻</div></div>
-  <div class="regime-card"><div class="regime-label">主要禁止</div><div class="regime-name" style="color:var(--color-error)">混用規則</div><div class="regime-tags"><span class="rt" style="background:var(--color-error-highlight);color:var(--color-error)">SPX收租模組 ≠ 個股進攻模組</span></div></div>
-</div>
+
 
 <!-- 今日市場狀態 + 財報風險 -->
 <div style="margin-top:var(--space-6)">
