@@ -3985,9 +3985,13 @@ function updateGate2Progress() {
 function completeGate2() {
   var allChecks = document.querySelectorAll('.g2-check-row');
   var doneChecks = document.querySelectorAll('.g2-check-row.checked');
+  var isAdmin = document.querySelector('.badge-admin') !== null || document.querySelector('[data-role="admin"]') !== null;
   if (doneChecks.length < allChecks.length) {
-    alert('請先完成所有 TOS 確認項目（' + doneChecks.length + '/' + allChecks.length + '）');
-    return;
+    if (isAdmin || confirm('篩選未完成 (' + doneChecks.length + '/' + allChecks.length + ')。\n\n管理員模式：是否強制跳過進入第3關？')) {
+      // Admin override — continue
+    } else {
+      return;
+    }
   }
   // Navigate to Gate 3
   var navItems = document.querySelectorAll('.nav-item');

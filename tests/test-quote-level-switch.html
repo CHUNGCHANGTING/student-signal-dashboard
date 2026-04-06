@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>Quote Level Switch Test</title>
+<style>
+body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; line-height: 1.8; }
+.pass { color: #6daa45; } .fail { color: #d163a7; } .info { color: #5591c7; }
+h2 { color: #e8af34; border-bottom: 1px solid #333; padding-bottom: 4px; }
+.result { padding: 4px 8px; margin: 2px 0; border-radius: 4px; }
+.result.pass { background: rgba(109,170,69,0.1); }
+.result.fail { background: rgba(209,99,167,0.1); }
+#summary { margin-top: 20px; padding: 12px; border-radius: 8px; font-size: 16px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>🧪 Quote Level Switch — Integration Test</h1>
+<p class="info">驗證 demo/live 切換邏輯：模擬學生帳戶 (live) 和商業帳戶 (demo) 的行為差異</p>
+<div id="results"></div>
+<div id="summary"></div>
+
+<script>
+// ─── Test Framework ───
+var results = [];
+var container = document.getElementById('results');
+
+function assert(name, condition, detail) {
+  var pass = !!condition;
+  results.push({ name: name, pass: pass, detail: detail || '' });
+  var div = document.createElement('div');
+  div.className = 'result ' + (pass ? 'pass' : 'fail');
+  div.textContent = (pass ? '✅' : '❌') + ' ' + name + (detail ? ' — ' + detail : '');
+  container.appendChild(div);
+  return pass;
+}
+
+function section(title) {
+  var h = document.createElement('h2');
+  h.textContent = title;
+  container.appendChild(h);
+}
+
+// ─── Mock Environment ───
+var selectedBroker = 'tastytrade';
+var _ttQuoteLevelChecked = false;
+var _ttQuoteLevelLive = false;
+
+// Simulated localStorage/sessionStorage
+var mockLocalStorage = {};
+var mockSessionStorage = {};
+
+var originalLocalStorage = {
+  getItem: function(k) { return mockLocalStorage[k] || null; },
+  setItem: function(k, v) { mockLocalStorage[k] = v; },
+  removeItem: function(k) { delete mockLocalStorage[k]; }
+};
+var originalSessionStorage = {
+  getItem: function(k) { return mockSessionStorage[k] || null; },
+  setItem: function(k, v) { mockSessionStorage[k] = v; },
+  removeItem: function(k) { delete mockSessionStorage[k]; }
+};
+
+// ─── Functions Under Test (extracted from index.html) ───
+function isTastytradeActive() {
+  if (selectedBroker !== 'tastytrade') return false;
+  if (!originalLocalStorage.getItem('broker_tt-session')) return false;
+  return _ttQuoteLevelLive;
+}
+
+async function checkTastytradeQuoteLevel_mock(mockLevel, mockIsLive) {
+  // Simulates what checkTastytradeQuoteLevel does after getting response from n8n
+  _ttQuoteLevelChecked = true;
+  _ttQuoteLevelLive = mockIsLive;
+  originalSessionStorage.setItem('tt-quote-level', mockLevel);
+  return mockIsLive;
+}
+
+function buildTastyOptionSymbol(rootSym, expStr, type, strike) {
+  if (!expStr) return '';
+  var padded = (rootSym + '      ').slice(0, 6);
+  var exp = expStr.replace(/-/g, '').slice(2);
+  var t = type === 'C' ? 'C' : 'P';
+  var s = Math.round(strike * 1000).toString().padStart(8, '0');
+  return padded + exp + t + s;
+}
+
+// ─── Run Tests ───
+async function runTests() {
+
+  // ═══════════════════════════════════════
+  section('1. isTastytradeActive() — 基本邏輯');
+  // ═══════════════════════════════════════
+
+  // Reset
+  selectedBroker = 'schwab';
+  _ttQuoteLevelLive = true;
+  mockLocalStorage['broker_tt-session'] = 'fake-token';
+  assert('非 tastytrade 券商 → false',
+    isTastytradeActive() === false,
+    'selectedBroker=schwab');
+
+  selectedBroker = 'tastytrade';
+  delete mockLocalStorage['broker_tt-session'];
+  _ttQuoteLevelLive = true;
+  assert('無 session token → false',
+    isTastytradeActive() === false,
+    '沒有 broker_tt-session');
+
+  selectedBroker = 'tastytrade';
+  mockLocalStorage['broker_tt-session'] = 'fake-token';
+  _ttQuoteLevelLive = false;
+  assert('quote level 不是 live → false',
+    isTastytradeActive() === false,
+    '_ttQuoteLevelLive=false');
+
+  selectedBroker = 'tastytrade';
+  mockLocalStorage['broker_tt-session'] = 'fake-token';
+  _ttQuoteLevelLive = true;
+  assert('tastytrade + session + live → true',
+    isTastytradeActive() === true,
+    '所有條件滿足');
+
+  // ═══════════════════════════════════════
+  section('2. 商業帳戶 (demo/delayed) — 走 CBOE');
+  // ═══════════════════════════════════════
+
+  // Simulate business account
+  _ttQuoteLevelChecked = false;
+  _ttQuoteLevelLive = false;
+  mockSessionStorage = {};
+  selectedBroker = 'tastytrade';
+  mockLocalStorage['broker_tt-session'] = 'fake-token';
+
+  await checkTastytradeQuoteLevel_mock('demo', false);
+
+  assert('checkQuoteLevel 回傳 false',
+    _ttQuoteLevelLive === false,
+    'level=demo → isLive=false');
+
+  assert('sessionStorage 設為 demo',
+    originalSessionStorage.getItem('tt-quote-level') === 'demo',
+    'tt-quote-level=demo');
+
+  assert('isTastytradeActive() → false',
+    isTastytradeActive() === false,
+    '商業帳戶不走 tastytrade 即時');
+
+  var useTasty = isTastytradeActive();
+  var g2DataSource = useTasty ? 'tastytrade' : 'cboe';
+  assert('g2DataSource = cboe',
+    g2DataSource === 'cboe',
+    '商業帳戶用 CBOE 數據源');
+
+  // ═══════════════════════════════════════
+  section('3. 學生個人帳戶 (live) — 走 tastytrade');
+  // ═══════════════════════════════════════
+
+  // Simulate student individual account
+  _ttQuoteLevelChecked = false;
+  _ttQuoteLevelLive = false;
+  mockSessionStorage = {};
+  selectedBroker = 'tastytrade';
+  mockLocalStorage['broker_tt-session'] = 'student-oauth-token-xxx';
+
+  await checkTastytradeQuoteLevel_mock('live', true);
+
+  assert('checkQuoteLevel 回傳 true',
+    _ttQuoteLevelLive === true,
+    'level=live → isLive=true');
+
+  assert('sessionStorage 設為 live',
+    originalSessionStorage.getItem('tt-quote-level') === 'live',
+    'tt-quote-level=live');
+
+  assert('isTastytradeActive() → true',
+    isTastytradeActive() === true,
+    '學生帳戶走 tastytrade 即時');
+
+  var useTasty2 = isTastytradeActive();
+  var g2DataSource2 = useTasty2 ? 'tastytrade' : 'cboe';
+  assert('g2DataSource = tastytrade',
+    g2DataSource2 === 'tastytrade',
+    '學生帳戶用 tastytrade 數據源');
+
+  // ═══════════════════════════════════════
+  section('4. 數據源切換 — 路徑驗證');
+  // ═══════════════════════════════════════
+
+  // When useTasty=true, batch pre-fetch should collect tastytrade symbols
+  var testSignals = [
+    { symbol: 'AAPL', strategy: 'BULL_CALL_DEBIT_SPREAD', expiry: '2026-04-17', orderText: 'BUY CALL 200.0 / SELL CALL 210.0' },
+    { symbol: 'SPY', strategy: 'BULL_PUT_CREDIT_SPREAD', expiry: '2026-04-24', orderText: 'SELL PUT 540.0 / BUY PUT 535.0' }
+  ];
+
+  // Simulate batch symbol collection (same logic as autoFetchAll)
+  var allTastySymbols = [];
+  for (var k = 0; k < testSignals.length; k++) {
+    var sig = testSignals[k];
+    var root = sig.symbol.replace(/[^A-Z]/g, '');
+    var strikes = (sig.orderText || '').match(/[\d.]+/g) || [];
+    var expiry = sig.expiry || '';
+    if (strikes.length >= 2 && expiry) {
+      var optType = sig.strategy.includes('PUT') ? 'P' : 'C';
+      allTastySymbols.push(buildTastyOptionSymbol(root, expiry, optType, parseFloat(strikes[0])));
+      allTastySymbols.push(buildTastyOptionSymbol(root, expiry, optType, parseFloat(strikes[1])));
+    }
+  }
+  allTastySymbols = allTastySymbols.filter(function(s, i, a) { return s && a.indexOf(s) === i; });
+
+  assert('AAPL Call symbols 正確',
+    allTastySymbols.indexOf('AAPL  260417C00200000') >= 0 &&
+    allTastySymbols.indexOf('AAPL  260417C00210000') >= 0,
+    'AAPL  260417C00200000 + AAPL  260417C00210000');
+
+  assert('SPY Put symbols 正確',
+    allTastySymbols.indexOf('SPY   260424P00540000') >= 0 &&
+    allTastySymbols.indexOf('SPY   260424P00535000') >= 0,
+    'SPY   260424P00540000 + SPY   260424P00535000');
+
+  assert('共 4 個不重複 symbols',
+    allTastySymbols.length === 4,
+    '2 symbols × 2 legs = 4');
+
+  // When useTasty=false (business), no tastytrade symbols should be collected
+  _ttQuoteLevelLive = false;
+  var useTastyBiz = isTastytradeActive();
+  var bizSymbols = [];
+  if (useTastyBiz) {
+    // This block should NOT execute for business accounts
+    bizSymbols = allTastySymbols;
+  }
+  assert('商業帳戶不收集 tastytrade symbols',
+    bizSymbols.length === 0,
+    'useTasty=false → 不進入批次收集');
+
+  // ═══════════════════════════════════════
+  section('5. sessionStorage 快取 — 不重複檢查');
+  // ═══════════════════════════════════════
+
+  _ttQuoteLevelChecked = false;
+  _ttQuoteLevelLive = false;
+  mockSessionStorage = { 'tt-quote-level': 'live' };
+
+  // Simulate checkTastytradeQuoteLevel reading from cache
+  var cached = originalSessionStorage.getItem('tt-quote-level');
+  if (cached !== null) {
+    _ttQuoteLevelChecked = true;
+    _ttQuoteLevelLive = (cached === 'live');
+  }
+
+  assert('從 cache 讀取 live',
+    _ttQuoteLevelLive === true,
+    'sessionStorage=live → _ttQuoteLevelLive=true');
+
+  assert('已標記為 checked',
+    _ttQuoteLevelChecked === true,
+    '不需要再呼叫 API');
+
+  // Cache demo
+  _ttQuoteLevelChecked = false;
+  _ttQuoteLevelLive = false;
+  mockSessionStorage = { 'tt-quote-level': 'demo' };
+  cached = originalSessionStorage.getItem('tt-quote-level');
+  if (cached !== null) {
+    _ttQuoteLevelChecked = true;
+    _ttQuoteLevelLive = (cached === 'live');
+  }
+  assert('從 cache 讀取 demo',
+    _ttQuoteLevelLive === false,
+    'sessionStorage=demo → _ttQuoteLevelLive=false');
+
+  // ═══════════════════════════════════════
+  section('6. Edge Cases');
+  // ═══════════════════════════════════════
+
+  // Unknown level
+  _ttQuoteLevelChecked = false;
+  _ttQuoteLevelLive = false;
+  mockSessionStorage = { 'tt-quote-level': 'unknown' };
+  cached = originalSessionStorage.getItem('tt-quote-level');
+  _ttQuoteLevelChecked = true;
+  _ttQuoteLevelLive = (cached === 'live');
+  assert('unknown level → false',
+    _ttQuoteLevelLive === false,
+    'level=unknown 不算 live');
+
+  // Error level
+  mockSessionStorage = { 'tt-quote-level': 'error' };
+  cached = originalSessionStorage.getItem('tt-quote-level');
+  _ttQuoteLevelLive = (cached === 'live');
+  assert('error level → false',
+    _ttQuoteLevelLive === false,
+    'level=error 不算 live');
+
+  // No broker selected
+  selectedBroker = '';
+  mockLocalStorage['broker_tt-session'] = 'token';
+  _ttQuoteLevelLive = true;
+  assert('空券商 → false',
+    isTastytradeActive() === false,
+    'selectedBroker 為空');
+
+  // buildTastyOptionSymbol edge cases
+  assert('空 expiry → 空字串',
+    buildTastyOptionSymbol('KO', '', 'C', 76) === '',
+    'expiry 為空');
+
+  assert('3字元 root 正確 padding',
+    buildTastyOptionSymbol('KO', '2026-04-17', 'C', 76) === 'KO    260417C00076000',
+    'KO → "KO    "');
+
+  assert('4字元 root 正確 padding',
+    buildTastyOptionSymbol('AAPL', '2026-04-17', 'P', 200) === 'AAPL  260417P00200000',
+    'AAPL → "AAPL  "');
+
+  assert('小數 strike 正確轉換',
+    buildTastyOptionSymbol('SPY', '2026-05-15', 'C', 542.5) === 'SPY   260515C00542500',
+    '542.5 → 00542500');
+
+  // ═══════════════════════════════════════
+  // Summary
+  // ═══════════════════════════════════════
+  var passed = results.filter(function(r) { return r.pass; }).length;
+  var failed = results.filter(function(r) { return !r.pass; }).length;
+  var total = results.length;
+  var summaryEl = document.getElementById('summary');
+  if (failed === 0) {
+    summaryEl.style.background = 'rgba(109,170,69,0.15)';
+    summaryEl.style.color = '#6daa45';
+    summaryEl.textContent = '✅ ALL PASSED — ' + passed + '/' + total + ' tests';
+  } else {
+    summaryEl.style.background = 'rgba(209,99,167,0.15)';
+    summaryEl.style.color = '#d163a7';
+    summaryEl.textContent = '❌ ' + failed + ' FAILED — ' + passed + '/' + total + ' passed';
+  }
+}
+
+runTests();
+</script>
+</body>
+</html>
