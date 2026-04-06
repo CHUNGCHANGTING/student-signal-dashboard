@@ -2676,16 +2676,16 @@ function renderStudentTable(students) {
 
     let actions = '';
     if (status === 'pending') {
-      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus('' + s.id + '','active')">開通</button> ';
+      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus(\'' + s.id + '\',\'active\')">開通</button> ';
     } else if (status === 'active') {
-      actions += '<button class="btn-sm btn-suspend" onclick="updateStudentStatus('' + s.id + '','suspended')">停用</button> ';
+      actions += '<button class="btn-sm btn-suspend" onclick="updateStudentStatus(\'' + s.id + '\',\'suspended\')">停用</button> ';
     } else if (status === 'suspended') {
-      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus('' + s.id + '','active')">恢復</button> ';
+      actions += '<button class="btn-sm btn-activate" onclick="updateStudentStatus(\'' + s.id + '\',\'active\')">恢復</button> ';
     }
     if (role === 'admin') {
-      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole('' + s.id + '','student')">設為學生</button>';
+      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole(\'' + s.id + '\',\'student\')">設為學生</button>';
     } else {
-      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole('' + s.id + '','admin')">設為管理員</button>';
+      actions += '<button class="btn-sm btn-role" onclick="updateStudentRole(\'' + s.id + '\',\'admin\')">設為管理員</button>';
     }
 
     return '<tr><td>' + name + '</td><td>' + email + '</td><td>' + roleBadge + '</td><td>' + statusBadge + '</td><td>' + skool + '</td><td>' + date + '</td><td style="white-space:nowrap">' + actions + '</td></tr>';
