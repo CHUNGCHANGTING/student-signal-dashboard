@@ -1371,6 +1371,10 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>停損是紀律</div>
   </div>
 </div>
+<div id="g4-final-action" style="text-align:center;margin-top:var(--space-6)">
+  <button id="g4-open-broker-btn" onclick="g4OpenBroker()" style="padding:var(--space-4) var(--space-8);font-size:var(--text-base);font-weight:700;background:var(--color-success);color:#fff;border:none;border-radius:var(--radius-lg);cursor:pointer;opacity:0.4;pointer-events:none">🚀 開啟券商下單</button>
+  <div style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-2)">完成所有確認後解鎖。點擊後開啟 tastytrade 選擇權頁面，以 Spread 組合單一次下單。</div>
+</div>
 </section>
 <!-- Live Dashboard -->
 <section class="live-section" id="live-dashboard" style="display:none">
@@ -4349,6 +4353,17 @@ function loadGate4() {
   }
 }
 
+function g4OpenBroker() {
+  // Open broker option chain for the first approved signal
+  var sig = (g2ApprovedSignals || [])[0];
+  var config = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab'];
+  if (sig) {
+    window.open(config.optionUrl(sig.symbol), '_blank');
+  } else {
+    window.open(config.optionUrl('SPY'), '_blank');
+  }
+}
+
 function g4AdminOverride() {
   var manualItems = document.querySelectorAll('.g4-manual');
   manualItems.forEach(function(el) {
@@ -4386,6 +4401,17 @@ function updateGate4Progress() {
   var pFill = document.getElementById('gate4-progress-fill');
   if (pText) pText.textContent = done + ' / ' + total;
   if (pFill) pFill.style.width = (total > 0 ? done / total * 100 : 0) + '%';
+  // Unlock broker button when all done
+  var brokerBtn = document.getElementById('g4-open-broker-btn');
+  if (brokerBtn) {
+    if (done >= total && total > 0) {
+      brokerBtn.style.opacity = '1';
+      brokerBtn.style.pointerEvents = 'auto';
+    } else {
+      brokerBtn.style.opacity = '0.4';
+      brokerBtn.style.pointerEvents = 'none';
+    }
+  }
 }
 
 // Hook gate4 into showSection
