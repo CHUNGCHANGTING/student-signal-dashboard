@@ -848,7 +848,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
           </div>
           <div class="sp-field">
             <label>DTE</label>
-            <input type="number" id="mf-dte" placeholder="21-60">
+            <input type="number" id="mf-dte" placeholder="14-45">
           </div>
           <div class="sp-field">
             <label>POP</label>
@@ -1750,7 +1750,7 @@ function riskFilterSP(module, strategy, ivr, dte, event_risk) {
   if (event_risk === true || event_risk === 'true') return { decision: 'blocked', reason: 'event_risk' };
   if (is_income && ivr < 27) return { decision: 'blocked', reason: 'ivr_too_low' };
   if (strategy === 'IRON_CONDOR' && ivr < 30) return { decision: 'blocked', reason: 'ic_ivr_below_30' };
-  if (dte < 21 || dte > 60) return { decision: 'blocked', reason: 'dte_out_of_range' };
+  if (dte < 14 || dte > 45) return { decision: 'blocked', reason: 'dte_out_of_range' };
   return { decision: 'approved', reason: null };
 }
 
@@ -1768,7 +1768,7 @@ function getReasonLabel(reason) {
     'event_risk': '事件風險（財報 / FOMC 等）',
     'ivr_too_low': '收租模組 IVR < 27，不符合門檻',
     'ic_ivr_below_30': 'Iron Condor IVR < 30，不符合門檻',
-    'dte_out_of_range': 'DTE 不在 21–60 天範圍'
+    'dte_out_of_range': 'DTE 不在 14–45 天範圍'
   };
   return map[reason] || reason;
 }
@@ -1844,8 +1844,8 @@ function analyzePayload(payload) {
   else if (ivr >= 27) ivrClass = 'val';
 
   var dteClass = '';
-  if (dte < 21 || dte > 60) dteClass = 'val-stop';
-  else if (dte >= 21 && dte <= 60) dteClass = 'val';
+  if (dte < 14 || dte > 45) dteClass = 'val-stop';
+  else if (dte >= 14 && dte <= 45) dteClass = 'val';
 
   var popClass = pop >= 0.65 ? 'val' : pop >= 0.50 ? 'val-warn' : 'val-stop';
   var evClass = ev > 0 ? 'val' : ev < 0 ? 'val-stop' : '';
