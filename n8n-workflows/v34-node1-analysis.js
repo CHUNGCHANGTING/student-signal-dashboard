@@ -6,7 +6,8 @@
 //   • Yahoo Finance  – 60-day daily OHLCV  (technical analysis)
 //   • tastytrade     – market-metrics (IVR, IV percentile)
 //   • tastytrade     – option-chains/nested  (expirations)
-//   • CBOE delayed   – ALL option Greeks + bid/ask/OI/volume
+//   • CBOE delayed   – option Greeks + OI/volume (structure filtering)
+//   • tastytrade     – market-data/by-type  (real-time bid/ask overlay for credit/EV calc)
 // ============================================================
 
 // ─────────────────────────────────────────────────────────────
@@ -288,6 +289,145 @@ function daysToExpiry(expDateStr) {
   const now = new Date();
   const exp = new Date(expDateStr + 'T16:00:00-05:00'); // 4 PM ET
   return Math.round((exp - now) / (1000 * 60 * 60 * 24));
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5b. tastytrade OCC symbol builder
+// ─────────────────────────────────────────────────────────────
+// CBOE:  KO260417C00076000 (no spaces)
+// tasty: KO    260417C00076000 (root padded to 6 chars with spaces)
+function cboeToTastySymbol(cboeSymbol) {
+  const m = cboeSymbol.match(/^([A-Z]+)(\d{6}[CP]\d{8})$/);
+  if (!m) return null;
+  const root = m[1];
+  const rest = m[2];
+  const padded = (root + '      ').slice(0, 6);
+  return padded + rest;
+}
+
+function buildTastySymbol(root, expDate, type, strike) {
+  // expDate: '2026-04-17' → '260417'
+  const exp = expDate.replace(/-/g, '').slice(2); // YYMMDD
+  const t = type === 'C' ? 'C' : 'P';
+  const s = Math.round(strike * 1000).toString().padStart(8, '0');
+  const padded = (root + '      ').slice(0, 6);
+  return padded + exp + t + s;
+}
+
+// Batch fetch tastytrade real-time quotes for option symbols
+async function fetchTastyQuotes(tastySymbols) {
+  if (!tastySymbols || tastySymbols.length === 0) return {};
+  // API limit: chunk by ~20 symbols per request
+  const chunks = [];
+  for (let i = 0; i < tastySymbols.length; i += 20) {
+    chunks.push(tastySymbols.slice(i, i + 20));
+  }
+  const result = {};
+  for (const chunk of chunks) {
+    const encoded = chunk.map(s => encodeURIComponent(s)).join(',');
+    const url = `https://api.tastyworks.com/market-data/by-type?equity-option=${encoded}`;
+    const data = await httpGet.call(this, url, ttHeaders, `tasty-quotes:${chunk.length}syms`);
+    if (data?.data?.items) {
+      for (const item of data.data.items) {
+        result[item.symbol] = item;
+      }
+    }
+  }
+  return result;
+}
+
+// Recalculate spread financials with real-time bid/ask overlay
+function recalcSpreadWithRealtime(spread, tastyQuotes, ticker) {
+  const root = ticker.replace(/[^A-Z]/g, '');
+  const isIC = spread.strategy === 'Iron Condor';
+  const isCredit = ['Bull Put Spread', 'Bear Call Spread', 'Iron Condor'].includes(spread.strategy);
+
+  if (isIC) {
+    // IC: 4 legs — need put side and call side
+    const psKey = buildTastySymbol(root, spread.expDate, 'P', spread.putShortStrike);
+    const plKey = buildTastySymbol(root, spread.expDate, 'P', spread.putLongStrike);
+    const csKey = buildTastySymbol(root, spread.expDate, 'C', spread.callShortStrike);
+    const clKey = buildTastySymbol(root, spread.expDate, 'C', spread.callLongStrike);
+    const ps = tastyQuotes[psKey], pl = tastyQuotes[plKey];
+    const cs = tastyQuotes[csKey], cl = tastyQuotes[clKey];
+    if (!ps || !pl || !cs || !cl) return null; // missing quote
+    const putCredit  = midRT(ps) - midRT(pl);
+    const callCredit = midRT(cs) - midRT(cl);
+    const combinedCredit = putCredit + callCredit;
+    if (combinedCredit <= 0) return null;
+    const callWing = spread.callLongStrike - spread.callShortStrike;
+    const putWing  = spread.putShortStrike - spread.putLongStrike;
+    const wingWidth = Math.max(callWing, putWing);
+    const combinedMaxLoss = wingWidth - combinedCredit;
+    if (combinedMaxLoss <= 0) return null;
+    return {
+      ...spread,
+      credit:         +combinedCredit.toFixed(4),
+      credit_cboe:    spread.credit, // preserve original
+      margin:         +combinedMaxLoss.toFixed(4),
+      returnRate:     +(combinedCredit / combinedMaxLoss).toFixed(4),
+      takeProfit:     +(combinedCredit * 0.5).toFixed(4),
+      stopLoss:       +(combinedCredit * 2.0).toFixed(4),
+      ev:             +(combinedCredit * spread.winRate - combinedMaxLoss * (1 - spread.winRate)).toFixed(4),
+      bidAskSource:   'tastytrade-realtime',
+    };
+  }
+
+  // 2-leg spreads
+  const shortType = spread.strategy.includes('Put') ? 'P' : 'C';
+  const longType  = shortType; // same type for vertical spreads
+  const skeyShort = buildTastySymbol(root, spread.expDate, shortType, spread.shortStrike);
+  const skeyLong  = buildTastySymbol(root, spread.expDate, longType, spread.longStrike);
+  const qShort = tastyQuotes[skeyShort];
+  const qLong  = tastyQuotes[skeyLong];
+  if (!qShort || !qLong) return null;
+
+  if (isCredit) {
+    const credit = midRT(qShort) - midRT(qLong);
+    if (credit <= 0) return null;
+    const width = Math.abs(spread.shortStrike - spread.longStrike);
+    const maxLoss = width - credit;
+    if (maxLoss <= 0) return null;
+    const stopMult = spread.strategy === 'Iron Condor' ? 2.0 : 1.3;
+    return {
+      ...spread,
+      credit:       +credit.toFixed(4),
+      credit_cboe:  spread.credit,
+      margin:       +maxLoss.toFixed(4),
+      returnRate:   +(credit / maxLoss).toFixed(4),
+      takeProfit:   +(credit * 0.5).toFixed(4),
+      stopLoss:     +(credit * 1.3).toFixed(4),
+      ev:           +(credit * spread.winRate - maxLoss * (1 - spread.winRate)).toFixed(4),
+      evRange: {
+        evBest:  +((parseFloat(qShort.ask)||0) - (parseFloat(qLong.bid)||0)).toFixed(4),
+        evMid:   +credit.toFixed(4),
+        evWorst: +((parseFloat(qShort.bid)||0) - (parseFloat(qLong.ask)||0)).toFixed(4),
+      },
+      bidAskSource: 'tastytrade-realtime',
+    };
+  } else {
+    // Debit spread
+    const debit = midRT(qLong) - midRT(qShort);
+    if (debit <= 0) return null;
+    const width = Math.abs(spread.shortStrike - spread.longStrike);
+    const maxGain = width - debit;
+    if (maxGain <= 0) return null;
+    return {
+      ...spread,
+      debit:        +debit.toFixed(4),
+      debit_cboe:   spread.debit,
+      margin:       +debit.toFixed(4),
+      returnRate:   +(maxGain / debit).toFixed(4),
+      takeProfit:   +(debit * 2.0).toFixed(4),
+      stopLoss:     +(debit * 0.7).toFixed(4),
+      ev:           +(maxGain * spread.winRate - debit * (1 - spread.winRate)).toFixed(4),
+      bidAskSource: 'tastytrade-realtime',
+    };
+  }
+}
+
+function midRT(q) {
+  return ((parseFloat(q.bid) || 0) + (parseFloat(q.ask) || 0)) / 2;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1110,6 +1250,59 @@ for (const sym of symbols) {
     optsByExpType, underlyingPrice, direction, ivr, ivPercentile, directionScore, support, resistance, volumeAnalysis
   );
   log(`${ticker}: ${positiveEVSpreads.length} positive-EV spreads found`);
+
+  // ── 12b-vii. tastytrade real-time Bid/Ask overlay ───────────
+  // Recalculate credit/EV with real-time prices for the winning spreads
+  if (positiveEVSpreads.length > 0 && accessToken) {
+    try {
+      // Collect all unique option symbols needed
+      const tastySymbolsNeeded = new Set();
+      for (const sp of positiveEVSpreads) {
+        if (sp.strategy === 'Iron Condor') {
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'P', sp.putShortStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'P', sp.putLongStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'C', sp.callShortStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'C', sp.callLongStrike));
+        } else {
+          const optType = sp.strategy.includes('Put') ? 'P' : 'C';
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, optType, sp.shortStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, optType, sp.longStrike));
+        }
+      }
+      const tastyQuotes = await fetchTastyQuotes.call(this, [...tastySymbolsNeeded]);
+      const quoteCount = Object.keys(tastyQuotes).length;
+      log(`${ticker}: tastytrade real-time quotes fetched: ${quoteCount}/${tastySymbolsNeeded.size}`);
+
+      if (quoteCount > 0) {
+        const updatedSpreads = [];
+        for (const sp of positiveEVSpreads) {
+          const updated = recalcSpreadWithRealtime(sp, tastyQuotes, ticker);
+          if (updated) {
+            // Only keep if EV is still positive with real-time prices
+            if (updated.ev > 0) {
+              updatedSpreads.push(updated);
+            } else {
+              log(`${ticker}: ${sp.strategy} ${sp.shortStrike || sp.putShortStrike}/${sp.longStrike || sp.putLongStrike} EV turned negative with real-time prices (${updated.ev}), dropped`);
+            }
+          } else {
+            // Fallback: keep CBOE data with label
+            sp.bidAskSource = 'cboe-delayed';
+            updatedSpreads.push(sp);
+          }
+        }
+        positiveEVSpreads = updatedSpreads;
+        log(`${ticker}: ${positiveEVSpreads.length} spreads after real-time recalc`);
+      } else {
+        // Mark all as CBOE delayed
+        positiveEVSpreads.forEach(sp => { sp.bidAskSource = 'cboe-delayed'; });
+      }
+    } catch(rtErr) {
+      log(`${ticker}: tastytrade real-time overlay failed: ${rtErr.message}, using CBOE delayed`);
+      positiveEVSpreads.forEach(sp => { sp.bidAskSource = 'cboe-delayed'; });
+    }
+  } else if (positiveEVSpreads.length > 0) {
+    positiveEVSpreads.forEach(sp => { sp.bidAskSource = 'cboe-delayed'; });
+  }
 
   // Fix: Credit fallback — if no credit spreads found and direction allows it,
   // log warning for teacher review (debit spreads may still be available)

@@ -56,7 +56,7 @@ const ranked = results
   .slice(0, 5);
 
 if (ranked.length === 0) {
-  const noMsg = `📢 正EV履約價推播 v3.0 — ${dateStr} ${timeStr}\n━━━━━━━━━━━━━━\n\n⚠️ 今日無符合正EV條件的履約價\n篩選: Delta選價 + Greeks + IVR + 流動性\n\n少做多看，靜候佳機 🧘`;
+  const noMsg = `📢 正EV履約價推播 v3.4 — ${dateStr} ${timeStr}\n━━━━━━━━━━━━━━\n\n今日無符合條件的推薦\n篩選: Delta選價 + Greeks + IVR + 流動性\n\n🛡️ 沒有好的機會時，不做就是最好的策略 🧘\n少做多看，靜候佳機`;
   // Push to LINE
   try {
     await this.helpers.httpRequest({
@@ -125,6 +125,7 @@ ranked.forEach((sym, idx) => {
     const isDebit = ['Bear Put', 'Bull Call'].includes(s.strategy);
     const action = isDebit ? '付' : '收';
     const amount = parseFloat(s.credit || s.debit || 0).toFixed(2);
+    const rtTag = s.bidAskSource === 'tastytrade-realtime' ? '即時' : '';
     const wr = s.winRate ? `勝率${s.winRate}` : '';
 
     const sLabel = stratLabel[s.strategy] || s.strategy;
@@ -133,7 +134,11 @@ ranked.forEach((sym, idx) => {
     } else {
       msg += `➡️ ${sLabel} ${s.shortStrike}/${s.longStrike}\n`;
     }
-    msg += `   ${action}$${amount} | EV $${parseFloat(s.ev).toFixed(2)} | Kelly ${s.kelly}\n`;
+    // EV range: show worst~best based on Bid/Ask slippage
+    const evStr = s.evRange
+      ? `EV $${s.evRange.evWorst}~$${s.evRange.evBest} (中$${parseFloat(s.ev).toFixed(2)})`
+      : `EV $${parseFloat(s.ev).toFixed(2)}`;
+    msg += `   ${action}$${amount}${rtTag ? '(' + rtTag + ')' : ''} | ${evStr} | Kelly ${s.kelly}\n`;
     msg += `   ${s.dte}DTE | ${wr} | Δ${s.shortDelta || '?'}\n`;
 
     // Stop loss / take profit
@@ -148,12 +153,25 @@ ranked.forEach((sym, idx) => {
   });
 });
 
+// Detect data source from spreads
+const allSpreads = ranked.flatMap(r => r.spreads || []);
+const hasRealtime = allSpreads.some(s => s.bidAskSource === 'tastytrade-realtime');
+const hasDelayed  = allSpreads.some(s => s.bidAskSource === 'cboe-delayed');
+const srcLabel = hasRealtime && !hasDelayed ? '🟣 即時報價' 
+  : hasRealtime ? '🟣 即時+CBOE' 
+  : 'CBOE 延遲';
+
 msg += `\n━━━━━━━━━━━━━━\n`;
 msg += `v3.4 篩選:\n`;
 msg += `📊 Greeks + Delta選價 + IVR\n`;
 msg += `🧠 RSI/MA20/Skew方向判斷\n`;
 msg += `🛡️ BidAsk<10% + OI>500\n`;
-msg += `⚠️ CBOE即時數據，下單前請確認`;
+msg += `💱 Bid/Ask: ${srcLabel}\n`;
+msg += `\n🛡️ 風險提醒:\n`;
+msg += `• 每筆交易已鎖定最大虧損，不會超過設定範圍\n`;
+msg += `• 信號為輔助決策工具，下單決定權在你手上\n`;
+msg += `• 單筆建議不超過帳戶 5%，先求穩再求多\n`;
+msg += `• 停損是紀律`;
 
 // Split if too long (LINE limit 5000 chars)
 const msgParts = [];
@@ -231,12 +249,19 @@ ranked.forEach(sym => {
       symbol: sym.ticker,
       strategy: s.strategy,
       decision: parseFloat(s.ev) > 0 ? 'GO' : 'SKIP',
-      note: `EV=$${parseFloat(s.ev).toFixed(2)} Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`,
+      note: s.evRange
+        ? `EV=$${s.evRange.evWorst}~$${s.evRange.evBest}(中${parseFloat(s.ev).toFixed(2)}) Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`
+        : `EV=$${parseFloat(s.ev).toFixed(2)} Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`,
       module: moduleMap[s.strategy] || s.strategy,
       bias: sym.direction || 'neutral',
       iv_environment: `IVR=${(parseFloat(sym.ivr)*100).toFixed(0)}%`,
       created_at: new Date().toISOString(),
-      event_risk: false,
+      event_risk: (function() {
+        const KEY_EV = ['2026-01-09','2026-01-13','2026-01-28','2026-02-11','2026-02-13','2026-03-06','2026-03-11','2026-03-18','2026-04-03','2026-04-10','2026-04-29','2026-05-08','2026-05-12','2026-06-05','2026-06-10','2026-06-17','2026-07-02','2026-07-14','2026-07-29','2026-08-07','2026-08-12','2026-09-04','2026-09-11','2026-09-16','2026-10-02','2026-10-14','2026-10-28','2026-11-06','2026-11-10','2026-12-04','2026-12-09','2026-12-10'];
+        const today = new Date().toISOString().slice(0,10);
+        const in2d = new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+        return KEY_EV.some(d => d >= today && d <= in2d);
+      })(),
       pop: parseFloat(s.winRate) * 100 || 0,
       credit_received: parseFloat(s.credit || 0),
       debit_paid: parseFloat(s.debit || 0),

@@ -125,6 +125,7 @@ ranked.forEach((sym, idx) => {
     const isDebit = ['Bear Put', 'Bull Call'].includes(s.strategy);
     const action = isDebit ? '付' : '收';
     const amount = parseFloat(s.credit || s.debit || 0).toFixed(2);
+    const rtTag = s.bidAskSource === 'tastytrade-realtime' ? '即時' : '';
     const wr = s.winRate ? `勝率${s.winRate}` : '';
 
     const sLabel = stratLabel[s.strategy] || s.strategy;
@@ -137,7 +138,7 @@ ranked.forEach((sym, idx) => {
     const evStr = s.evRange
       ? `EV $${s.evRange.evWorst}~$${s.evRange.evBest} (中$${parseFloat(s.ev).toFixed(2)})`
       : `EV $${parseFloat(s.ev).toFixed(2)}`;
-    msg += `   ${action}$${amount} | ${evStr} | Kelly ${s.kelly}\n`;
+    msg += `   ${action}$${amount}${rtTag ? '(' + rtTag + ')' : ''} | ${evStr} | Kelly ${s.kelly}\n`;
     msg += `   ${s.dte}DTE | ${wr} | Δ${s.shortDelta || '?'}\n`;
 
     // Stop loss / take profit
@@ -152,11 +153,20 @@ ranked.forEach((sym, idx) => {
   });
 });
 
+// Detect data source from spreads
+const allSpreads = ranked.flatMap(r => r.spreads || []);
+const hasRealtime = allSpreads.some(s => s.bidAskSource === 'tastytrade-realtime');
+const hasDelayed  = allSpreads.some(s => s.bidAskSource === 'cboe-delayed');
+const srcLabel = hasRealtime && !hasDelayed ? '🟣 即時報價' 
+  : hasRealtime ? '🟣 即時+CBOE' 
+  : 'CBOE 延遲';
+
 msg += `\n━━━━━━━━━━━━━━\n`;
 msg += `v3.4 篩選:\n`;
 msg += `📊 Greeks + Delta選價 + IVR\n`;
 msg += `🧠 RSI/MA20/Skew方向判斷\n`;
 msg += `🛡️ BidAsk<10% + OI>500\n`;
+msg += `💱 Bid/Ask: ${srcLabel}\n`;
 msg += `\n🛡️ 風險提醒:\n`;
 msg += `• 每筆交易已鎖定最大虧損，不會超過設定範圍\n`;
 msg += `• 信號為輔助決策工具，下單決定權在你手上\n`;

@@ -6,7 +6,8 @@
 //   • Yahoo Finance  – 60-day daily OHLCV  (technical analysis)
 //   • tastytrade     – market-metrics (IVR, IV percentile)
 //   • tastytrade     – option-chains/nested  (expirations)
-//   • CBOE delayed   – ALL option Greeks + bid/ask/OI/volume
+//   • CBOE delayed   – option Greeks + OI/volume (structure filtering)
+//   • tastytrade     – market-data/by-type  (real-time bid/ask overlay for credit/EV calc)
 // ============================================================
 
 // ─────────────────────────────────────────────────────────────
@@ -291,19 +292,196 @@ function daysToExpiry(expDateStr) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 5b. tastytrade OCC symbol builder
+// ─────────────────────────────────────────────────────────────
+// CBOE:  KO260417C00076000 (no spaces)
+// tasty: KO    260417C00076000 (root padded to 6 chars with spaces)
+function cboeToTastySymbol(cboeSymbol) {
+  const m = cboeSymbol.match(/^([A-Z]+)(\d{6}[CP]\d{8})$/);
+  if (!m) return null;
+  const root = m[1];
+  const rest = m[2];
+  const padded = (root + '      ').slice(0, 6);
+  return padded + rest;
+}
+
+function buildTastySymbol(root, expDate, type, strike) {
+  // expDate: '2026-04-17' → '260417'
+  const exp = expDate.replace(/-/g, '').slice(2); // YYMMDD
+  const t = type === 'C' ? 'C' : 'P';
+  const s = Math.round(strike * 1000).toString().padStart(8, '0');
+  const padded = (root + '      ').slice(0, 6);
+  return padded + exp + t + s;
+}
+
+// Batch fetch tastytrade real-time quotes for option symbols
+async function fetchTastyQuotes(tastySymbols) {
+  if (!tastySymbols || tastySymbols.length === 0) return {};
+  // API limit: chunk by ~20 symbols per request
+  const chunks = [];
+  for (let i = 0; i < tastySymbols.length; i += 20) {
+    chunks.push(tastySymbols.slice(i, i + 20));
+  }
+  const result = {};
+  for (const chunk of chunks) {
+    const encoded = chunk.map(s => encodeURIComponent(s)).join(',');
+    const url = `https://api.tastyworks.com/market-data/by-type?equity-option=${encoded}`;
+    const data = await httpGet.call(this, url, ttHeaders, `tasty-quotes:${chunk.length}syms`);
+    if (data?.data?.items) {
+      for (const item of data.data.items) {
+        result[item.symbol] = item;
+      }
+    }
+  }
+  return result;
+}
+
+// Recalculate spread financials with real-time bid/ask overlay
+function recalcSpreadWithRealtime(spread, tastyQuotes, ticker) {
+  const root = ticker.replace(/[^A-Z]/g, '');
+  const isIC = spread.strategy === 'Iron Condor';
+  const isCredit = ['Bull Put Spread', 'Bear Call Spread', 'Iron Condor'].includes(spread.strategy);
+
+  if (isIC) {
+    // IC: 4 legs — need put side and call side
+    const psKey = buildTastySymbol(root, spread.expDate, 'P', spread.putShortStrike);
+    const plKey = buildTastySymbol(root, spread.expDate, 'P', spread.putLongStrike);
+    const csKey = buildTastySymbol(root, spread.expDate, 'C', spread.callShortStrike);
+    const clKey = buildTastySymbol(root, spread.expDate, 'C', spread.callLongStrike);
+    const ps = tastyQuotes[psKey], pl = tastyQuotes[plKey];
+    const cs = tastyQuotes[csKey], cl = tastyQuotes[clKey];
+    if (!ps || !pl || !cs || !cl) return null; // missing quote
+    const putCredit  = midRT(ps) - midRT(pl);
+    const callCredit = midRT(cs) - midRT(cl);
+    const combinedCredit = putCredit + callCredit;
+    if (combinedCredit <= 0) return null;
+    const callWing = spread.callLongStrike - spread.callShortStrike;
+    const putWing  = spread.putShortStrike - spread.putLongStrike;
+    const wingWidth = Math.max(callWing, putWing);
+    const combinedMaxLoss = wingWidth - combinedCredit;
+    if (combinedMaxLoss <= 0) return null;
+    return {
+      ...spread,
+      credit:         +combinedCredit.toFixed(4),
+      credit_cboe:    spread.credit, // preserve original
+      margin:         +combinedMaxLoss.toFixed(4),
+      returnRate:     +(combinedCredit / combinedMaxLoss).toFixed(4),
+      takeProfit:     +(combinedCredit * 0.5).toFixed(4),
+      stopLoss:       +(combinedCredit * 2.0).toFixed(4),
+      ev:             +(combinedCredit * spread.winRate - combinedMaxLoss * (1 - spread.winRate)).toFixed(4),
+      bidAskSource:   'tastytrade-realtime',
+    };
+  }
+
+  // 2-leg spreads
+  const shortType = spread.strategy.includes('Put') ? 'P' : 'C';
+  const longType  = shortType; // same type for vertical spreads
+  const skeyShort = buildTastySymbol(root, spread.expDate, shortType, spread.shortStrike);
+  const skeyLong  = buildTastySymbol(root, spread.expDate, longType, spread.longStrike);
+  const qShort = tastyQuotes[skeyShort];
+  const qLong  = tastyQuotes[skeyLong];
+  if (!qShort || !qLong) return null;
+
+  if (isCredit) {
+    const credit = midRT(qShort) - midRT(qLong);
+    if (credit <= 0) return null;
+    const width = Math.abs(spread.shortStrike - spread.longStrike);
+    const maxLoss = width - credit;
+    if (maxLoss <= 0) return null;
+    const stopMult = spread.strategy === 'Iron Condor' ? 2.0 : 1.3;
+    return {
+      ...spread,
+      credit:       +credit.toFixed(4),
+      credit_cboe:  spread.credit,
+      margin:       +maxLoss.toFixed(4),
+      returnRate:   +(credit / maxLoss).toFixed(4),
+      takeProfit:   +(credit * 0.5).toFixed(4),
+      stopLoss:     +(credit * 1.3).toFixed(4),
+      ev:           +(credit * spread.winRate - maxLoss * (1 - spread.winRate)).toFixed(4),
+      evRange: {
+        evBest:  +((parseFloat(qShort.ask)||0) - (parseFloat(qLong.bid)||0)).toFixed(4),
+        evMid:   +credit.toFixed(4),
+        evWorst: +((parseFloat(qShort.bid)||0) - (parseFloat(qLong.ask)||0)).toFixed(4),
+      },
+      bidAskSource: 'tastytrade-realtime',
+    };
+  } else {
+    // Debit spread
+    const debit = midRT(qLong) - midRT(qShort);
+    if (debit <= 0) return null;
+    const width = Math.abs(spread.shortStrike - spread.longStrike);
+    const maxGain = width - debit;
+    if (maxGain <= 0) return null;
+    return {
+      ...spread,
+      debit:        +debit.toFixed(4),
+      debit_cboe:   spread.debit,
+      margin:       +debit.toFixed(4),
+      returnRate:   +(maxGain / debit).toFixed(4),
+      takeProfit:   +(debit * 2.0).toFixed(4),
+      stopLoss:     +(debit * 0.7).toFixed(4),
+      ev:           +(maxGain * spread.winRate - debit * (1 - spread.winRate)).toFixed(4),
+      bidAskSource: 'tastytrade-realtime',
+    };
+  }
+}
+
+function midRT(q) {
+  return ((parseFloat(q.bid) || 0) + (parseFloat(q.ask) || 0)) / 2;
+}
+
+// ─────────────────────────────────────────────────────────────
 // 6.  LIQUIDITY CHECK
 // ─────────────────────────────────────────────────────────────
 function passesLiquidity(opt) {
   const bid = parseFloat(opt.bid) || 0;
   const ask = parseFloat(opt.ask) || 0;
   const oi  = parseInt(opt.open_interest, 10) || 0;
-  if (ask <= 0) return false;
-  const spreadPct = (ask - bid) / ask;
-  return spreadPct <= LIQUIDITY_MAX_SPREAD_PCT && oi >= LIQUIDITY_MIN_OI;
+  // Fix: bid must be > 0 (zero-bid options are illiquid even if ask exists)
+  if (bid <= 0 || ask <= 0) return false;
+  const spreadAbs = ask - bid;
+  const spreadPct = spreadAbs / ask;
+  // Fix: also check absolute spread ≤ $0.15 to catch penny options with 200%+ spread
+  return spreadPct <= LIQUIDITY_MAX_SPREAD_PCT && spreadAbs <= 0.15 && oi >= LIQUIDITY_MIN_OI;
 }
 
 function midPrice(opt) {
   return ((parseFloat(opt.bid) || 0) + (parseFloat(opt.ask) || 0)) / 2;
+}
+
+// EV range: best/worst case based on Bid-Ask slippage
+function calcEVRange(shortOpt, longOpt, winRate, width, isCredit) {
+  const sBid = parseFloat(shortOpt.bid) || 0;
+  const sAsk = parseFloat(shortOpt.ask) || 0;
+  const lBid = parseFloat(longOpt.bid) || 0;
+  const lAsk = parseFloat(longOpt.ask) || 0;
+  if (isCredit) {
+    // Credit spread: sell short, buy long
+    const creditBest  = sAsk - lBid;  // best fill: sell at ask, buy at bid (unlikely but possible with limit)
+    const creditMid   = midPrice(shortOpt) - midPrice(longOpt);
+    const creditWorst = sBid - lAsk;  // worst fill: sell at bid, buy at ask
+    const mlBest  = width - creditBest;
+    const mlMid   = width - creditMid;
+    const mlWorst = width - creditWorst;
+    return {
+      evBest:  +(creditBest * winRate - mlBest * (1 - winRate)).toFixed(2),
+      evMid:   +(creditMid * winRate - mlMid * (1 - winRate)).toFixed(2),
+      evWorst: +(Math.max(creditWorst, 0) * winRate - (width - Math.max(creditWorst, 0)) * (1 - winRate)).toFixed(2)
+    };
+  } else {
+    // Debit spread: buy long, sell short
+    const debitBest  = lBid - sAsk;  // best: buy at bid (unlikely), sell at ask
+    const debitMid   = midPrice(longOpt) - midPrice(shortOpt);
+    const debitWorst = lAsk - sBid;  // worst: buy at ask, sell at bid
+    const gainBest  = width - debitBest;
+    const gainMid   = width - debitMid;
+    const gainWorst = width - debitWorst;
+    return {
+      evBest:  +(winRate * gainBest - (1 - winRate) * debitBest).toFixed(2),
+      evMid:   +(winRate * gainMid - (1 - winRate) * debitMid).toFixed(2),
+      evWorst: +(winRate * gainWorst - (1 - winRate) * Math.max(debitWorst, 0)).toFixed(2)
+    };
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -362,7 +540,8 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
     const calls = [...callOpts.values()].sort((a, b) => a._strike - b._strike);
 
     // ─── Bull Put Spread / Put Credit Spread (credit, 看多) ────
-    if ((direction === 'bullish' || direction === 'neutral')
+    // Event risk: skip income strategies when CPI/FOMC/NFP within 2 days
+    if (!hasEconEventRisk && (direction === 'bullish' || direction === 'neutral')
         && ivr >= IVR_MIN_PCS && ivr <= IVR_MAX_PCS
         && dte >= DTE_MIN_CREDIT && dte <= DTE_MAX_CREDIT) {
       // Notion LV1: 賣腿 Delta 0.20-0.25, IVR 30-60, DTE 14-30
@@ -431,6 +610,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           credit: +credit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortPut, longPut, winRate, width, true),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +maxLoss.toFixed(4),
@@ -447,7 +627,8 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
     }
 
     // ─── Bear Call Spread / Call Credit Spread (credit, 看空) ────
-    if ((direction === 'bearish' || direction === 'neutral')
+    // Event risk: skip income strategies when CPI/FOMC/NFP within 2 days
+    if (!hasEconEventRisk && (direction === 'bearish' || direction === 'neutral')
         && ivr >= IVR_MIN_CCS && ivr <= IVR_MAX_CCS
         && dte >= DTE_MIN_CREDIT && dte <= DTE_MAX_CREDIT) {
       // Notion LV2: 賣腿 Delta 0.15 區間, IVR 30-50, DTE 14-30
@@ -510,6 +691,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           credit: +credit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortCall, longCall, winRate, width, true),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +maxLoss.toFixed(4),
@@ -575,6 +757,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           debit: +debit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortCall, longCall, winRate, width, false),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +debit.toFixed(4),
@@ -639,6 +822,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           debit: +debit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortPut, longPut, winRate, longPut._strike - shortPut._strike, false),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +debit.toFixed(4),
@@ -655,7 +839,8 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
     }
 
     // ─── Iron Condor = Bear Call + Bull Put on same expiration ───
-    if (direction === 'neutral'
+    // Event risk: skip income strategies when CPI/FOMC/NFP within 2 days
+    if (!hasEconEventRisk && direction === 'neutral'
         && ivr >= IVR_MIN_IC
         && dte >= DTE_MIN_IC && dte <= DTE_MAX_IC) {
       // Notion: IVR>30, DTE 20-30, Delta ±0.10-0.15
@@ -677,7 +862,13 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
         // Verify no strike overlap
         if (bp.shortStrike < bc.shortStrike) {
           const combinedCredit  = +(bc.credit + bp.credit).toFixed(4);
-          const combinedMaxLoss = Math.max(bc.margin, bp.margin); // wider of the two
+          // Fix: IC maxLoss = wider wing width - combined credit (not max of individual margins)
+          // Bear Call: longStrike > shortStrike; Bull Put: shortStrike > longStrike
+          const callWing = bc.longStrike - bc.shortStrike;
+          const putWing  = bp.shortStrike - bp.longStrike;
+          const wingWidth = Math.max(callWing, putWing);
+          const combinedMaxLoss = +(wingWidth - combinedCredit).toFixed(4);
+          if (combinedMaxLoss <= 0) continue; // sanity check
           const combinedWinRate = bc.winRate * bp.winRate;         // both expire OTM
           const combinedEV      = combinedCredit * combinedWinRate
                                   - combinedMaxLoss * (1 - combinedWinRate);
@@ -910,6 +1101,18 @@ try {
   }
 } catch(e) { log(`Earnings fetch error: ${e.message}`); }
 
+// 12d-pre. Event Risk Calendar Check (2026 CPI/FOMC/NFP)
+const EVENT_DATES_2026 = ['2026-01-09','2026-01-13','2026-01-28','2026-02-11','2026-02-13','2026-03-06','2026-03-11','2026-03-18','2026-04-03','2026-04-10','2026-04-29','2026-05-08','2026-05-12','2026-06-05','2026-06-10','2026-06-17','2026-07-02','2026-07-14','2026-07-29','2026-08-07','2026-08-12','2026-09-04','2026-09-11','2026-09-16','2026-10-02','2026-10-14','2026-10-28','2026-11-06','2026-11-10','2026-12-04','2026-12-09','2026-12-10'];
+const EVENT_TYPE_MAP = {'01-09':'NFP','01-13':'CPI','01-28':'FOMC','02-11':'NFP','02-13':'CPI','03-06':'NFP','03-11':'CPI','03-18':'FOMC','04-03':'NFP','04-10':'CPI','04-29':'FOMC','05-08':'NFP','05-12':'CPI','06-05':'NFP','06-10':'CPI','06-17':'FOMC','07-02':'NFP','07-14':'CPI','07-29':'FOMC','08-07':'NFP','08-12':'CPI','09-04':'NFP','09-11':'CPI','09-16':'FOMC','10-02':'NFP','10-14':'CPI','10-28':'FOMC','11-06':'NFP','11-10':'CPI','12-04':'NFP','12-09':'FOMC','12-10':'CPI'};
+const todayStr = new Date().toISOString().slice(0,10);
+const in2daysStr = new Date(Date.now() + 2*86400000).toISOString().slice(0,10);
+const upcomingEconEvents = EVENT_DATES_2026.filter(d => d >= todayStr && d <= in2daysStr);
+const hasEconEventRisk = upcomingEconEvents.length > 0;
+const econEventLabel = upcomingEconEvents.map(d => EVENT_TYPE_MAP[d.slice(5)] + ' ' + d.slice(5)).join(', ');
+if (hasEconEventRisk) {
+  log(`⚠️ Event Risk: ${econEventLabel} — income strategies will be blocked, debit strategies allowed`);
+}
+
 // 12d. Process each symbol
 const sectorCount = {}; // track per-sector recommendations
 for (const sym of symbols) {
@@ -1043,10 +1246,71 @@ for (const sym of symbols) {
   log(`${ticker}: direction=${direction} score=${directionScore} regime=${marketRegime}`);
 
   // ── 12b-vi. Build spreads ───────────────────────────────────
-  const positiveEVSpreads = buildSpreads(
+  let positiveEVSpreads = buildSpreads(
     optsByExpType, underlyingPrice, direction, ivr, ivPercentile, directionScore, support, resistance, volumeAnalysis
   );
   log(`${ticker}: ${positiveEVSpreads.length} positive-EV spreads found`);
+
+  // ── 12b-vii. tastytrade real-time Bid/Ask overlay ───────────
+  // Recalculate credit/EV with real-time prices for the winning spreads
+  if (positiveEVSpreads.length > 0 && accessToken) {
+    try {
+      // Collect all unique option symbols needed
+      const tastySymbolsNeeded = new Set();
+      for (const sp of positiveEVSpreads) {
+        if (sp.strategy === 'Iron Condor') {
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'P', sp.putShortStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'P', sp.putLongStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'C', sp.callShortStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, 'C', sp.callLongStrike));
+        } else {
+          const optType = sp.strategy.includes('Put') ? 'P' : 'C';
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, optType, sp.shortStrike));
+          tastySymbolsNeeded.add(buildTastySymbol(cboeRoot, sp.expDate, optType, sp.longStrike));
+        }
+      }
+      const tastyQuotes = await fetchTastyQuotes.call(this, [...tastySymbolsNeeded]);
+      const quoteCount = Object.keys(tastyQuotes).length;
+      log(`${ticker}: tastytrade real-time quotes fetched: ${quoteCount}/${tastySymbolsNeeded.size}`);
+
+      if (quoteCount > 0) {
+        const updatedSpreads = [];
+        for (const sp of positiveEVSpreads) {
+          const updated = recalcSpreadWithRealtime(sp, tastyQuotes, ticker);
+          if (updated) {
+            // Only keep if EV is still positive with real-time prices
+            if (updated.ev > 0) {
+              updatedSpreads.push(updated);
+            } else {
+              log(`${ticker}: ${sp.strategy} ${sp.shortStrike || sp.putShortStrike}/${sp.longStrike || sp.putLongStrike} EV turned negative with real-time prices (${updated.ev}), dropped`);
+            }
+          } else {
+            // Fallback: keep CBOE data with label
+            sp.bidAskSource = 'cboe-delayed';
+            updatedSpreads.push(sp);
+          }
+        }
+        positiveEVSpreads = updatedSpreads;
+        log(`${ticker}: ${positiveEVSpreads.length} spreads after real-time recalc`);
+      } else {
+        // Mark all as CBOE delayed
+        positiveEVSpreads.forEach(sp => { sp.bidAskSource = 'cboe-delayed'; });
+      }
+    } catch(rtErr) {
+      log(`${ticker}: tastytrade real-time overlay failed: ${rtErr.message}, using CBOE delayed`);
+      positiveEVSpreads.forEach(sp => { sp.bidAskSource = 'cboe-delayed'; });
+    }
+  } else if (positiveEVSpreads.length > 0) {
+    positiveEVSpreads.forEach(sp => { sp.bidAskSource = 'cboe-delayed'; });
+  }
+
+  // Fix: Credit fallback — if no credit spreads found and direction allows it,
+  // log warning for teacher review (debit spreads may still be available)
+  const hasCreditSpread = positiveEVSpreads.some(s => ['Bull Put Spread', 'Bear Call Spread', 'Iron Condor'].includes(s.strategy));
+  const hasDebitSpread = positiveEVSpreads.some(s => ['Bull Call Spread', 'Bear Put Spread'].includes(s.strategy));
+  if (!hasCreditSpread && (direction === 'bullish' || direction === 'bearish') && ivr >= 0.25) {
+    log(`${ticker}: ⚠️ Credit fallback — no credit spreads passed filters (IVR=${(ivr*100).toFixed(0)}%, direction=${direction}). Only debit spreads available. Check if reward:risk threshold is too strict.`);
+  }
 
   results.push({
     ticker,

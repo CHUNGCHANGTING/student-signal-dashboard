@@ -10,7 +10,8 @@
   "data_sources": [
     "Yahoo Finance (prices, RSI, MA20, MACD, support/resistance, volume, VIX)",
     "tastytrade market-metrics (IVR, IVP, IV Index)",
-    "CBOE delayed quotes (Greeks, bid/ask, OI, volume)",
+    "tastytrade market-data/by-type (real-time bid/ask overlay for credit/EV calc)",
+    "CBOE delayed quotes (Greeks, OI, volume — structure filtering)",
     "Finnhub (earnings calendar)",
     "Google Sheets (signal tracking & settlement)"
   ],
