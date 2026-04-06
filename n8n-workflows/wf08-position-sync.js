@@ -52,32 +52,29 @@ if (action === 'cboe-proxy' || action === 'cboe') {
   return [{ json: { batch: true, symbols: symbolList, results } }];
 }
 
-// === tastytrade Login Proxy (bypass browser User-Agent restriction) ===
-if (action === 'tt-login') {
-  const body = inputData.body || {};
-  const login = body.login || '';
-  const password = body.password || '';
-  if (!login || !password) {
-    return [{ json: { error: { code: 'missing_fields', message: 'Missing login or password' } } }];
-  }
+// === tastytrade OAuth Token Proxy (Dashboard uses this to get access token) ===
+const TT_CLIENT_ID     = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
+const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
+const TT_REFRESH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw';
+
+if (action === 'tt-login' || action === 'tt-oauth') {
+  // OAuth flow: exchange refresh token for access token (no password needed, no 2FA)
   try {
     const resp = await this.helpers.httpRequest({
       method: 'POST',
-      url: 'https://api.tastyworks.com/sessions',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'chilldove-dashboard/1.0',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ login, password, 'remember-me': true }),
+      url: 'https://api.tastyworks.com/oauth/token',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-dashboard/1.0' },
+      body: `grant_type=refresh_token&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}&refresh_token=${encodeURIComponent(TT_REFRESH_TOKEN)}`,
       returnFullResponse: true,
       ignoreHttpStatusErrors: true,
       timeout: 15000
     });
     const data = typeof resp.body === 'string' ? JSON.parse(resp.body) : resp.body;
-    // Forward the OTP header if present
-    const otpHeader = resp.headers?.['x-tastyworks-otp'] || '';
-    return [{ json: { statusCode: resp.statusCode, data: data?.data || null, error: data?.error || null, otpRequired: otpHeader === 'required' } }];
+    if (data.access_token) {
+      return [{ json: { data: { 'session-token': data.access_token, 'token-type': data.token_type, 'expires-in': data.expires_in }, auth: 'oauth' } }];
+    } else {
+      return [{ json: { error: { code: data.error || 'oauth_failed', message: data.error_description || 'OAuth token exchange failed' } } }];
+    }
   } catch(e) {
     return [{ json: { error: { code: 'proxy_error', message: e.message } } }];
   }
@@ -96,8 +93,7 @@ if (action === 'tt-login') {
 // ============================================================
 
 const TT_API = 'https://api.tastyworks.com';
-const TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
-const TT_CLIENT_SECRET = '<TT_CLIENT_SECRET>';
+// TT_CLIENT_ID, TT_CLIENT_SECRET, TT_REFRESH_TOKEN declared above in OAuth proxy section
 
 let input;
 try {

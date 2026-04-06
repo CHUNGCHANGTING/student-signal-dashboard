@@ -73,11 +73,32 @@ const IVP_MAX_DEBIT    = 0.50;
 const REWARD_RISK_MIN  = 3.0;   // Credit spread 報酬比至少 1:3 (Notion)
 
 // ─────────────────────────────────────────────────────────────
-// 1.  AUTH
+// 1.  AUTH — OAuth 2.0 (refresh token 永久有效，不受 2FA 影響)
 // ─────────────────────────────────────────────────────────────
-const accessToken = $input.first().json.access_token;
+const TT_CLIENT_ID     = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
+const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
+const TT_REFRESH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw';
+
+// Exchange refresh token for access token (valid 15 min)
+let accessToken = $input.first().json.access_token || null;
+if (!accessToken) {
+  try {
+    const tokenResp = await this.helpers.httpRequest({
+      method: 'POST',
+      url: 'https://api.tastyworks.com/oauth/token',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-n8n/3.0' },
+      body: `grant_type=refresh_token&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}&refresh_token=${encodeURIComponent(TT_REFRESH_TOKEN)}`,
+      returnFullResponse: true,
+      ignoreHttpStatusErrors: true,
+    });
+    const tokenData = typeof tokenResp.body === 'string' ? JSON.parse(tokenResp.body) : tokenResp.body;
+    if (tokenData.access_token) {
+      accessToken = tokenData.access_token;
+    }
+  } catch(e) { /* will fall through to use input token or fail gracefully */ }
+}
 const ttHeaders = {
-  'Authorization': 'Bearer ' + accessToken,
+  'Authorization': accessToken ? 'Bearer ' + accessToken : '',
   'Accept': 'application/json',
   'User-Agent': 'chilldove-n8n/3.0',
 };
