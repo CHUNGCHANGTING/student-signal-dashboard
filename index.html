@@ -834,19 +834,19 @@ a, button, [role=button] { transition: color var(--transition), background var(-
         <span style="background:var(--color-primary);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">3</span>
         <h2 style="margin:0">⚠️ 風險須知</h2>
       </div>
-      <div style="font-size:12px;line-height:1.8;padding:var(--space-3);background:var(--color-error-highlight);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
-        <div style="font-weight:700;color:var(--color-error);margin-bottom:var(--space-2)">選擇權交易風險警示</div>
-        <div>• 選擇權交易具有高度風險，可能損失全部投入資金</div>
-        <div>• 過去績效不代表未來結果</div>
-        <div>• 系統信號僅供參考，不構成投資建議</div>
-        <div>• 請勿投入無法承受損失的資金</div>
-        <div>• 建議單筆部位不超過帳戶總值 5%</div>
-        <div>• 每筆交易必須設定停損點</div>
+      <div style="font-size:12px;line-height:1.8;padding:var(--space-3);background:var(--color-warning-highlight);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
+        <div style="font-weight:700;color:var(--color-text);margin-bottom:var(--space-2)">🛡️ 交易前的重要觀念</div>
+        <div>• 選擇權是有結構的風險控制工具 — 我們的系統會幫你在每筆交易前鎖定最大虧損</div>
+        <div>• 每筆交易都有明確的最大虧損金額，不會超過你設定的範圍</div>
+        <div>• 系統信號是輔助決策工具，最終下單決定權始終在你手上</div>
+        <div>• 建議用「學習資金」開始 — 單筆不超過帳戶 5%，先求穩再求多</div>
+        <div>• 每筆交易都必須設定停損點 — 這是紀律，不是建議</div>
+        <div>• 過去績效不代表未來結果，保持學習心態持續進步</div>
       </div>
       <div style="margin-bottom:var(--space-3)">
         <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px">
           <input type="checkbox" id="setup-risk-agree" onchange="document.getElementById('setup-final-btn').disabled = !this.checked" style="margin-top:2px;accent-color:var(--color-primary)">
-          <span>我已閱讀並理解以上風險警示，且使用自己可承受損失的資金進行交易</span>
+          <span>我理解以上觀念，並會在可控制的風險範圍內進行交易</span>
         </label>
       </div>
       <div style="display:flex;gap:var(--space-2)">
