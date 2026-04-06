@@ -1069,7 +1069,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
           <span id="sp-auto-status-text">⏳ 等待 WF-02 訊號推送...</span>
         </div>
         <div class="sp-auto-url-row">
-          <input type="text" id="sp-auto-url" value="https://chilldove.app.n8n.cloud/webhook/ev-signals" placeholder="WF-02 Webhook URL">
+          <input type="text" id="sp-auto-url" value="https://chilldove.app.n8n.cloud/webhook/skool-verify" placeholder="WF-02 Webhook URL">
           <button class="btn-primary" onclick="connectAutoReceive()">連線</button>
         </div>
         <p class="sp-auto-desc">當 WF-02 收到 TradingView Alert 或手動觸發後，判斷結果會自動顯示在下方。</p>
@@ -2039,10 +2039,11 @@ function connectAutoReceive() {
   var statusText = document.getElementById('sp-auto-status-text');
   statusText.textContent = '\u9023\u7dda\u4e2d...';
   dotEl.className = 'status-dot waiting';
-  fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get_signals' }) }).then(function(r) { return r.json(); }).then(function(raw) {
+    var data = Array.isArray(raw) ? raw[0] : raw;
     autoReceiveConnected = true;
     dotEl.className = 'status-dot connected';
-    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda';
+    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + (data.signals ? data.signals.length + ' \u7b46\u4fe1\u865f' : '\u7b49\u5f85\u63a8\u64ad');
     processAutoSignals(data);
   }).catch(function(e) {
     dotEl.className = 'status-dot waiting';
@@ -2056,10 +2057,11 @@ function manualPollSignal() {
   if (!url) return;
   var statusText = document.getElementById('sp-auto-status-text');
   statusText.textContent = '\ud83d\udd04 \u5237\u65b0\u4e2d...';
-  fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get_signals' }) }).then(function(r) { return r.json(); }).then(function(raw) {
+    var data = Array.isArray(raw) ? raw[0] : raw;
     var dotEl = document.getElementById('sp-auto-dot');
     dotEl.className = 'status-dot connected';
-    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + new Date().toLocaleTimeString();
+    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + (data.signals ? data.signals.length + ' \u7b46\u4fe1\u865f' : '\u7b49\u5f85\u63a8\u64ad') + ' (' + new Date().toLocaleTimeString() + ')';
     autoReceiveConnected = true;
     processAutoSignals(data);
   }).catch(function(e) {
