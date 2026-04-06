@@ -2992,12 +2992,14 @@ var selectedBroker = localStorage.getItem('g2_broker') || '';
 
 // === Broker Setup Flow ===
 function checkBrokerSetup() {
-  var saved = localStorage.getItem('g2_broker');
+  // selectedBroker may already be set from Supabase profile during checkAuth
+  var saved = selectedBroker || localStorage.getItem('g2_broker');
   if (!saved) {
-    // First time — show setup overlay
+    // First time on any device — show setup overlay
     document.getElementById('broker-setup-overlay').style.display = 'flex';
   } else {
     selectedBroker = saved;
+    localStorage.setItem('g2_broker', saved); // Keep localStorage in sync
     updateBrokerUI(saved);
   }
 }
@@ -3016,6 +3018,20 @@ function confirmSetupBroker() {
   localStorage.setItem('g2_broker', broker);
   document.getElementById('broker-setup-overlay').style.display = 'none';
   updateBrokerUI(broker);
+  // Sync to Supabase so it persists across devices
+  saveBrokerToCloud(broker);
+}
+
+async function saveBrokerToCloud(broker) {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    await supabaseClient.auth.updateUser({
+      data: { broker: broker }
+    });
+  } catch(e) {
+    // Silently fail — localStorage still works as fallback
+    console.log('Broker cloud sync skipped:', e.message);
+  }
 }
 
 function showBrokerSetup() {
@@ -3582,6 +3598,12 @@ async function checkAuth() {
 
       if (profile && profile.status === 'active') {
         userRole = profile.role || 'student';
+        // Restore broker setting from user_metadata (persists across devices)
+        var cloudBroker = session.user.user_metadata && session.user.user_metadata.broker;
+        if (cloudBroker) {
+          localStorage.setItem('g2_broker', cloudBroker);
+          selectedBroker = cloudBroker;
+        }
         showApp();
         updateUserDisplay();
       } else if (profile && profile.status !== 'active') {
