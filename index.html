@@ -1180,6 +1180,10 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="g2-approved-list" style="margin-bottom:var(--space-4)">
   <div class="info-block note"><p>請先在第1關完成批次判斷，通過的標的會自動帶入此處。</p></div>
 </div>
+<div id="g2-fetch-all-bar" style="display:none;margin-bottom:var(--space-3)">
+  <button onclick="autoFetchAll()" style="width:100%;padding:var(--space-3);background:linear-gradient(135deg,var(--color-primary),#2ecc71);color:#fff;border:none;border-radius:var(--radius-md);font-size:var(--text-sm);font-weight:700;cursor:pointer">⚡ 全部自動試算（CBOE 即時 Bid/Ask/OI/Delta）</button>
+  <p style="font-size:10px;color:var(--color-text-muted);text-align:center;margin-top:4px">使用 CBOE 延遲報價（約 15 分鐘延遲），不需券商 API</p>
+</div>
 
 <!-- TOS Parameter Reference -->
 <div style="margin-top:var(--space-4)">
@@ -2913,7 +2917,13 @@ function populateGate2() {
     html += '<span>EV: ' + s.ev.toFixed(2) + '</span>';
     html += '</div>';
     html += '<div id="g2-check-' + s.symbol + '" style="margin-top:var(--space-2)">';
-    // Bid-Ask interactive input (above checkboxes)
+    // Auto-fetch data row + Bid-Ask display
+    html += '<div style="margin-bottom:6px">';
+    html += '<button onclick="autoFetchOptionData(\'' + s.symbol + '\',\'' + s.strategy + '\',\'' + (s.expiry || '') + '\',\'' + (s.orderText || '') + '\')" style="width:100%;padding:6px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer" id="g2-fetch-btn-' + s.symbol + '">⚡ 自動試算（CBOE 即時數據）</button>';
+    html += '</div>';
+    // Auto-fill results area
+    html += '<div id="g2-auto-data-' + s.symbol + '" style="display:none;font-size:11px;margin-bottom:6px;padding:6px;background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm)"></div>';
+    // Bid-Ask row (auto-filled or manual)
     html += '<div class="g2-bidask-row" data-symbol="' + s.symbol + '" style="display:flex;align-items:center;gap:var(--space-2);padding:6px 0;font-size:11px;border-bottom:1px solid var(--color-border);margin-bottom:4px">';
     html += '<div style="display:flex;align-items:center;gap:6px;flex:1">';
     html += '<span style="font-weight:700;min-width:28px">Bid</span>';
@@ -2921,7 +2931,7 @@ function populateGate2() {
     html += '<span style="font-weight:700;min-width:28px">Ask</span>';
     html += '<input type="number" step="0.01" id="g2-ask-' + s.symbol + '" placeholder="0.00" oninput="updateBidAsk(\'' + s.symbol + '\')" style="width:70px;padding:3px 6px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text);font-size:12px;text-align:center">';
     html += '</div>';
-    html += '<div id="g2-spread-' + s.symbol + '" style="min-width:120px;text-align:right;font-weight:700;font-size:12px;color:var(--color-text-muted)">— 輸入 Bid/Ask</div>';
+    html += '<div id="g2-spread-' + s.symbol + '" style="min-width:120px;text-align:right;font-weight:700;font-size:12px;color:var(--color-text-muted)">— 點擊自動試算</div>';
     html += '</div>';
 
     // Per-symbol TOS checklist (OI, Delta, Width — bidask is now interactive above)
@@ -2985,6 +2995,9 @@ function populateGate2() {
   container.innerHTML = html;
   // Restore saved broker selection
   restoreSavedBroker();
+  // Show fetch-all button
+  var fetchAllBar = document.getElementById('g2-fetch-all-bar');
+  if (fetchAllBar) fetchAllBar.style.display = 'block';
 }
 
 // === Multi-Broker Support for Gate 2 ===
@@ -3136,6 +3149,165 @@ function getBrokerOptionLink(symbol, broker) {
 // restoreSavedBroker is now handled by checkBrokerSetup
 function restoreSavedBroker() {
   updateBrokerUI(selectedBroker || localStorage.getItem('g2_broker') || 'schwab');
+}
+
+// === CBOE Auto-Fetch for Gate 2 ===
+async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
+  var btn = document.getElementById('g2-fetch-btn-' + symbol);
+  var dataEl = document.getElementById('g2-auto-data-' + symbol);
+  if (btn) { btn.textContent = '⏳ 載入中...'; btn.disabled = true; }
+
+  try {
+    var cboeRoot = symbol.replace(/[^A-Z]/g, '');
+    var resp = await fetch('https://cdn.cboe.com/api/global/delayed_quotes/options/' + cboeRoot + '.json');
+    var data = await resp.json();
+    var opts = (data && data.data && data.data.options) || [];
+
+    if (opts.length === 0) {
+      if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ CBOE 無數據，請手動輸入'; }
+      if (btn) { btn.textContent = '❌ 無數據 — 手動輸入'; btn.disabled = false; }
+      return;
+    }
+
+    // Parse strikes from orderText: "BUY CALL 76.0 / SELL CALL 81.0"
+    var strikes = (orderText || '').match(/[\d.]+/g) || [];
+    var isCall = strategy.includes('CALL');
+    var isPut = strategy.includes('PUT');
+
+    // Build CBOE option symbol: KO260417C00076000
+    function buildCboeSymbol(sym, expStr, type, strike) {
+      if (!expStr) return '';
+      var exp = expStr.replace(/-/g, '').slice(2); // 260417
+      var t = type === 'C' ? 'C' : 'P';
+      var s = Math.round(strike * 1000).toString().padStart(8, '0');
+      return sym + exp + t + s;
+    }
+
+    // Determine option type for each leg
+    var legs = [];
+    if (strategy === 'BULL_CALL_DEBIT_SPREAD' && strikes.length >= 2) {
+      legs = [
+        { label: 'Long Call', strike: parseFloat(strikes[0]), type: 'C', side: 'long' },
+        { label: 'Short Call', strike: parseFloat(strikes[1]), type: 'C', side: 'short' }
+      ];
+    } else if (strategy === 'BEAR_PUT_DEBIT_SPREAD' && strikes.length >= 2) {
+      legs = [
+        { label: 'Long Put', strike: parseFloat(strikes[0]), type: 'P', side: 'long' },
+        { label: 'Short Put', strike: parseFloat(strikes[1]), type: 'P', side: 'short' }
+      ];
+    } else if (strategy === 'BULL_PUT_CREDIT_SPREAD' && strikes.length >= 2) {
+      legs = [
+        { label: 'Short Put', strike: parseFloat(strikes[0]), type: 'P', side: 'short' },
+        { label: 'Long Put', strike: parseFloat(strikes[1]), type: 'P', side: 'long' }
+      ];
+    } else if (strategy === 'BEAR_CALL_CREDIT_SPREAD' && strikes.length >= 2) {
+      legs = [
+        { label: 'Short Call', strike: parseFloat(strikes[0]), type: 'C', side: 'short' },
+        { label: 'Long Call', strike: parseFloat(strikes[1]), type: 'C', side: 'long' }
+      ];
+    }
+
+    if (legs.length === 0) {
+      if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ 無法解析下單指令，請手動輸入'; }
+      if (btn) { btn.textContent = '⚡ 重新試算'; btn.disabled = false; }
+      return;
+    }
+
+    // Look up each leg in CBOE data
+    var html = '<table style="width:100%;font-size:11px;border-collapse:collapse">';
+    html += '<tr style="border-bottom:1px solid var(--color-border);font-weight:600"><td>Leg</td><td>Strike</td><td>Bid</td><td>Ask</td><td>Delta</td><td>OI</td><td>Vol</td><td>狀態</td></tr>';
+
+    var allOk = true;
+    var shortLegBid = 0, shortLegAsk = 0;
+
+    for (var i = 0; i < legs.length; i++) {
+      var leg = legs[i];
+      var cboeKey = buildCboeSymbol(cboeRoot, expiry, leg.type, leg.strike);
+      var match = opts.filter(function(o) { return (o.option || '') === cboeKey; });
+      var opt = match.length > 0 ? match[0] : null;
+
+      if (!opt) {
+        html += '<tr><td>' + leg.label + '</td><td>$' + leg.strike + '</td><td colspan="5">❌ 找不到</td><td style="color:var(--color-error)">✗</td></tr>';
+        allOk = false;
+        continue;
+      }
+
+      var bid = parseFloat(opt.bid) || 0;
+      var ask = parseFloat(opt.ask) || 0;
+      var delta = parseFloat(opt.delta) || 0;
+      var oi = parseInt(opt.open_interest) || 0;
+      var vol = parseInt(opt.volume) || 0;
+      var spread = ask - bid;
+
+      // Color coding
+      var oiColor = oi >= 500 ? 'var(--color-success)' : oi >= 100 ? 'var(--color-warning)' : 'var(--color-error)';
+      var spreadColor = spread <= 0.05 ? 'var(--color-success)' : spread <= 0.10 ? 'var(--color-success)' : spread <= 0.15 ? 'var(--color-warning)' : 'var(--color-error)';
+      var oiOk = oi >= 500;
+      var spreadOk = spread <= 0.10;
+
+      if (leg.side === 'short') { shortLegBid = bid; shortLegAsk = ask; }
+
+      var status = (oiOk && spreadOk) ? '<span style="color:var(--color-success)">✅</span>' : '<span style="color:var(--color-error)">⚠️</span>';
+      if (!oiOk || !spreadOk) allOk = false;
+
+      html += '<tr style="border-bottom:1px solid var(--color-border)">';
+      html += '<td style="font-weight:600">' + leg.label + '</td>';
+      html += '<td>$' + leg.strike.toFixed(1) + '</td>';
+      html += '<td>$' + bid.toFixed(2) + '</td>';
+      html += '<td>$' + ask.toFixed(2) + '</td>';
+      html += '<td>' + Math.abs(delta).toFixed(4) + '</td>';
+      html += '<td style="color:' + oiColor + ';font-weight:600">' + oi + '</td>';
+      html += '<td>' + vol + '</td>';
+      html += '<td>' + status + '</td>';
+      html += '</tr>';
+    }
+    html += '</table>';
+
+    // Summary
+    if (allOk) {
+      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-success-highlight);color:var(--color-success);border-radius:var(--radius-sm);font-weight:600">✅ 全部條件符合 — OI 充足、Bid-Ask 合格</div>';
+    } else {
+      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-weight:600">⚠️ 部分條件未達標 — 請留意 OI 或 Bid-Ask</div>';
+    }
+
+    if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = html; }
+
+    // Auto-fill Bid/Ask inputs (use short leg for credit, long leg for debit)
+    var bidInput = document.getElementById('g2-bid-' + symbol);
+    var askInput = document.getElementById('g2-ask-' + symbol);
+    if (bidInput && shortLegBid > 0) { bidInput.value = shortLegBid.toFixed(2); }
+    if (askInput && shortLegAsk > 0) { askInput.value = shortLegAsk.toFixed(2); }
+    updateBidAsk(symbol);
+
+    // Auto-check OI and Delta if conditions met
+    if (allOk) {
+      var checkRows = document.querySelectorAll('.g2-check-row[data-symbol="' + symbol + '"]');
+      checkRows.forEach(function(row) {
+        if (!row.classList.contains('checked')) {
+          row.classList.add('checked');
+          var box = row.querySelector('.g2-checkbox');
+          if (box) { box.style.background = 'var(--color-success)'; box.style.borderColor = 'var(--color-success)'; var svg = box.querySelector('svg'); if (svg) svg.style.display = 'block'; }
+        }
+      });
+      updateGate2Progress();
+    }
+
+    if (btn) { btn.textContent = allOk ? '✅ 試算完成' : '⚠️ 試算完成（有警告）'; btn.style.background = allOk ? 'var(--color-success)' : 'var(--color-warning)'; }
+
+  } catch(e) {
+    if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '❌ CBOE API 錯誤: ' + e.message + '<br>請手動輸入 Bid/Ask'; }
+    if (btn) { btn.textContent = '⚡ 重新試算'; btn.disabled = false; }
+  }
+}
+
+// Fetch all approved symbols at once
+async function autoFetchAll() {
+  for (var i = 0; i < g2ApprovedSignals.length; i++) {
+    var s = g2ApprovedSignals[i];
+    await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '');
+    // Small delay between requests
+    await new Promise(function(r) { setTimeout(r, 500); });
+  }
 }
 
 // === Bid-Ask Spread Real-time Color Warning ===
