@@ -5253,7 +5253,8 @@ async function verifySkoolMember() {
         user_email: currentUser.email 
       })
     });
-    const result = await resp.json();
+    const raw = await resp.json();
+    const result = Array.isArray(raw) ? raw[0] : raw;
     
     if (result.verified) {
       statusEl.textContent = '✅ 驗證成功！帳號已開通，正在重新載入...';
