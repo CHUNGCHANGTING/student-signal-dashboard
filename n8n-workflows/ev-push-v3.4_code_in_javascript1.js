@@ -15,6 +15,8 @@ if ($input.first().json.halted) {
   try { await this.helpers.httpRequest({ method: 'POST', url: `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_CHAT, text: haltMsg }) }); } catch(e) {}
   // Also POST to webhook
   try { await this.helpers.httpRequest({ method: 'POST', url: 'https://chilldove.app.n8n.cloud/webhook/ev-signals-update', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timestamp: new Date().toISOString(), signals: [], summary: { halted: true, reason: d.haltReason, vix: d.vix, version: 'v3.4' }, raw: [] }) }); } catch(e) {}
+  // Even halt messages get Dashboard link
+  haltMsg += `\n\n📊 Dashboard:\nhttps://chungchangting.github.io/student-signal-dashboard/`;
   return [{ json: { message: haltMsg, halted: true, version: 'v3.4' } }];
 }
 
@@ -160,6 +162,8 @@ if (msg.length > 4500) {
   }
   if (current) msgParts.push(current);
 } else {
+  // Append Dashboard link
+  msg += `\n\n📊 試算 Dashboard:\nhttps://chungchangting.github.io/student-signal-dashboard/`;
   msgParts.push(msg);
 }
 

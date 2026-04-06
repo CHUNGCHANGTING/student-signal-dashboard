@@ -1,0 +1,337 @@
+{
+  "updatedAt": "2026-04-05T21:15:12.787Z",
+  "createdAt": "2026-04-05T20:50:30.025Z",
+  "id": "tecBDH3Q64fBF2a2",
+  "name": "【訂單監控】WF-09 Order Monitor",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "sched09",
+      "name": "Every 2 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// WF-09【訂單監控】Account Order Monitor\n// Schedule (every 2 min during market hours) → Check orders → Alert\n// ============================================================\n\nconst TT_API = 'https://api.tastyworks.com';\nconst TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';\nconst TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';\nconst LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';\nconst TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';\nconst TG_CHAT = '-1003799249092';\n\n// ─── Market Hours Check ───\nconst now = new Date();\nconst utcHour = now.getUTCHours();\nconst utcDay = now.getUTCDay();\nif (utcDay === 0 || utcDay === 6) return [{ json: { skipped: true, reason: 'Weekend' } }];\nif (utcHour < 13 || utcHour > 21) return [{ json: { skipped: true, reason: 'Outside market hours' } }];\n\n// ─── Student Accounts ───\nconst STUDENTS = [\n  { student_id: 'S001', name: '老師', account_number: '5WZ90854',\n    refresh_token: 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw',\n    line_user_id: 'U457d141fef9c4ccc372dc32dd0c8f45c' }\n];\n\nconst allEvents = [];\n\nfor (const student of STUDENTS) {\n  if (!student.refresh_token) continue;\n\n  // ─── Get Token ───\n  let accessToken;\n  try {\n    const tokenRes = await this.helpers.httpRequest({\n      method: 'POST', url: TT_API + '/oauth/token',\n      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-monitor/1.0' },\n      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(student.refresh_token) + '&client_id=' + TT_CLIENT_ID + '&client_secret=' + TT_CLIENT_SECRET,\n    });\n    accessToken = tokenRes.access_token || tokenRes['access-token'];\n    if (!accessToken) continue;\n  } catch (e) { continue; }\n\n  const authHeaders = { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json', 'User-Agent': 'chilldove-monitor/1.0' };\n\n  // ─── Fetch Recent Orders ───\n  let recentOrders = [];\n  try {\n    const ordRes = await this.helpers.httpRequest({\n      method: 'GET', url: TT_API + '/accounts/' + student.account_number + '/orders/live',\n      headers: authHeaders, ignoreHttpStatusErrors: true,\n    });\n    recentOrders = ordRes?.data?.items || ordRes?.data || [];\n  } catch (e) { continue; }\n\n  // ─── Detect Events (last 3 minutes) ───\n  for (const order of recentOrders) {\n    const terminalAt = new Date(order['terminal-at'] || order['updated-at'] || 0);\n    const diffMs = now.getTime() - terminalAt.getTime();\n    if (diffMs > 180000) continue; // Skip if older than 3 minutes\n\n    const status = order.status;\n    if (!['Filled', 'Rejected', 'Cancelled', 'Expired'].includes(status)) continue;\n\n    // Build fills info\n    const fills = [];\n    let totalFillPrice = 0, totalQty = 0;\n    for (const leg of (order.legs || [])) {\n      for (const fill of (leg.fills || [])) {\n        fills.push({ symbol: leg.symbol, action: leg.action, fill_price: parseFloat(fill['fill-price'] || 0), quantity: parseInt(fill.quantity || 0), filled_at: fill['filled-at'] || '' });\n        totalFillPrice += parseFloat(fill['fill-price'] || 0);\n        totalQty += parseInt(fill.quantity || 0);\n      }\n    }\n    const avgFillPrice = totalQty > 0 ? (totalFillPrice / totalQty).toFixed(4) : '0';\n\n    const isOpening = (order.legs || []).some(l => l.action === 'Buy to Open' || l.action === 'Sell to Open');\n    const isClosing = (order.legs || []).some(l => l.action === 'Buy to Close' || l.action === 'Sell to Close');\n\n    // ─── Build Notification Message ───\n    let notifyMsg = '';\n    let eventType = '';\n\n    if (status === 'Filled') {\n      eventType = 'ORDER_FILLED';\n      const icon = isOpening ? '🟢 開倉成交' : '🔴 平倉成交';\n      const effectIcon = order['price-effect'] === 'Credit' ? '💰' : '💸';\n      notifyMsg = [icon, '━━━━━━━━━━━',\n        '📌 ' + order['underlying-symbol'] + ' | ' + order['order-type'],\n        effectIcon + ' 成交價: $' + avgFillPrice + ' (' + (order['price-effect']||'') + ')',\n        '📊 口數: ' + totalQty, '',\n        ...fills.map(f => '  ' + f.action + ': ' + f.symbol.substring(0,20) + ' @ $' + f.fill_price),\n        '', '🕐 ' + new Date(fills[0]?.filled_at || now).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),\n        '📋 Order #' + order.id\n      ].join('\n');\n\n    } else if (status === 'Rejected') {\n      eventType = 'ORDER_REJECTED';\n      notifyMsg = ['⛔ 訂單被拒絕', '━━━━━━━━━━━',\n        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),\n        '❌ 原因: ' + (order['reject-reason'] || '未知原因'),\n        '💲 委託價: $' + (order.price || 'N/A') + ' ' + (order['price-effect']||''),\n        '', '⚠️ 請檢查: buying power / 履約價 / 市場狀態',\n        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),\n        '📋 Order #' + order.id\n      ].join('\n');\n\n    } else if (status === 'Expired') {\n      eventType = 'ORDER_EXPIRED';\n      notifyMsg = ['⏰ 訂單已過期', '━━━━━━━━━━━',\n        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),\n        '💲 委託價: $' + (order.price || 'N/A'),\n        '📊 Time-in-force: ' + (order['time-in-force']||''),\n        '', '💡 Day order 未成交已自動取消',\n        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })\n      ].join('\n');\n\n    } else if (status === 'Cancelled') {\n      eventType = 'ORDER_CANCELLED';\n      notifyMsg = ['🚫 訂單已取消', '━━━━━━━━━━━',\n        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),\n        '💲 委託價: $' + (order.price || 'N/A'),\n        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),\n        '📋 Order #' + order.id\n      ].join('\n');\n    }\n\n    // ─── Send LINE Push ───\n    if (notifyMsg && student.line_user_id) {\n      try {\n        await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.line.me/v2/bot/message/push',\n          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_TOKEN },\n          body: JSON.stringify({ to: student.line_user_id, messages: [{ type: 'text', text: notifyMsg }] }),\n          ignoreHttpStatusErrors: true,\n        });\n      } catch (e) {}\n    }\n\n    // ─── Send Telegram ───\n    if (notifyMsg && TG_CHAT) {\n      try {\n        await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage',\n          headers: { 'Content-Type': 'application/json' },\n          body: JSON.stringify({ chat_id: TG_CHAT, text: notifyMsg }),\n          ignoreHttpStatusErrors: true,\n        });\n      } catch (e) {}\n    }\n\n    allEvents.push({\n      student_id: student.student_id, event: eventType, timestamp: now.toISOString(),\n      order_id: order.id, symbol: order['underlying-symbol'] || '', status: order.status,\n      order_type: order['order-type'] || '', price: order.price || '',\n      price_effect: order['price-effect'] || '', avg_fill_price: avgFillPrice,\n      is_opening: isOpening, is_closing: isClosing, notify_message: notifyMsg\n    });\n  }\n}\n\nif (allEvents.length === 0) return [{ json: { events: 0, checked_at: now.toISOString(), status: 'no_new_events' } }];\nreturn allEvents.map(evt => ({ json: evt }));\n"
+      },
+      "id": "code09",
+      "name": "Check Orders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has_event",
+              "leftValue": "={{ .event }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if09",
+      "name": "Has Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "order_events",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "sheet09",
+      "name": "Log Event",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        910,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 2 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Orders": {
+      "main": [
+        [
+          {
+            "node": "Has Event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Event?": {
+      "main": [
+        [
+          {
+            "node": "Log Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every 2 Minutes": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "13fe5fda-368c-4045-860b-890ced4391a8",
+  "activeVersionId": "13fe5fda-368c-4045-860b-890ced4391a8",
+  "versionCounter": 5,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-05T20:50:30.027Z",
+      "createdAt": "2026-04-05T20:50:30.027Z",
+      "role": "workflow:owner",
+      "workflowId": "tecBDH3Q64fBF2a2",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-05T21:15:12.836Z",
+    "createdAt": "2026-04-05T21:15:12.836Z",
+    "versionId": "13fe5fda-368c-4045-860b-890ced4391a8",
+    "workflowId": "tecBDH3Q64fBF2a2",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 2
+              }
+            ]
+          }
+        },
+        "id": "sched09",
+        "name": "Every 2 Minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// ============================================================\n// WF-09【訂單監控】Account Order Monitor\n// Schedule (every 2 min during market hours) → Check orders → Alert\n// ============================================================\n\nconst TT_API = 'https://api.tastyworks.com';\nconst TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';\nconst TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';\nconst LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';\nconst TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';\nconst TG_CHAT = '-1003799249092';\n\n// ─── Market Hours Check ───\nconst now = new Date();\nconst utcHour = now.getUTCHours();\nconst utcDay = now.getUTCDay();\nif (utcDay === 0 || utcDay === 6) return [{ json: { skipped: true, reason: 'Weekend' } }];\nif (utcHour < 13 || utcHour > 21) return [{ json: { skipped: true, reason: 'Outside market hours' } }];\n\n// ─── Student Accounts ───\nconst STUDENTS = [\n  { student_id: 'S001', name: '老師', account_number: '5WZ90854',\n    refresh_token: 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw',\n    line_user_id: 'U457d141fef9c4ccc372dc32dd0c8f45c' }\n];\n\nconst allEvents = [];\n\nfor (const student of STUDENTS) {\n  if (!student.refresh_token) continue;\n\n  // ─── Get Token ───\n  let accessToken;\n  try {\n    const tokenRes = await this.helpers.httpRequest({\n      method: 'POST', url: TT_API + '/oauth/token',\n      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-monitor/1.0' },\n      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(student.refresh_token) + '&client_id=' + TT_CLIENT_ID + '&client_secret=' + TT_CLIENT_SECRET,\n    });\n    accessToken = tokenRes.access_token || tokenRes['access-token'];\n    if (!accessToken) continue;\n  } catch (e) { continue; }\n\n  const authHeaders = { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json', 'User-Agent': 'chilldove-monitor/1.0' };\n\n  // ─── Fetch Recent Orders ───\n  let recentOrders = [];\n  try {\n    const ordRes = await this.helpers.httpRequest({\n      method: 'GET', url: TT_API + '/accounts/' + student.account_number + '/orders/live',\n      headers: authHeaders, ignoreHttpStatusErrors: true,\n    });\n    recentOrders = ordRes?.data?.items || ordRes?.data || [];\n  } catch (e) { continue; }\n\n  // ─── Detect Events (last 3 minutes) ───\n  for (const order of recentOrders) {\n    const terminalAt = new Date(order['terminal-at'] || order['updated-at'] || 0);\n    const diffMs = now.getTime() - terminalAt.getTime();\n    if (diffMs > 180000) continue; // Skip if older than 3 minutes\n\n    const status = order.status;\n    if (!['Filled', 'Rejected', 'Cancelled', 'Expired'].includes(status)) continue;\n\n    // Build fills info\n    const fills = [];\n    let totalFillPrice = 0, totalQty = 0;\n    for (const leg of (order.legs || [])) {\n      for (const fill of (leg.fills || [])) {\n        fills.push({ symbol: leg.symbol, action: leg.action, fill_price: parseFloat(fill['fill-price'] || 0), quantity: parseInt(fill.quantity || 0), filled_at: fill['filled-at'] || '' });\n        totalFillPrice += parseFloat(fill['fill-price'] || 0);\n        totalQty += parseInt(fill.quantity || 0);\n      }\n    }\n    const avgFillPrice = totalQty > 0 ? (totalFillPrice / totalQty).toFixed(4) : '0';\n\n    const isOpening = (order.legs || []).some(l => l.action === 'Buy to Open' || l.action === 'Sell to Open');\n    const isClosing = (order.legs || []).some(l => l.action === 'Buy to Close' || l.action === 'Sell to Close');\n\n    // ─── Build Notification Message ───\n    let notifyMsg = '';\n    let eventType = '';\n\n    if (status === 'Filled') {\n      eventType = 'ORDER_FILLED';\n      const icon = isOpening ? '🟢 開倉成交' : '🔴 平倉成交';\n      const effectIcon = order['price-effect'] === 'Credit' ? '💰' : '💸';\n      notifyMsg = [icon, '━━━━━━━━━━━',\n        '📌 ' + order['underlying-symbol'] + ' | ' + order['order-type'],\n        effectIcon + ' 成交價: $' + avgFillPrice + ' (' + (order['price-effect']||'') + ')',\n        '📊 口數: ' + totalQty, '',\n        ...fills.map(f => '  ' + f.action + ': ' + f.symbol.substring(0,20) + ' @ $' + f.fill_price),\n        '', '🕐 ' + new Date(fills[0]?.filled_at || now).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),\n        '📋 Order #' + order.id\n      ].join('\n');\n\n    } else if (status === 'Rejected') {\n      eventType = 'ORDER_REJECTED';\n      notifyMsg = ['⛔ 訂單被拒絕', '━━━━━━━━━━━',\n        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),\n        '❌ 原因: ' + (order['reject-reason'] || '未知原因'),\n        '💲 委託價: $' + (order.price || 'N/A') + ' ' + (order['price-effect']||''),\n        '', '⚠️ 請檢查: buying power / 履約價 / 市場狀態',\n        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),\n        '📋 Order #' + order.id\n      ].join('\n');\n\n    } else if (status === 'Expired') {\n      eventType = 'ORDER_EXPIRED';\n      notifyMsg = ['⏰ 訂單已過期', '━━━━━━━━━━━',\n        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),\n        '💲 委託價: $' + (order.price || 'N/A'),\n        '📊 Time-in-force: ' + (order['time-in-force']||''),\n        '', '💡 Day order 未成交已自動取消',\n        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })\n      ].join('\n');\n\n    } else if (status === 'Cancelled') {\n      eventType = 'ORDER_CANCELLED';\n      notifyMsg = ['🚫 訂單已取消', '━━━━━━━━━━━',\n        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),\n        '💲 委託價: $' + (order.price || 'N/A'),\n        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),\n        '📋 Order #' + order.id\n      ].join('\n');\n    }\n\n    // ─── Send LINE Push ───\n    if (notifyMsg && student.line_user_id) {\n      try {\n        await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.line.me/v2/bot/message/push',\n          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_TOKEN },\n          body: JSON.stringify({ to: student.line_user_id, messages: [{ type: 'text', text: notifyMsg }] }),\n          ignoreHttpStatusErrors: true,\n        });\n      } catch (e) {}\n    }\n\n    // ─── Send Telegram ───\n    if (notifyMsg && TG_CHAT) {\n      try {\n        await this.helpers.httpRequest({\n          method: 'POST', url: 'https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage',\n          headers: { 'Content-Type': 'application/json' },\n          body: JSON.stringify({ chat_id: TG_CHAT, text: notifyMsg }),\n          ignoreHttpStatusErrors: true,\n        });\n      } catch (e) {}\n    }\n\n    allEvents.push({\n      student_id: student.student_id, event: eventType, timestamp: now.toISOString(),\n      order_id: order.id, symbol: order['underlying-symbol'] || '', status: order.status,\n      order_type: order['order-type'] || '', price: order.price || '',\n      price_effect: order['price-effect'] || '', avg_fill_price: avgFillPrice,\n      is_opening: isOpening, is_closing: isClosing, notify_message: notifyMsg\n    });\n  }\n}\n\nif (allEvents.length === 0) return [{ json: { events: 0, checked_at: now.toISOString(), status: 'no_new_events' } }];\nreturn allEvents.map(evt => ({ json: evt }));\n"
+        },
+        "id": "code09",
+        "name": "Check Orders",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          470,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "has_event",
+                "leftValue": "={{ .event }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        },
+        "id": "if09",
+        "name": "Has Event?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          690,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "order_events",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {}
+          },
+          "options": {}
+        },
+        "id": "sheet09",
+        "name": "Log Event",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          910,
+          200
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Every 2 Minutes": {
+        "main": [
+          [
+            {
+              "node": "Check Orders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Orders": {
+        "main": [
+          [
+            {
+              "node": "Has Event?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Event?": {
+        "main": [
+          [
+            {
+              "node": "Log Event",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-05T21:15:13.266Z",
+        "id": 430,
+        "workflowId": "tecBDH3Q64fBF2a2",
+        "versionId": "13fe5fda-368c-4045-860b-890ced4391a8",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}

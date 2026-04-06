@@ -1,0 +1,305 @@
+{
+  "updatedAt": "2026-04-05T21:06:42.117Z",
+  "createdAt": "2026-04-05T20:50:28.918Z",
+  "id": "UWSFghoS27mcfPRd",
+  "name": "【學生平倉】WF-07 Close Position",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "student-close-position",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh07",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "student-close-position"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// WF-07【學生平倉】Student Close Position\n// n8n Webhook → OAuth Token → Close Order → P&L Calc → Update Sheet\n// ============================================================\n// Endpoint: POST /webhook/student-close-position\n// Payload: {\n//   student_id, account_number, refresh_token,\n//   symbol, strategy, legs[], close_type,\n//   close_price, close_price_effect,\n//   original_order_id, original_credit, original_debit,\n//   tracking_id, note\n// }\n// close_type: \"profit\" | \"stop\" | \"manual\" | \"expiry\"\n// ============================================================\n\nconst TT_API = 'https://api.tastyworks.com';\nconst TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';\nconst TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';\n\nconst input = $input.first().json;\n\nconst {\n  student_id,\n  account_number,\n  refresh_token,\n  symbol,\n  strategy,\n  legs,\n  close_type = 'manual',\n  close_price,\n  close_price_effect,\n  original_order_id,\n  original_credit,\n  original_debit,\n  tracking_id,\n  note\n} = input;\n\n// ─────────────────────────────────────────────────────────────\n// 1. VALIDATE\n// ─────────────────────────────────────────────────────────────\nif (!student_id || !account_number || !refresh_token || !legs || !legs.length) {\n  return [{ json: { success: false, error: 'Missing required fields: student_id, account_number, refresh_token, legs' } }];\n}\n\n// ─────────────────────────────────────────────────────────────\n// 2. GET OAUTH ACCESS TOKEN\n// ─────────────────────────────────────────────────────────────\nlet accessToken;\ntry {\n  const tokenRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${TT_API}/oauth/token`,\n    headers: {\n      'Content-Type': 'application/x-www-form-urlencoded',\n      'User-Agent': 'chilldove-student-bot/1.0'\n    },\n    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh_token)}&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}`,\n  });\n  accessToken = tokenRes.access_token || tokenRes['access-token'];\n  if (!accessToken) throw new Error('No token returned');\n} catch (e) {\n  return [{ json: { success: false, error: `OAuth failed: ${e.message}` } }];\n}\n\nconst authHeaders = {\n  'Authorization': `Bearer ${accessToken}`,\n  'Content-Type': 'application/json',\n  'User-Agent': 'chilldove-student-bot/1.0'\n};\n\n// ─────────────────────────────────────────────────────────────\n// 3. CHECK FOR EXISTING COMPLEX ORDERS TO CANCEL\n// ─────────────────────────────────────────────────────────────\n// If there's an active stop-loss (from OTOCO), cancel it first\n// Otherwise closing order may conflict\nlet cancelledOrders = [];\ntry {\n  const liveOrdersRes = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${TT_API}/accounts/${account_number}/orders/live`,\n    headers: authHeaders,\n  });\n  const liveOrders = liveOrdersRes?.data?.items || liveOrdersRes?.data || [];\n\n  // Find contingent/stop orders for this symbol\n  for (const order of liveOrders) {\n    const isRelated = order['underlying-symbol'] === symbol;\n    const isContingent = order.status === 'Contingent' || order.status === 'Live';\n    const isStop = order['order-type'] === 'Stop';\n\n    if (isRelated && isContingent && isStop) {\n      try {\n        // Check if it's a complex order child\n        if (order['complex-order-id']) {\n          await this.helpers.httpRequest({\n            method: 'DELETE',\n            url: `${TT_API}/accounts/${account_number}/complex-orders/${order['complex-order-id']}`,\n            headers: authHeaders,\n          });\n          cancelledOrders.push({ id: order['complex-order-id'], type: 'complex' });\n        } else {\n          await this.helpers.httpRequest({\n            method: 'DELETE',\n            url: `${TT_API}/accounts/${account_number}/orders/${order.id}`,\n            headers: authHeaders,\n          });\n          cancelledOrders.push({ id: order.id, type: 'simple' });\n        }\n      } catch (cancelErr) {\n        // Non-fatal: order may already be cancelled\n        cancelledOrders.push({ id: order.id, error: cancelErr.message });\n      }\n    }\n  }\n} catch (e) {\n  // Non-fatal: continue with close order\n}\n\n// ─────────────────────────────────────────────────────────────\n// 4. BUILD CLOSING ORDER\n// ─────────────────────────────────────────────────────────────\nconst closingLegs = legs.map(leg => ({\n  'instrument-type': leg.instrument_type || 'Equity Option',\n  'symbol': leg.symbol,\n  'action': leg.close_action || (\n    leg.action === 'Sell to Open' ? 'Buy to Close' :\n    leg.action === 'Buy to Open' ? 'Sell to Close' :\n    leg.action  // already a closing action\n  ),\n  'quantity': leg.quantity || 1\n}));\n\n// Determine order type based on close_type\nlet closeOrder;\nif (close_price && close_type !== 'stop') {\n  // Limit order for profit-taking or manual close\n  closeOrder = {\n    'time-in-force': 'Day',\n    'order-type': 'Limit',\n    'price': parseFloat(close_price),\n    'price-effect': close_price_effect || 'Debit',\n    'legs': closingLegs\n  };\n} else {\n  // Market order for stop-loss or immediate close\n  closeOrder = {\n    'time-in-force': 'Day',\n    'order-type': 'Market',\n    'legs': closingLegs\n  };\n}\n\n// ─────────────────────────────────────────────────────────────\n// 5. SUBMIT CLOSING ORDER\n// ─────────────────────────────────────────────────────────────\nlet closeResult;\nconst timestamp = new Date().toISOString();\n\ntry {\n  const closeRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${TT_API}/accounts/${account_number}/orders`,\n    headers: authHeaders,\n    body: JSON.stringify(closeOrder),\n    returnFullResponse: true,\n  });\n\n  const resData = typeof closeRes.body === 'string' ? JSON.parse(closeRes.body) : closeRes.body;\n\n  closeResult = {\n    success: closeRes.statusCode < 400,\n    order_id: resData?.data?.order?.id || null,\n    status: resData?.data?.order?.status || 'unknown',\n    raw: resData\n  };\n} catch (e) {\n  closeResult = { success: false, error: e.message };\n}\n\n// ─────────────────────────────────────────────────────────────\n// 6. CALCULATE P&L (estimated, will be confirmed by Streamer)\n// ─────────────────────────────────────────────────────────────\nlet estimatedPnL = null;\nconst origCredit = parseFloat(original_credit || 0);\nconst origDebit = parseFloat(original_debit || 0);\nconst closeP = parseFloat(close_price || 0);\nconst qty = parseInt(legs[0]?.quantity || 1);\n\nif (strategy && (origCredit > 0 || origDebit > 0)) {\n  if (['PCS', 'CCS', 'IC', 'BPCS', 'BCCS'].includes(strategy)) {\n    // Credit strategy: profit = credit received - cost to close\n    estimatedPnL = (origCredit - closeP) * qty * 100;\n  } else if (['BCDS', 'BPDS'].includes(strategy)) {\n    // Debit strategy: profit = close price - debit paid\n    estimatedPnL = (closeP - origDebit) * qty * 100;\n  }\n}\n\n// ─────────────────────────────────────────────────────────────\n// 7. BUILD RECORD FOR GOOGLE SHEET\n// ─────────────────────────────────────────────────────────────\nconst record = {\n  timestamp,\n  student_id,\n  account_number,\n  tracking_id: tracking_id || `CLS-${Date.now()}`,\n  symbol,\n  strategy,\n  close_type,\n  close_order_id: closeResult.order_id || '',\n  close_price: close_price || 'MARKET',\n  close_price_effect: close_price_effect || '',\n  original_order_id: original_order_id || '',\n  original_credit: origCredit || '',\n  original_debit: origDebit || '',\n  estimated_pnl: estimatedPnL !== null ? estimatedPnL.toFixed(2) : '',\n  win_loss: estimatedPnL > 0 ? 'WIN' : estimatedPnL < 0 ? 'LOSS' : 'BREAK_EVEN',\n  cancelled_stop_orders: JSON.stringify(cancelledOrders),\n  status: closeResult.success ? 'CLOSE_SENT' : 'CLOSE_FAILED',\n  error: closeResult.error || '',\n  note: note || ''\n};\n\nreturn [{ json: {\n  ...closeResult,\n  student_id,\n  symbol,\n  strategy,\n  close_type,\n  estimated_pnl: estimatedPnL,\n  cancelled_orders: cancelledOrders,\n  tracking_id: record.tracking_id,\n  record,\n  _sheetData: record\n}}];\n"
+      },
+      "id": "code07",
+      "name": "Close Position",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "signal_closes",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "sheet07",
+      "name": "Write to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        690,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "resp07",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        690,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Close Position",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Close Position": {
+      "main": [
+        [
+          {
+            "node": "Write to Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+  "activeVersionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+  "versionCounter": 8,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-05T20:50:28.920Z",
+      "createdAt": "2026-04-05T20:50:28.920Z",
+      "role": "workflow:owner",
+      "workflowId": "UWSFghoS27mcfPRd",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-05T21:06:42.119Z",
+    "createdAt": "2026-04-05T21:06:42.119Z",
+    "versionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+    "workflowId": "UWSFghoS27mcfPRd",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "student-close-position",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wh07",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          250,
+          300
+        ],
+        "webhookId": "student-close-position"
+      },
+      {
+        "parameters": {
+          "jsCode": "// ============================================================\n// WF-07【學生平倉】Student Close Position\n// n8n Webhook → OAuth Token → Close Order → P&L Calc → Update Sheet\n// ============================================================\n// Endpoint: POST /webhook/student-close-position\n// Payload: {\n//   student_id, account_number, refresh_token,\n//   symbol, strategy, legs[], close_type,\n//   close_price, close_price_effect,\n//   original_order_id, original_credit, original_debit,\n//   tracking_id, note\n// }\n// close_type: \"profit\" | \"stop\" | \"manual\" | \"expiry\"\n// ============================================================\n\nconst TT_API = 'https://api.tastyworks.com';\nconst TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';\nconst TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';\n\nconst input = $input.first().json;\n\nconst {\n  student_id,\n  account_number,\n  refresh_token,\n  symbol,\n  strategy,\n  legs,\n  close_type = 'manual',\n  close_price,\n  close_price_effect,\n  original_order_id,\n  original_credit,\n  original_debit,\n  tracking_id,\n  note\n} = input;\n\n// ─────────────────────────────────────────────────────────────\n// 1. VALIDATE\n// ─────────────────────────────────────────────────────────────\nif (!student_id || !account_number || !refresh_token || !legs || !legs.length) {\n  return [{ json: { success: false, error: 'Missing required fields: student_id, account_number, refresh_token, legs' } }];\n}\n\n// ─────────────────────────────────────────────────────────────\n// 2. GET OAUTH ACCESS TOKEN\n// ─────────────────────────────────────────────────────────────\nlet accessToken;\ntry {\n  const tokenRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${TT_API}/oauth/token`,\n    headers: {\n      'Content-Type': 'application/x-www-form-urlencoded',\n      'User-Agent': 'chilldove-student-bot/1.0'\n    },\n    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh_token)}&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}`,\n  });\n  accessToken = tokenRes.access_token || tokenRes['access-token'];\n  if (!accessToken) throw new Error('No token returned');\n} catch (e) {\n  return [{ json: { success: false, error: `OAuth failed: ${e.message}` } }];\n}\n\nconst authHeaders = {\n  'Authorization': `Bearer ${accessToken}`,\n  'Content-Type': 'application/json',\n  'User-Agent': 'chilldove-student-bot/1.0'\n};\n\n// ─────────────────────────────────────────────────────────────\n// 3. CHECK FOR EXISTING COMPLEX ORDERS TO CANCEL\n// ─────────────────────────────────────────────────────────────\n// If there's an active stop-loss (from OTOCO), cancel it first\n// Otherwise closing order may conflict\nlet cancelledOrders = [];\ntry {\n  const liveOrdersRes = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${TT_API}/accounts/${account_number}/orders/live`,\n    headers: authHeaders,\n  });\n  const liveOrders = liveOrdersRes?.data?.items || liveOrdersRes?.data || [];\n\n  // Find contingent/stop orders for this symbol\n  for (const order of liveOrders) {\n    const isRelated = order['underlying-symbol'] === symbol;\n    const isContingent = order.status === 'Contingent' || order.status === 'Live';\n    const isStop = order['order-type'] === 'Stop';\n\n    if (isRelated && isContingent && isStop) {\n      try {\n        // Check if it's a complex order child\n        if (order['complex-order-id']) {\n          await this.helpers.httpRequest({\n            method: 'DELETE',\n            url: `${TT_API}/accounts/${account_number}/complex-orders/${order['complex-order-id']}`,\n            headers: authHeaders,\n          });\n          cancelledOrders.push({ id: order['complex-order-id'], type: 'complex' });\n        } else {\n          await this.helpers.httpRequest({\n            method: 'DELETE',\n            url: `${TT_API}/accounts/${account_number}/orders/${order.id}`,\n            headers: authHeaders,\n          });\n          cancelledOrders.push({ id: order.id, type: 'simple' });\n        }\n      } catch (cancelErr) {\n        // Non-fatal: order may already be cancelled\n        cancelledOrders.push({ id: order.id, error: cancelErr.message });\n      }\n    }\n  }\n} catch (e) {\n  // Non-fatal: continue with close order\n}\n\n// ─────────────────────────────────────────────────────────────\n// 4. BUILD CLOSING ORDER\n// ─────────────────────────────────────────────────────────────\nconst closingLegs = legs.map(leg => ({\n  'instrument-type': leg.instrument_type || 'Equity Option',\n  'symbol': leg.symbol,\n  'action': leg.close_action || (\n    leg.action === 'Sell to Open' ? 'Buy to Close' :\n    leg.action === 'Buy to Open' ? 'Sell to Close' :\n    leg.action  // already a closing action\n  ),\n  'quantity': leg.quantity || 1\n}));\n\n// Determine order type based on close_type\nlet closeOrder;\nif (close_price && close_type !== 'stop') {\n  // Limit order for profit-taking or manual close\n  closeOrder = {\n    'time-in-force': 'Day',\n    'order-type': 'Limit',\n    'price': parseFloat(close_price),\n    'price-effect': close_price_effect || 'Debit',\n    'legs': closingLegs\n  };\n} else {\n  // Market order for stop-loss or immediate close\n  closeOrder = {\n    'time-in-force': 'Day',\n    'order-type': 'Market',\n    'legs': closingLegs\n  };\n}\n\n// ─────────────────────────────────────────────────────────────\n// 5. SUBMIT CLOSING ORDER\n// ─────────────────────────────────────────────────────────────\nlet closeResult;\nconst timestamp = new Date().toISOString();\n\ntry {\n  const closeRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${TT_API}/accounts/${account_number}/orders`,\n    headers: authHeaders,\n    body: JSON.stringify(closeOrder),\n    returnFullResponse: true,\n  });\n\n  const resData = typeof closeRes.body === 'string' ? JSON.parse(closeRes.body) : closeRes.body;\n\n  closeResult = {\n    success: closeRes.statusCode < 400,\n    order_id: resData?.data?.order?.id || null,\n    status: resData?.data?.order?.status || 'unknown',\n    raw: resData\n  };\n} catch (e) {\n  closeResult = { success: false, error: e.message };\n}\n\n// ─────────────────────────────────────────────────────────────\n// 6. CALCULATE P&L (estimated, will be confirmed by Streamer)\n// ─────────────────────────────────────────────────────────────\nlet estimatedPnL = null;\nconst origCredit = parseFloat(original_credit || 0);\nconst origDebit = parseFloat(original_debit || 0);\nconst closeP = parseFloat(close_price || 0);\nconst qty = parseInt(legs[0]?.quantity || 1);\n\nif (strategy && (origCredit > 0 || origDebit > 0)) {\n  if (['PCS', 'CCS', 'IC', 'BPCS', 'BCCS'].includes(strategy)) {\n    // Credit strategy: profit = credit received - cost to close\n    estimatedPnL = (origCredit - closeP) * qty * 100;\n  } else if (['BCDS', 'BPDS'].includes(strategy)) {\n    // Debit strategy: profit = close price - debit paid\n    estimatedPnL = (closeP - origDebit) * qty * 100;\n  }\n}\n\n// ─────────────────────────────────────────────────────────────\n// 7. BUILD RECORD FOR GOOGLE SHEET\n// ─────────────────────────────────────────────────────────────\nconst record = {\n  timestamp,\n  student_id,\n  account_number,\n  tracking_id: tracking_id || `CLS-${Date.now()}`,\n  symbol,\n  strategy,\n  close_type,\n  close_order_id: closeResult.order_id || '',\n  close_price: close_price || 'MARKET',\n  close_price_effect: close_price_effect || '',\n  original_order_id: original_order_id || '',\n  original_credit: origCredit || '',\n  original_debit: origDebit || '',\n  estimated_pnl: estimatedPnL !== null ? estimatedPnL.toFixed(2) : '',\n  win_loss: estimatedPnL > 0 ? 'WIN' : estimatedPnL < 0 ? 'LOSS' : 'BREAK_EVEN',\n  cancelled_stop_orders: JSON.stringify(cancelledOrders),\n  status: closeResult.success ? 'CLOSE_SENT' : 'CLOSE_FAILED',\n  error: closeResult.error || '',\n  note: note || ''\n};\n\nreturn [{ json: {\n  ...closeResult,\n  student_id,\n  symbol,\n  strategy,\n  close_type,\n  estimated_pnl: estimatedPnL,\n  cancelled_orders: cancelledOrders,\n  tracking_id: record.tracking_id,\n  record,\n  _sheetData: record\n}}];\n"
+        },
+        "id": "code07",
+        "name": "Close Position",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          470,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "signal_closes",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {}
+          },
+          "options": {}
+        },
+        "id": "sheet07",
+        "name": "Write to Sheet",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          690,
+          200
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($json) }}",
+          "options": {}
+        },
+        "id": "resp07",
+        "name": "Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          690,
+          400
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Close Position",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Close Position": {
+        "main": [
+          [
+            {
+              "node": "Write to Sheet",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-05T21:06:42.372Z",
+        "id": 403,
+        "workflowId": "UWSFghoS27mcfPRd",
+        "versionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-05T21:06:42.908Z",
+        "id": 405,
+        "workflowId": "UWSFghoS27mcfPRd",
+        "versionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-05T21:06:42.260Z",
+        "id": 402,
+        "workflowId": "UWSFghoS27mcfPRd",
+        "versionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-05T21:06:42.676Z",
+        "id": 404,
+        "workflowId": "UWSFghoS27mcfPRd",
+        "versionId": "04124965-f535-4cbb-b85b-a64e86b3c12a",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}

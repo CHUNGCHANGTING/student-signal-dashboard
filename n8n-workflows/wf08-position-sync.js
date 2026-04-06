@@ -13,7 +13,13 @@ const TT_API = 'https://api.tastyworks.com';
 const TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
 const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
 
-const input = $input.first().json;
+let input;
+try {
+  const raw = $input.first().json;
+  input = raw.body || raw;
+} catch (e) {
+  return [{ json: { success: false, error: 'Input read failed: ' + e.message } }];
+}
 const method = input.method || 'GET';
 
 // ─────────────────────────────────────────────────────────────
@@ -31,26 +37,19 @@ const STUDENT_DB = {
 };
 
 const studentId = input.query?.student_id || input.student_id || 'S001';
-const studentRecord = STUDENT_DB[studentId];
+const studentRecord = STUDENT_DB[studentId] || {};
 
-if (!studentRecord) {
-  return [{ json: {
-    success: false,
-    error: `Student ${studentId} not found`,
-    positions: [], signals: [], risk: {}
-  }}];
-}
-
-// Allow override from input (for freshly bound students)
+// Direct input overrides DB lookup
 const accountNumber = input.account_number || studentRecord.account_number;
 const refreshToken = input.refresh_token || studentRecord.refresh_token;
 
-if (!refreshToken) {
+if (!refreshToken || !accountNumber) {
   return [{ json: {
     success: false,
-    error: 'No refresh token configured. Student needs to bind their tastytrade account.',
+    error: 'Missing refresh_token or account_number. Pass via POST body or configure in student DB.',
     positions: [], signals: [], risk: {},
-    bind_required: true
+    bind_required: true,
+    received_keys: Object.keys(input)
   }}];
 }
 
@@ -68,7 +67,7 @@ try {
     },
     body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}`,
   });
-  accessToken = tokenRes['access-token'] || tokenRes.access_token;
+  accessToken = tokenRes.access_token || tokenRes['access-token'] || tokenRes.token;
   if (!accessToken) throw new Error('No token');
 } catch (e) {
   return [{ json: {
@@ -94,6 +93,7 @@ try {
     method: 'GET',
     url: `${TT_API}/accounts/${accountNumber}/positions`,
     headers: authHeaders,
+    ignoreHttpStatusErrors: true,
   });
   const rawPositions = posRes?.data?.items || posRes?.data || [];
 
@@ -128,6 +128,7 @@ try {
     method: 'GET',
     url: `${TT_API}/accounts/${accountNumber}/balances`,
     headers: authHeaders,
+    ignoreHttpStatusErrors: true,
   });
   const b = balRes?.data || {};
   balances = {
@@ -151,6 +152,7 @@ try {
     method: 'GET',
     url: `${TT_API}/accounts/${accountNumber}/orders/live`,
     headers: authHeaders,
+    ignoreHttpStatusErrors: true,
   });
   const rawOrders = ordRes?.data?.items || ordRes?.data || [];
 

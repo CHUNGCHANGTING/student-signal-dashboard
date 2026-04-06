@@ -57,7 +57,7 @@ try {
     },
     body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refresh_token)}&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}`,
   });
-  accessToken = tokenRes['access-token'] || tokenRes.access_token;
+  accessToken = tokenRes.access_token || tokenRes['access-token'];
   if (!accessToken) throw new Error('No token returned');
 } catch (e) {
   return [{ json: { success: false, error: `OAuth failed: ${e.message}` } }];

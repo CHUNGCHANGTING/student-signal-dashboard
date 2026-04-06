@@ -1,0 +1,1123 @@
+{
+  "updatedAt": "2026-04-06T03:33:34.222Z",
+  "createdAt": "2026-04-03T18:38:49.758Z",
+  "id": "F0HpvQBWnp6ClqG5",
+  "name": "WF-02 訊號接收與模組分流",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "signal-intake",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1308bdef-952c-4f08-95af-50ecc4cb1239",
+      "name": "Webhook",
+      "webhookId": "e16d2a1f-2cdf-4217-ac7b-45b4855286ce",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "nQOSIZN5SqPbX7AH",
+          "name": "Signal Intake Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// WF-02: pickModule + risk filter\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const d = item.json.body || item.json;\n  const symbol = (d.symbol || '').toUpperCase();\n  const strategy = (d.strategy || '').toUpperCase();\n  const ivr = parseFloat(d.ivr) || 0;\n  const dte = parseInt(d.dte) || 0;\n  const event_risk = String(d.event_risk).toLowerCase() === 'true';\n  const pop = parseFloat(d.pop) || 0;\n  const credit_received = parseFloat(d.credit_received) || 0;\n  const debit_paid = parseFloat(d.debit_paid) || 0;\n  const max_loss = parseFloat(d.max_loss) || 0;\n  const bias = (d.bias || '').toLowerCase();\n\n  // --- pickModule ---\n  const spx_qqq = ['SPX', 'QQQ', '/ES', '/NQ'];\n  const is_index = spx_qqq.includes(symbol);\n  const income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];\n  const debit_strats = ['BULL_CALL_DEBIT_SPREAD', 'BEAR_PUT_DEBIT_SPREAD'];\n\n  let module = 'UNKNOWN';\n  let module_resolved = 'UNKNOWN';\n\n  if (income_strats.includes(strategy)) {\n    if (strategy === 'IRON_CONDOR') {\n      module = is_index ? 'IC_INDEX' : 'IC_EQUITY';\n    } else if (strategy === 'BULL_PUT_CREDIT_SPREAD') {\n      module = is_index ? 'BPCS_INDEX' : 'BPCS_EQUITY';\n    } else if (strategy === 'BEAR_CALL_CREDIT_SPREAD') {\n      module = is_index ? 'BCCS_INDEX' : 'BCCS_EQUITY';\n    } else {\n      module = 'CREDIT_VERTICAL';\n    }\n    module_resolved = module;\n  } else if (debit_strats.includes(strategy)) {\n    module = strategy === 'BULL_CALL_DEBIT_SPREAD' ? 'BCDS' : 'BPDS';\n    module_resolved = module;\n  }\n\n  // --- risk filter ---\n  let decision = 'APPROVED';\n  let reject_reason = null;\n\n  if (event_risk) {\n    decision = 'REJECTED';\n    reject_reason = 'event_risk=true';\n  } else if (income_strats.includes(strategy) && ivr < 25) {\n    decision = 'REJECTED';\n    reject_reason = 'IVR too low: ' + ivr;\n  } else if (income_strats.includes(strategy) && pop < 0.65) {\n    decision = 'REJECTED';\n    reject_reason = 'POP too low: ' + pop;\n  } else if (dte < 14) {\n    decision = 'REJECTED';\n    reject_reason = 'DTE too short: ' + dte + ' (min 14)';\n  } else if (dte > 45) {\n    decision = 'REJECTED';\n    reject_reason = 'DTE too long: ' + dte + ' (max 45)';\n  }\n\n  // --- student note ---\n  const note_map = {\n    'IRON_CONDOR': 'Range-bound, IVR ' + ivr + ', theta income',\n    'BULL_PUT_CREDIT_SPREAD': 'Bullish income, IVR ' + ivr,\n    'BEAR_CALL_CREDIT_SPREAD': 'Bearish income, IVR ' + ivr,\n    'BULL_CALL_DEBIT_SPREAD': 'Bullish breakout, limited risk',\n    'BEAR_PUT_DEBIT_SPREAD': 'Bearish breakdown, limited risk',\n    'CREDIT_VERTICAL': 'High IV directional'\n  };\n  const note = note_map[strategy] || strategy;\n\n  // --- build signal ID ---\n  const now = new Date();\n  const sig_id = 'SIG-' +\n    now.toISOString().slice(0, 10).replace(/-/g, '') + '-' +\n    symbol + '-' +\n    Math.floor(Math.random() * 1000);\n\n  results.push({\n    json: {\n      symbol,\n      strategy,\n      module,\n      module_resolved,\n      decision,\n      reject_reason,\n      note,\n      sig_id,\n      ivr,\n      dte,\n      pop,\n      credit_received,\n      debit_paid,\n      max_loss,\n      created_at: now.toISOString().slice(0, 16).replace('T', ' ')\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "d08f9669-fa97-4183-b39f-f225e6785171",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a0421f8c-358a-494f-bc2b-1c611c276ba5",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "600f053f-9593-4816-9b4f-5e670d2f337b",
+      "name": "IF: decision=approved"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "list",
+          "cachedResultName": "Options Dashboard Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 637583169,
+          "mode": "list",
+          "cachedResultName": "signals",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4/edit#gid=637583169"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "symbol",
+              "displayName": "symbol",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "strategy",
+              "displayName": "strategy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision",
+              "displayName": "decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "student_note",
+              "displayName": "student_note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "module",
+              "displayName": "module",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bias",
+              "displayName": "bias",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_risk",
+              "displayName": "event_risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pop",
+              "displayName": "pop",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "credit_received",
+              "displayName": "credit_received",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "debit_paid",
+              "displayName": "debit_paid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "target_value",
+              "displayName": "target_value",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "max_loss",
+              "displayName": "max_loss",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "24a0bc84-c60a-423f-ab37-d15e8d271d28",
+      "name": "Sheets: Append signals",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/broadcast",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messages: [{ type: 'text', text: '📊 新訊號\\n' + $json.symbol + ' ' + $json.strategy + '\\n模組: ' + $json.module + '\\n決策: ' + $json.decision + '\\nEV: ' + $json.ev + '\\n' + ($json.student_note || '') }] }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "ade94c5a-151d-4b11-a700-700b717147fc",
+      "name": "LINE: Broadcast signal",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "0ojgOP3YjhHytkWX",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "dc1bd222-3e8f-4218-ab4d-755473a844e9",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1LiN07qjiF7Eb37pW-XfXS_pmgYbWqgby7DFrcBE42Qo",
+          "mode": "list",
+          "cachedResultName": "下班鴿AI選擇權交易系統(模擬倉)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LiN07qjiF7Eb37pW-XfXS_pmgYbWqgby7DFrcBE42Qo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Rejected Signals",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "symbol",
+              "displayName": "symbol",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "strategy",
+              "displayName": "strategy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "decision",
+              "displayName": "decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reject_reason",
+              "displayName": "reject_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "module",
+              "displayName": "module",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ivr",
+              "displayName": "ivr",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dte",
+              "displayName": "dte",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_risk",
+              "displayName": "event_risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        624,
+        96
+      ],
+      "id": "84a7be35-8d58-4aa0-aa48-615f1b3b395d",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        832,
+        96
+      ],
+      "id": "9bddce2f-7e51-48fd-8f0f-e8a5d86c2661",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "IF: decision=approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: decision=approved": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Append signals",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Append signals": {
+      "main": [
+        [
+          {
+            "node": "LINE: Broadcast signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LINE: Broadcast signal": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "body": {
+            "symbol": "QQQ",
+            "strategy": "BEAR_CALL_CREDIT_SPREAD",
+            "ivr": 33,
+            "dte": 25,
+            "event_risk": "false",
+            "pop": 0.7,
+            "credit_received": 1.1,
+            "debit_paid": 0,
+            "max_loss": 290,
+            "bias": "bearish"
+          },
+          "headers": {
+            "content-type": "application/json"
+          },
+          "params": {}
+        }
+      }
+    ]
+  },
+  "versionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+  "activeVersionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+  "versionCounter": 58,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-03T18:38:49.761Z",
+      "createdAt": "2026-04-03T18:38:49.761Z",
+      "role": "workflow:owner",
+      "workflowId": "F0HpvQBWnp6ClqG5",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-06T03:33:34.223Z",
+    "createdAt": "2026-04-06T03:33:34.223Z",
+    "versionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+    "workflowId": "F0HpvQBWnp6ClqG5",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "signal-intake",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "1308bdef-952c-4f08-95af-50ecc4cb1239",
+        "name": "Webhook",
+        "webhookId": "e16d2a1f-2cdf-4217-ac7b-45b4855286ce",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "nQOSIZN5SqPbX7AH",
+            "name": "Signal Intake Auth"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// WF-02: pickModule + risk filter\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const d = item.json.body || item.json;\n  const symbol = (d.symbol || '').toUpperCase();\n  const strategy = (d.strategy || '').toUpperCase();\n  const ivr = parseFloat(d.ivr) || 0;\n  const dte = parseInt(d.dte) || 0;\n  const event_risk = String(d.event_risk).toLowerCase() === 'true';\n  const pop = parseFloat(d.pop) || 0;\n  const credit_received = parseFloat(d.credit_received) || 0;\n  const debit_paid = parseFloat(d.debit_paid) || 0;\n  const max_loss = parseFloat(d.max_loss) || 0;\n  const bias = (d.bias || '').toLowerCase();\n\n  // --- pickModule ---\n  const spx_qqq = ['SPX', 'QQQ', '/ES', '/NQ'];\n  const is_index = spx_qqq.includes(symbol);\n  const income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];\n  const debit_strats = ['BULL_CALL_DEBIT_SPREAD', 'BEAR_PUT_DEBIT_SPREAD'];\n\n  let module = 'UNKNOWN';\n  let module_resolved = 'UNKNOWN';\n\n  if (income_strats.includes(strategy)) {\n    if (strategy === 'IRON_CONDOR') {\n      module = is_index ? 'IC_INDEX' : 'IC_EQUITY';\n    } else if (strategy === 'BULL_PUT_CREDIT_SPREAD') {\n      module = is_index ? 'BPCS_INDEX' : 'BPCS_EQUITY';\n    } else if (strategy === 'BEAR_CALL_CREDIT_SPREAD') {\n      module = is_index ? 'BCCS_INDEX' : 'BCCS_EQUITY';\n    } else {\n      module = 'CREDIT_VERTICAL';\n    }\n    module_resolved = module;\n  } else if (debit_strats.includes(strategy)) {\n    module = strategy === 'BULL_CALL_DEBIT_SPREAD' ? 'BCDS' : 'BPDS';\n    module_resolved = module;\n  }\n\n  // --- risk filter ---\n  let decision = 'APPROVED';\n  let reject_reason = null;\n\n  if (event_risk) {\n    decision = 'REJECTED';\n    reject_reason = 'event_risk=true';\n  } else if (income_strats.includes(strategy) && ivr < 25) {\n    decision = 'REJECTED';\n    reject_reason = 'IVR too low: ' + ivr;\n  } else if (income_strats.includes(strategy) && pop < 0.65) {\n    decision = 'REJECTED';\n    reject_reason = 'POP too low: ' + pop;\n  } else if (dte < 14) {\n    decision = 'REJECTED';\n    reject_reason = 'DTE too short: ' + dte + ' (min 14)';\n  } else if (dte > 45) {\n    decision = 'REJECTED';\n    reject_reason = 'DTE too long: ' + dte + ' (max 45)';\n  }\n\n  // --- student note ---\n  const note_map = {\n    'IRON_CONDOR': 'Range-bound, IVR ' + ivr + ', theta income',\n    'BULL_PUT_CREDIT_SPREAD': 'Bullish income, IVR ' + ivr,\n    'BEAR_CALL_CREDIT_SPREAD': 'Bearish income, IVR ' + ivr,\n    'BULL_CALL_DEBIT_SPREAD': 'Bullish breakout, limited risk',\n    'BEAR_PUT_DEBIT_SPREAD': 'Bearish breakdown, limited risk',\n    'CREDIT_VERTICAL': 'High IV directional'\n  };\n  const note = note_map[strategy] || strategy;\n\n  // --- build signal ID ---\n  const now = new Date();\n  const sig_id = 'SIG-' +\n    now.toISOString().slice(0, 10).replace(/-/g, '') + '-' +\n    symbol + '-' +\n    Math.floor(Math.random() * 1000);\n\n  results.push({\n    json: {\n      symbol,\n      strategy,\n      module,\n      module_resolved,\n      decision,\n      reject_reason,\n      note,\n      sig_id,\n      ivr,\n      dte,\n      pop,\n      credit_received,\n      debit_paid,\n      max_loss,\n      created_at: now.toISOString().slice(0, 16).replace('T', ' ')\n    }\n  });\n}\n\nreturn results;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          208,
+          0
+        ],
+        "id": "d08f9669-fa97-4183-b39f-f225e6785171",
+        "name": "Code in JavaScript"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "a0421f8c-358a-494f-bc2b-1c611c276ba5",
+                "leftValue": "={{ $json.decision }}",
+                "rightValue": "approved",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          416,
+          0
+        ],
+        "id": "600f053f-9593-4816-9b4f-5e670d2f337b",
+        "name": "IF: decision=approved"
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "list",
+            "cachedResultName": "Options Dashboard Data",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4/edit?usp=drivesdk"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": 637583169,
+            "mode": "list",
+            "cachedResultName": "signals",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4/edit#gid=637583169"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {},
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "symbol",
+                "displayName": "symbol",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "strategy",
+                "displayName": "strategy",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "decision",
+                "displayName": "decision",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "student_note",
+                "displayName": "student_note",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "module",
+                "displayName": "module",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "bias",
+                "displayName": "bias",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "event_risk",
+                "displayName": "event_risk",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "created_at",
+                "displayName": "created_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "pop",
+                "displayName": "pop",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "credit_received",
+                "displayName": "credit_received",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "debit_paid",
+                "displayName": "debit_paid",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "target_value",
+                "displayName": "target_value",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "max_loss",
+                "displayName": "max_loss",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.7,
+        "position": [
+          624,
+          -96
+        ],
+        "id": "24a0bc84-c60a-423f-ab37-d15e8d271d28",
+        "name": "Sheets: Append signals",
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.line.me/v2/bot/message/broadcast",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ messages: [{ type: 'text', text: '📊 新訊號\\n' + $json.symbol + ' ' + $json.strategy + '\\n模組: ' + $json.module + '\\n決策: ' + $json.decision + '\\nEV: ' + $json.ev + '\\n' + ($json.student_note || '') }] }) }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          832,
+          -96
+        ],
+        "id": "ade94c5a-151d-4b11-a700-700b717147fc",
+        "name": "LINE: Broadcast signal",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "0ojgOP3YjhHytkWX",
+            "name": "Header Auth account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1040,
+          -96
+        ],
+        "id": "dc1bd222-3e8f-4218-ab4d-755473a844e9",
+        "name": "Respond to Webhook"
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "1LiN07qjiF7Eb37pW-XfXS_pmgYbWqgby7DFrcBE42Qo",
+            "mode": "list",
+            "cachedResultName": "下班鴿AI選擇權交易系統(模擬倉)",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LiN07qjiF7Eb37pW-XfXS_pmgYbWqgby7DFrcBE42Qo/edit?usp=drivesdk"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "Rejected Signals",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {},
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "symbol",
+                "displayName": "symbol",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "strategy",
+                "displayName": "strategy",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "decision",
+                "displayName": "decision",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "reject_reason",
+                "displayName": "reject_reason",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "module",
+                "displayName": "module",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "ivr",
+                "displayName": "ivr",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "dte",
+                "displayName": "dte",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "event_risk",
+                "displayName": "event_risk",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "created_at",
+                "displayName": "created_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.7,
+        "position": [
+          624,
+          96
+        ],
+        "id": "84a7be35-8d58-4aa0-aa48-615f1b3b395d",
+        "name": "Append row in sheet",
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          832,
+          96
+        ],
+        "id": "9bddce2f-7e51-48fd-8f0f-e8a5d86c2661",
+        "name": "Respond to Webhook1"
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "IF: decision=approved",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF: decision=approved": {
+        "main": [
+          [
+            {
+              "node": "Sheets: Append signals",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Append row in sheet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sheets: Append signals": {
+        "main": [
+          [
+            {
+              "node": "LINE: Broadcast signal",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "LINE: Broadcast signal": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Append row in sheet": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-06T03:33:34.422Z",
+        "id": 447,
+        "workflowId": "F0HpvQBWnp6ClqG5",
+        "versionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T03:33:34.830Z",
+        "id": 449,
+        "workflowId": "F0HpvQBWnp6ClqG5",
+        "versionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T03:33:34.322Z",
+        "id": 446,
+        "workflowId": "F0HpvQBWnp6ClqG5",
+        "versionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T03:33:34.720Z",
+        "id": 448,
+        "workflowId": "F0HpvQBWnp6ClqG5",
+        "versionId": "cc31ce35-a8f3-4a71-912a-331ebb08a293",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}

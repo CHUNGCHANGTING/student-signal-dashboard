@@ -1,50 +1,27 @@
 // ============================================================
-// WF-09【Account Streamer 事件處理】
-// Polls order status → Detects Filled → Updates Sheet + Notifies
-// ============================================================
-// NOTE: n8n Cloud does not support persistent WebSocket connections.
-// This workflow uses polling (every 60s during market hours) as a
-// reliable alternative to the tastytrade Account Streamer WebSocket.
-//
-// For true WebSocket streaming, deploy a sidecar service:
-//   Node.js → wss://streamer.tastyworks.com → POST n8n webhook
-// ============================================================
-// Trigger: Schedule (every 60s during market hours UTC 13:30-20:00)
+// WF-09【訂單監控】Account Order Monitor
+// Schedule (every 2 min during market hours) → Check orders → Alert
 // ============================================================
 
 const TT_API = 'https://api.tastyworks.com';
 const TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
 const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
-const SHEET_ID = '1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4';
+const LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';
+const TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';
+const TG_CHAT = '-1003799249092';
 
-// ─────────────────────────────────────────────────────────────
-// 0. MARKET HOURS CHECK
-// ─────────────────────────────────────────────────────────────
+// ─── Market Hours Check ───
 const now = new Date();
 const utcHour = now.getUTCHours();
 const utcDay = now.getUTCDay();
+if (utcDay === 0 || utcDay === 6) return [{ json: { skipped: true, reason: 'Weekend' } }];
+if (utcHour < 13 || utcHour > 21) return [{ json: { skipped: true, reason: 'Outside market hours' } }];
 
-// Skip weekends and outside market hours (UTC 13:30 - 21:00 = US market)
-if (utcDay === 0 || utcDay === 6) {
-  return [{ json: { skipped: true, reason: 'Weekend' } }];
-}
-if (utcHour < 13 || utcHour > 21) {
-  return [{ json: { skipped: true, reason: 'Outside market hours' } }];
-}
-
-// ─────────────────────────────────────────────────────────────
-// 1. LOAD STUDENT ACCOUNTS (from static config or Sheet)
-// ─────────────────────────────────────────────────────────────
-// In production, read from Google Sheet "students" tab
+// ─── Student Accounts ───
 const STUDENTS = [
-  {
-    student_id: 'S001',
-    name: '老師 (Demo)',
-    account_number: '5WZ90854',
-    refresh_token: '', // Set from Sheet/env
-    line_user_id: 'U457d141fef9c4ccc372dc32dd0c8f45c',
-    telegram_chat_id: ''
-  }
+  { student_id: 'S001', name: '老師', account_number: '5WZ90854',
+    refresh_token: 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw',
+    line_user_id: 'U457d141fef9c4ccc372dc32dd0c8f45c' }
 ];
 
 const allEvents = [];
@@ -52,167 +29,139 @@ const allEvents = [];
 for (const student of STUDENTS) {
   if (!student.refresh_token) continue;
 
-  // ─────────────────────────────────────────────────────────
-  // 2. GET ACCESS TOKEN
-  // ─────────────────────────────────────────────────────────
+  // ─── Get Token ───
   let accessToken;
   try {
     const tokenRes = await this.helpers.httpRequest({
-      method: 'POST',
-      url: `${TT_API}/oauth/token`,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'chilldove-streamer/1.0'
-      },
-      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(student.refresh_token)}&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}`,
+      method: 'POST', url: TT_API + '/oauth/token',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-monitor/1.0' },
+      body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(student.refresh_token) + '&client_id=' + TT_CLIENT_ID + '&client_secret=' + TT_CLIENT_SECRET,
     });
-    accessToken = tokenRes['access-token'] || tokenRes.access_token;
+    accessToken = tokenRes.access_token || tokenRes['access-token'];
     if (!accessToken) continue;
-  } catch (e) {
-    allEvents.push({
-      student_id: student.student_id,
-      event: 'AUTH_FAILED',
-      error: e.message
-    });
-    continue;
-  }
+  } catch (e) { continue; }
 
-  const authHeaders = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-    'User-Agent': 'chilldove-streamer/1.0'
-  };
+  const authHeaders = { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json', 'User-Agent': 'chilldove-monitor/1.0' };
 
-  // ─────────────────────────────────────────────────────────
-  // 3. FETCH RECENT ORDERS (last 24h)
-  // ─────────────────────────────────────────────────────────
+  // ─── Fetch Recent Orders ───
   let recentOrders = [];
   try {
     const ordRes = await this.helpers.httpRequest({
-      method: 'GET',
-      url: `${TT_API}/accounts/${student.account_number}/orders/live`,
-      headers: authHeaders,
+      method: 'GET', url: TT_API + '/accounts/' + student.account_number + '/orders/live',
+      headers: authHeaders, ignoreHttpStatusErrors: true,
     });
     recentOrders = ordRes?.data?.items || ordRes?.data || [];
-  } catch (e) {
-    continue;
-  }
+  } catch (e) { continue; }
 
-  // ─────────────────────────────────────────────────────────
-  // 4. DETECT NEWLY FILLED ORDERS
-  // ─────────────────────────────────────────────────────────
-  const filledOrders = recentOrders.filter(o => o.status === 'Filled');
-  const recentFilled = filledOrders.filter(o => {
-    const filledAt = new Date(o['terminal-at'] || o['updated-at'] || 0);
-    const diffMs = now.getTime() - filledAt.getTime();
-    return diffMs < 120000; // Filled within last 2 minutes
-  });
+  // ─── Detect Events (last 3 minutes) ───
+  for (const order of recentOrders) {
+    const terminalAt = new Date(order['terminal-at'] || order['updated-at'] || 0);
+    const diffMs = now.getTime() - terminalAt.getTime();
+    if (diffMs > 180000) continue; // Skip if older than 3 minutes
 
-  for (const order of recentFilled) {
+    const status = order.status;
+    if (!['Filled', 'Rejected', 'Cancelled', 'Expired'].includes(status)) continue;
+
+    // Build fills info
     const fills = [];
-    let totalFillPrice = 0;
-    let totalQty = 0;
-
+    let totalFillPrice = 0, totalQty = 0;
     for (const leg of (order.legs || [])) {
       for (const fill of (leg.fills || [])) {
-        fills.push({
-          symbol: leg.symbol,
-          action: leg.action,
-          fill_price: parseFloat(fill['fill-price'] || 0),
-          quantity: parseInt(fill.quantity || 0),
-          filled_at: fill['filled-at'] || '',
-          venue: fill['destination-venue'] || ''
-        });
+        fills.push({ symbol: leg.symbol, action: leg.action, fill_price: parseFloat(fill['fill-price'] || 0), quantity: parseInt(fill.quantity || 0), filled_at: fill['filled-at'] || '' });
         totalFillPrice += parseFloat(fill['fill-price'] || 0);
         totalQty += parseInt(fill.quantity || 0);
       }
     }
-
     const avgFillPrice = totalQty > 0 ? (totalFillPrice / totalQty).toFixed(4) : '0';
 
-    const event = {
-      student_id: student.student_id,
-      student_name: student.name,
-      account_number: student.account_number,
-      event: 'ORDER_FILLED',
-      timestamp: now.toISOString(),
-      order_id: order.id,
-      complex_order_id: order['complex-order-id'] || null,
-      order_type: order['order-type'],
-      symbol: order['underlying-symbol'],
-      price: parseFloat(order.price || 0),
-      price_effect: order['price-effect'],
-      status: order.status,
-      avg_fill_price: avgFillPrice,
-      fills,
-      legs: (order.legs || []).map(l => ({
-        symbol: l.symbol,
-        action: l.action,
-        quantity: parseInt(l.quantity || 0),
-        remaining: parseInt(l['remaining-quantity'] || 0)
-      })),
-      is_opening: (order.legs || []).some(l =>
-        l.action === 'Buy to Open' || l.action === 'Sell to Open'
-      ),
-      is_closing: (order.legs || []).some(l =>
-        l.action === 'Buy to Close' || l.action === 'Sell to Close'
-      )
-    };
+    const isOpening = (order.legs || []).some(l => l.action === 'Buy to Open' || l.action === 'Sell to Open');
+    const isClosing = (order.legs || []).some(l => l.action === 'Buy to Close' || l.action === 'Sell to Close');
 
-    allEvents.push(event);
+    // ─── Build Notification Message ───
+    let notifyMsg = '';
+    let eventType = '';
 
-    // ─────────────────────────────────────────────────────
-    // 5. NOTIFY STUDENT (LINE / Telegram)
-    // ─────────────────────────────────────────────────────
-    const actionIcon = event.is_opening ? '🟢 開倉' : '🔴 平倉';
-    const effectIcon = order['price-effect'] === 'Credit' ? '💰' : '💸';
-    const notifyMsg = [
-      `${actionIcon} 成交通知`,
-      `━━━━━━━━━━━`,
-      `📌 ${order['underlying-symbol']} | ${event.order_type}`,
-      `${effectIcon} 成交價: $${avgFillPrice} (${order['price-effect']})`,
-      `📊 口數: ${totalQty}`,
-      '',
-      ...fills.map(f => `  ${f.action}: ${f.symbol} @ $${f.fill_price}`),
-      '',
-      `🕐 ${new Date(fills[0]?.filled_at || now).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`,
-      `📋 Order ID: ${order.id}`
-    ].join('\n');
+    if (status === 'Filled') {
+      eventType = 'ORDER_FILLED';
+      const icon = isOpening ? '🟢 開倉成交' : '🔴 平倉成交';
+      const effectIcon = order['price-effect'] === 'Credit' ? '💰' : '💸';
+      notifyMsg = [icon, '━━━━━━━━━━━',
+        '📌 ' + order['underlying-symbol'] + ' | ' + order['order-type'],
+        effectIcon + ' 成交價: $' + avgFillPrice + ' (' + (order['price-effect']||'') + ')',
+        '📊 口數: ' + totalQty, '',
+        ...fills.map(f => '  ' + f.action + ': ' + f.symbol.substring(0,20) + ' @ $' + f.fill_price),
+        '', '🕐 ' + new Date(fills[0]?.filled_at || now).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+        '📋 Order #' + order.id
+      ].join('
+');
 
-    // Store for downstream LINE/Telegram node
-    event.notify_message = notifyMsg;
-    event.line_user_id = student.line_user_id;
-    event.telegram_chat_id = student.telegram_chat_id;
-  }
+    } else if (status === 'Rejected') {
+      eventType = 'ORDER_REJECTED';
+      notifyMsg = ['⛔ 訂單被拒絕', '━━━━━━━━━━━',
+        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),
+        '❌ 原因: ' + (order['reject-reason'] || '未知原因'),
+        '💲 委託價: $' + (order.price || 'N/A') + ' ' + (order['price-effect']||''),
+        '', '⚠️ 請檢查: buying power / 履約價 / 市場狀態',
+        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+        '📋 Order #' + order.id
+      ].join('
+');
 
-  // ─────────────────────────────────────────────────────────
-  // 6. DETECT CANCELLED / REJECTED ORDERS
-  // ─────────────────────────────────────────────────────────
-  const rejectOrders = recentOrders.filter(o =>
-    (o.status === 'Rejected' || o.status === 'Cancelled') &&
-    (now.getTime() - new Date(o['terminal-at'] || 0).getTime()) < 120000
-  );
+    } else if (status === 'Expired') {
+      eventType = 'ORDER_EXPIRED';
+      notifyMsg = ['⏰ 訂單已過期', '━━━━━━━━━━━',
+        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),
+        '💲 委託價: $' + (order.price || 'N/A'),
+        '📊 Time-in-force: ' + (order['time-in-force']||''),
+        '', '💡 Day order 未成交已自動取消',
+        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+      ].join('
+');
 
-  for (const order of rejectOrders) {
+    } else if (status === 'Cancelled') {
+      eventType = 'ORDER_CANCELLED';
+      notifyMsg = ['🚫 訂單已取消', '━━━━━━━━━━━',
+        '📌 ' + (order['underlying-symbol']||'?') + ' | ' + (order['order-type']||''),
+        '💲 委託價: $' + (order.price || 'N/A'),
+        '🕐 ' + now.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+        '📋 Order #' + order.id
+      ].join('
+');
+    }
+
+    // ─── Send LINE Push ───
+    if (notifyMsg && student.line_user_id) {
+      try {
+        await this.helpers.httpRequest({
+          method: 'POST', url: 'https://api.line.me/v2/bot/message/push',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_TOKEN },
+          body: JSON.stringify({ to: student.line_user_id, messages: [{ type: 'text', text: notifyMsg }] }),
+          ignoreHttpStatusErrors: true,
+        });
+      } catch (e) {}
+    }
+
+    // ─── Send Telegram ───
+    if (notifyMsg && TG_CHAT) {
+      try {
+        await this.helpers.httpRequest({
+          method: 'POST', url: 'https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: TG_CHAT, text: notifyMsg }),
+          ignoreHttpStatusErrors: true,
+        });
+      } catch (e) {}
+    }
+
     allEvents.push({
-      student_id: student.student_id,
-      event: order.status === 'Rejected' ? 'ORDER_REJECTED' : 'ORDER_CANCELLED',
-      timestamp: now.toISOString(),
-      order_id: order.id,
-      symbol: order['underlying-symbol'],
-      reason: order['reject-reason'] || '',
-      notify_message: `⚠️ ${order.status}: ${order['underlying-symbol']} — ${order['reject-reason'] || 'No reason'}`,
-      line_user_id: student.line_user_id,
+      student_id: student.student_id, event: eventType, timestamp: now.toISOString(),
+      order_id: order.id, symbol: order['underlying-symbol'] || '', status: order.status,
+      order_type: order['order-type'] || '', price: order.price || '',
+      price_effect: order['price-effect'] || '', avg_fill_price: avgFillPrice,
+      is_opening: isOpening, is_closing: isClosing, notify_message: notifyMsg
     });
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 7. RETURN EVENTS FOR DOWNSTREAM PROCESSING
-// ─────────────────────────────────────────────────────────────
-if (allEvents.length === 0) {
-  return [{ json: { events: [], count: 0, checked_at: now.toISOString() } }];
-}
-
-// Return each event as separate item for n8n branching
+if (allEvents.length === 0) return [{ json: { events: 0, checked_at: now.toISOString(), status: 'no_new_events' } }];
 return allEvents.map(evt => ({ json: evt }));
