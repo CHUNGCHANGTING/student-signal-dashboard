@@ -3423,7 +3423,7 @@ function restoreSavedBroker() {
 }
 
 // === CBOE Auto-Fetch for Gate 2 ===
-async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
+async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetchedTastyQuotes) {
   var btn = document.getElementById('g2-fetch-btn-' + symbol);
   var dataEl = document.getElementById('g2-auto-data-' + symbol);
   if (btn) { btn.textContent = '⏳ 載入中...'; btn.disabled = true; }
@@ -3495,9 +3495,10 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
       return;
     }
 
-    // If tastytrade is active, fetch real-time quotes for the specific legs
-    var tastyQuotes = {};
-    if (useTasty) {
+    // Use pre-fetched tastytrade quotes (batch fetched in autoFetchAll)
+    var tastyQuotes = preFetchedTastyQuotes || {};
+    if (useTasty && Object.keys(tastyQuotes).length === 0) {
+      // Fallback: fetch individually if batch cache is empty
       try {
         var tastySymbols = legs.map(function(leg) {
           return buildTastyOptionSymbol(cboeRoot, expiry, leg.type, leg.strike);
@@ -3507,7 +3508,7 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
         }
       } catch(tastyErr) {
         console.log('tastytrade quote fetch failed, falling back to CBOE:', tastyErr.message);
-        useTasty = false; // Fall back to CBOE data for this symbol
+        useTasty = false;
       }
     }
 
@@ -3767,11 +3768,39 @@ async function autoFetchAll() {
     g2BatchCache = {};
   }
 
-  // Process each symbol using cached data
+  // Pre-fetch ALL tastytrade quotes in one batch (instead of per-symbol)
+  var g2TastyQuoteCache = {};
+  if (useTasty) {
+    try {
+      if (statusText) statusText.innerHTML = '🟣 批次拉取即時報價...';
+      var allTastySymbols = [];
+      for (var k = 0; k < g2ApprovedSignals.length; k++) {
+        var sig = g2ApprovedSignals[k];
+        var root = sig.symbol.replace(/[^A-Z]/g, '');
+        var strikes = (sig.orderText || '').match(/[\d.]+/g) || [];
+        var expiry = sig.expiry || '';
+        if (strikes.length >= 2 && expiry) {
+          var optType = sig.strategy.includes('PUT') ? 'P' : 'C';
+          allTastySymbols.push(buildTastyOptionSymbol(root, expiry, optType, parseFloat(strikes[0])));
+          allTastySymbols.push(buildTastyOptionSymbol(root, expiry, optType, parseFloat(strikes[1])));
+        }
+      }
+      // Deduplicate
+      allTastySymbols = allTastySymbols.filter(function(s, i, a) { return s && a.indexOf(s) === i; });
+      if (allTastySymbols.length > 0) {
+        g2TastyQuoteCache = await fetchTastytradeQuotes(allTastySymbols);
+        if (statusText) statusText.innerHTML = '🟣 即時報價已取得 (' + Object.keys(g2TastyQuoteCache).length + ' 檔)';
+      }
+    } catch(tastyBatchErr) {
+      console.log('Batch tastytrade fetch failed:', tastyBatchErr.message);
+    }
+  }
+
+  // Process each symbol using cached data (CBOE + tastytrade both pre-cached)
   for (var i = 0; i < g2ApprovedSignals.length; i++) {
     var s = g2ApprovedSignals[i];
     if (statusText) statusText.innerHTML = (useTasty ? '🟣' : '⚡') + ' 篩選中 ' + s.symbol + '... (' + (i+1) + '/' + g2ApprovedSignals.length + ')';
-    await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '');
+    await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '', g2TastyQuoteCache);
   }
   // Summary
   if (statusText) {
