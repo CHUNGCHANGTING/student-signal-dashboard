@@ -3216,7 +3216,11 @@ async function analyzeAllLINESignals() {
           var bid = parseFloat(match[0].bid) || 0;
           var ask = parseFloat(match[0].ask) || 0;
           var spread = ask > 0 ? ask - bid : 999;
-          if (oi < 500 || spread > 0.15 || bid <= 0) {
+          var _isOff = (r2.strategy === 'BULL_CALL_DEBIT_SPREAD' || r2.strategy === 'BEAR_PUT_DEBIT_SPREAD');
+          var _oiMin = _isOff ? 100 : 500;
+          var _mid = (bid + ask) / 2;
+          var _spPct = _mid > 0 ? spread / _mid : 1;
+          if (oi < _oiMin || (_spPct > 0.15 && spread > 0.10) || bid <= 0) {
             oiWarning = 'OI=' + oi + ' Spread=$' + spread.toFixed(2) + (bid <= 0 ? ' (bid=0)' : '');
             rf = { decision: 'blocked', reason: 'liquidity_cboe' };
           }
@@ -3924,10 +3928,15 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetch
 
       var spread = ask - bid;
 
-      // Color coding
-      var oiColor = oi >= 500 ? 'var(--color-success)' : oi >= 100 ? 'var(--color-warning)' : 'var(--color-error)';
-      var oiOk = oi >= 500;
-      var spreadOk = spread <= 0.10;
+      // Color coding — adaptive thresholds by strategy type
+      var isOffense = (strategy === 'BULL_CALL_DEBIT_SPREAD' || strategy === 'BEAR_PUT_DEBIT_SPREAD');
+      var oiThresh = isOffense ? 100 : 500; // Offense needs less OI
+      var oiColor = oi >= 500 ? 'var(--color-success)' : oi >= oiThresh ? 'var(--color-warning)' : 'var(--color-error)';
+      var oiOk = oi >= oiThresh;
+      // Bid-Ask: use % of mid-price instead of absolute $0.10 (fairer for high-price stocks)
+      var mid = (bid + ask) / 2;
+      var spreadPct = mid > 0 ? spread / mid : 1;
+      var spreadOk = spreadPct <= 0.15 || spread <= 0.10; // ≤15% of mid OR ≤$0.10
 
       if (leg.side === 'short') { shortLegBid = bid; shortLegAsk = ask; }
 
