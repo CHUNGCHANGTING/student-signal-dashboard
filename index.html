@@ -3651,9 +3651,13 @@ function fetchWithTimeout(url, opts, timeoutMs) {
   ]);
 }
 
-// Check if tastytrade broker is bound with a valid session
+// Check if tastytrade broker is bound with a valid session AND market-data works
 function isTastytradeActive() {
-  return selectedBroker === 'tastytrade' && !!localStorage.getItem('broker_tt-session');
+  if (selectedBroker !== 'tastytrade') return false;
+  if (!localStorage.getItem('broker_tt-session')) return false;
+  // If we previously got 403 on market-data, don't try again this session
+  if (sessionStorage.getItem('tt-market-data-blocked')) return false;
+  return true;
 }
 
 // Build tastytrade OCC option symbol: "KO    260417C00076000"
@@ -3675,10 +3679,11 @@ async function fetchTastytradeQuotes(optionSymbols) {
   var resp = await fetchWithTimeout(
     'https://api.tastyworks.com/market-data/by-type?equity-option=' + encoded,
     { headers: { 'Authorization': (isOAuth ? 'Bearer ' : '') + token } },
-    15000
+    8000
   );
   if (!resp.ok) {
-    // Token expired — try to refresh via n8n proxy
+    // 403 = subscription issue (professional account), don't retry
+    // 401 = token expired, try refresh once
     if (resp.status === 401) {
       try {
         var refreshResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
@@ -3688,11 +3693,11 @@ async function fetchTastytradeQuotes(optionSymbols) {
         var refreshData = await refreshResp.json();
         if (refreshData.data && refreshData.data['session-token']) {
           localStorage.setItem('broker_tt-session', refreshData.data['session-token']);
-          // Retry with new token
+          localStorage.setItem('broker_tt-auth', 'oauth');
           var retryResp = await fetchWithTimeout(
             'https://api.tastyworks.com/market-data/by-type?equity-option=' + encoded,
             { headers: { 'Authorization': 'Bearer ' + refreshData.data['session-token'] } },
-            15000
+            10000
           );
           if (retryResp.ok) {
             var retryData = await retryResp.json();
@@ -3704,8 +3709,8 @@ async function fetchTastytradeQuotes(optionSymbols) {
           }
         }
       } catch(refreshErr) { /* fall through */ }
-      localStorage.removeItem('broker_tt-session');
     }
+    if (resp.status === 403) sessionStorage.setItem('tt-market-data-blocked', '1');
     throw new Error('tastytrade API ' + resp.status);
   }
   var data = await resp.json();
@@ -3736,7 +3741,7 @@ async function autoFetchAll() {
 
   // Always fetch CBOE for OI/Delta/structure data
   try {
-    var batchResp = await fetchWithTimeout('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + symbols.join(','), 20000);
+    var batchResp = await fetchWithTimeout('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + symbols.join(','), 12000);
     var batchData = await batchResp.json();
     if (batchData.batch && batchData.results) {
       g2BatchCache = batchData.results;
