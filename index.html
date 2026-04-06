@@ -1272,7 +1272,70 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 </section>
 <section class="gate" id="gate3" style="display:none">
 <div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位確認</div><div class="gate-subtitle">帳戶風險、相關性、BP使用率</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。</p></div>
+
+<div id="g3-loading" style="text-align:center;padding:var(--space-6);color:var(--color-text-muted)">
+  <div style="font-size:var(--text-lg);margin-bottom:var(--space-2)">⚡ 讀取帳戶數據...</div>
+  <div style="font-size:var(--text-xs)">透過 n8n 拉取 tastytrade 持倉 + 餘額</div>
+</div>
+<div id="g3-error" style="display:none;padding:var(--space-4);background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-md);margin-bottom:var(--space-4)">
+  <strong>❌ 帳戶數據拉取失敗</strong><br>
+  <span id="g3-error-msg" style="font-size:var(--text-xs)"></span>
+</div>
+<div id="g3-content" style="display:none">
+
+<!-- ── Check 1: 帳戶風險 ── -->
+<div style="margin-bottom:var(--space-6)">
+  <div class="g1-section-title" style="font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-3)">1️⃣ 帳戶風險</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--space-3);margin-bottom:var(--space-3)">
+    <div style="padding:var(--space-3);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md)">
+      <div style="font-size:10px;color:var(--color-text-muted)">淨清算價值</div>
+      <div id="g3-net-liq" style="font-size:var(--text-lg);font-weight:700">$—</div>
+    </div>
+    <div style="padding:var(--space-3);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md)">
+      <div style="font-size:10px;color:var(--color-text-muted)">現金餘額</div>
+      <div id="g3-cash" style="font-size:var(--text-lg);font-weight:700">$—</div>
+    </div>
+    <div style="padding:var(--space-3);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md)">
+      <div style="font-size:10px;color:var(--color-text-muted)">選擇權購買力</div>
+      <div id="g3-option-bp" style="font-size:var(--text-lg);font-weight:700">$—</div>
+    </div>
+    <div style="padding:var(--space-3);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md)">
+      <div style="font-size:10px;color:var(--color-text-muted)">單筆風險上限 (2%)</div>
+      <div id="g3-risk-limit" style="font-size:var(--text-lg);font-weight:700">$—</div>
+    </div>
+  </div>
+  <div id="g3-risk-check" style="padding:var(--space-3);border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:600"></div>
+</div>
+
+<!-- ── Check 2: 相關性檢查 ── -->
+<div style="margin-bottom:var(--space-6)">
+  <div class="g1-section-title" style="font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-3)">2️⃣ 相關性檢查</div>
+  <div id="g3-positions-list" style="margin-bottom:var(--space-3)"></div>
+  <div id="g3-correlation-check" style="padding:var(--space-3);border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:600"></div>
+</div>
+
+<!-- ── Check 3: BP 使用率 ── -->
+<div style="margin-bottom:var(--space-6)">
+  <div class="g1-section-title" style="font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-3)">3️⃣ BP 使用率</div>
+  <div style="margin-bottom:var(--space-3)">
+    <div style="background:var(--color-surface-dynamic);border-radius:var(--radius-lg);height:24px;overflow:hidden;position:relative">
+      <div id="g3-bp-bar" style="height:100%;border-radius:var(--radius-lg);transition:width 0.5s ease;width:0%"></div>
+      <div id="g3-bp-label" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700"></div>
+    </div>
+  </div>
+  <div id="g3-bp-check" style="padding:var(--space-3);border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:600"></div>
+  <div style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-2)">
+    🟢 &lt;30% 安全 | 🟡 30-50% 注意 | 🟠 50-70% 警戒 | 🔴 &gt;70% 危險
+  </div>
+</div>
+
+<!-- Summary -->
+<div id="g3-summary" style="padding:var(--space-4);border-radius:var(--radius-md);text-align:center;margin-bottom:var(--space-4)"></div>
+<div style="text-align:center">
+  <button class="btn-primary" onclick="completeGate3()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-sm)">✅ 部位確認完成 → 進入第4關</button>
+</div>
+
+</div><!-- #g3-content -->
 </section>
 <section class="gate" id="gate4" style="display:none">
 <div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終核查清單與送單確認詞</div></div></div>
@@ -1444,7 +1507,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 })();
 
 // === Navigation ===
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
@@ -4005,6 +4068,191 @@ function completeGate2() {
     sumStatus.innerHTML = '<button onclick="goToGate4()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">→ 第4關 送單</button>';
     sumStatus.className = 'summary-val';
   }
+}
+
+// === GATE 3: 部位確認 — 帳戶風險 + 相關性 + BP使用率 ===
+var g3Data = null;
+var g3Passed = [false, false, false];
+
+async function loadGate3() {
+  var loading = document.getElementById('g3-loading');
+  var error = document.getElementById('g3-error');
+  var content = document.getElementById('g3-content');
+  if (loading) loading.style.display = 'block';
+  if (error) error.style.display = 'none';
+  if (content) content.style.display = 'none';
+
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tt-account-data' })
+    });
+    g3Data = await resp.json();
+    if (g3Data.error && !g3Data.balances) throw new Error(g3Data.error);
+  } catch(e) {
+    if (loading) loading.style.display = 'none';
+    if (error) { error.style.display = 'block'; document.getElementById('g3-error-msg').textContent = e.message; }
+    return;
+  }
+  if (loading) loading.style.display = 'none';
+  if (content) content.style.display = 'block';
+  renderGate3();
+}
+
+function renderGate3() {
+  if (!g3Data) return;
+  var bal = g3Data.balances || {};
+  var pos = g3Data.positions || [];
+  var netLiq = bal.netLiq || 0;
+  var cash = bal.cashBalance || 0;
+  var optBP = bal.optionBuyingPower || 0;
+  var maintReq = bal.maintenanceRequirement || 0;
+  var riskLimit = netLiq * 0.02;
+
+  // ── Check 1: 帳戶風險 ──
+  document.getElementById('g3-net-liq').textContent = '$' + netLiq.toFixed(2);
+  document.getElementById('g3-cash').textContent = '$' + cash.toFixed(2);
+  document.getElementById('g3-option-bp').textContent = '$' + optBP.toFixed(2);
+  document.getElementById('g3-risk-limit').textContent = '$' + riskLimit.toFixed(2);
+
+  // Check if approved signals' maxLoss fits within risk limit
+  var maxLossCheck = true;
+  var riskMsg = '';
+  if (g2ApprovedSignals && g2ApprovedSignals.length > 0) {
+    for (var i = 0; i < g2ApprovedSignals.length; i++) {
+      var sig = g2ApprovedSignals[i];
+      var ml = parseFloat(sig.max_loss || sig.margin || 0);
+      if (ml > riskLimit) {
+        maxLossCheck = false;
+        riskMsg += sig.symbol + ' maxLoss $' + ml.toFixed(2) + ' > 2% 上限 $' + riskLimit.toFixed(2) + '\n';
+      }
+      if (ml > optBP) {
+        maxLossCheck = false;
+        riskMsg += sig.symbol + ' maxLoss $' + ml.toFixed(2) + ' > 購買力 $' + optBP.toFixed(2) + '\n';
+      }
+    }
+  }
+  var riskEl = document.getElementById('g3-risk-check');
+  if (maxLossCheck) {
+    riskEl.innerHTML = '✅ 帳戶風險通過 — 單筆風險在 2% 以內，購買力充足';
+    riskEl.style.background = 'var(--color-success-highlight)'; riskEl.style.color = 'var(--color-success)';
+    g3Passed[0] = true;
+  } else {
+    riskEl.innerHTML = '⚠️ 風險超過上限<br>' + riskMsg.replace(/\n/g, '<br>');
+    riskEl.style.background = 'var(--color-warning-highlight)'; riskEl.style.color = 'var(--color-warning)';
+    g3Passed[0] = false;
+  }
+
+  // ── Check 2: 相關性檢查 ──
+  var posListEl = document.getElementById('g3-positions-list');
+  var corrEl = document.getElementById('g3-correlation-check');
+  var optionPos = pos.filter(function(p) { return p.type === 'Equity Option'; });
+  var underlyings = {};
+  optionPos.forEach(function(p) { underlyings[p.symbol] = (underlyings[p.symbol] || 0) + 1; });
+
+  if (optionPos.length === 0) {
+    posListEl.innerHTML = '<div style="padding:var(--space-2);background:var(--color-surface);border-radius:var(--radius-md);font-size:12px;color:var(--color-text-muted)">📊 目前無選擇權持倉</div>';
+  } else {
+    var html = '<table style="width:100%;font-size:11px;border-collapse:collapse">';
+    html += '<tr style="border-bottom:1px solid var(--color-border);font-weight:600"><td>標的</td><td>類型</td><td>Strike</td><td>到期</td><td>數量</td><td>方向</td></tr>';
+    optionPos.forEach(function(p) {
+      html += '<tr style="border-bottom:1px solid var(--color-border)">';
+      html += '<td style="font-weight:600">' + p.symbol + '</td>';
+      html += '<td>' + (p.optionType === 'C' ? 'Call' : p.optionType === 'P' ? 'Put' : (p.optionType || '—')) + '</td>';
+      html += '<td>' + (p.strikePrice || '—') + '</td>';
+      html += '<td>' + (p.expirationDate || '—') + '</td>';
+      html += '<td>' + p.quantity + '</td>';
+      html += '<td>' + (p.direction || '—') + '</td>';
+      html += '</tr>';
+    });
+    html += '</table>';
+    posListEl.innerHTML = html;
+  }
+
+  // Check for duplicate underlyings with approved signals
+  var corrPass = true;
+  var corrMsg = '';
+  if (g2ApprovedSignals) {
+    for (var j = 0; j < g2ApprovedSignals.length; j++) {
+      var sym = g2ApprovedSignals[j].symbol;
+      if (underlyings[sym]) {
+        corrPass = false;
+        corrMsg += '⚠️ ' + sym + ' 已有 ' + underlyings[sym] + ' 個選擇權部位，不建議重複開倉\n';
+      }
+    }
+  }
+  // Check total position count
+  var totalUnderlyings = Object.keys(underlyings).length;
+  if (totalUnderlyings >= 5) {
+    corrPass = false;
+    corrMsg += '⚠️ 已有 ' + totalUnderlyings + ' 檔持倉，接近上限 5 檔\n';
+  }
+
+  if (corrPass) {
+    corrEl.innerHTML = '✅ 相關性通過 — 無重複標的，持倉數量安全';
+    corrEl.style.background = 'var(--color-success-highlight)'; corrEl.style.color = 'var(--color-success)';
+    g3Passed[1] = true;
+  } else {
+    corrEl.innerHTML = corrMsg.replace(/\n/g, '<br>');
+    corrEl.style.background = 'var(--color-warning-highlight)'; corrEl.style.color = 'var(--color-warning)';
+    g3Passed[1] = false;
+  }
+
+  // ── Check 3: BP 使用率 ──
+  var bpUsage = netLiq > 0 ? (maintReq / netLiq * 100) : 0;
+  var bpBar = document.getElementById('g3-bp-bar');
+  var bpLabel = document.getElementById('g3-bp-label');
+  var bpCheck = document.getElementById('g3-bp-check');
+
+  bpBar.style.width = Math.min(bpUsage, 100) + '%';
+  bpLabel.textContent = bpUsage.toFixed(1) + '% (保證金 $' + maintReq.toFixed(0) + ' / 淨值 $' + netLiq.toFixed(0) + ')';
+
+  if (bpUsage < 30) {
+    bpBar.style.background = 'var(--color-success)'; bpLabel.style.color = 'var(--color-text)';
+    bpCheck.innerHTML = '🟢 安全 (' + bpUsage.toFixed(1) + '%) — 可正常開倉';
+    bpCheck.style.background = 'var(--color-success-highlight)'; bpCheck.style.color = 'var(--color-success)';
+    g3Passed[2] = true;
+  } else if (bpUsage < 50) {
+    bpBar.style.background = 'var(--color-gold)'; bpLabel.style.color = 'var(--color-text)';
+    bpCheck.innerHTML = '🟡 注意 (' + bpUsage.toFixed(1) + '%) — 建議減少倉位';
+    bpCheck.style.background = 'var(--color-gold-highlight)'; bpCheck.style.color = 'var(--color-gold)';
+    g3Passed[2] = true; // still passable
+  } else if (bpUsage < 70) {
+    bpBar.style.background = 'var(--color-warning)'; bpLabel.style.color = '#fff';
+    bpCheck.innerHTML = '🟠 警戒 (' + bpUsage.toFixed(1) + '%) — 只允許減倉/平倉';
+    bpCheck.style.background = 'var(--color-warning-highlight)'; bpCheck.style.color = 'var(--color-warning)';
+    g3Passed[2] = false;
+  } else {
+    bpBar.style.background = 'var(--color-error)'; bpLabel.style.color = '#fff';
+    bpCheck.innerHTML = '🔴 危險 (' + bpUsage.toFixed(1) + '%) — 禁止新開倉';
+    bpCheck.style.background = 'var(--color-error-highlight)'; bpCheck.style.color = 'var(--color-error)';
+    g3Passed[2] = false;
+  }
+
+  // Summary
+  var allPass = g3Passed[0] && g3Passed[1] && g3Passed[2];
+  var passCount = g3Passed.filter(Boolean).length;
+  var summaryEl = document.getElementById('g3-summary');
+  if (allPass) {
+    summaryEl.innerHTML = '✅ 全部通過 (' + passCount + '/3) — 可以進入第4關送單';
+    summaryEl.style.background = 'var(--color-success-highlight)'; summaryEl.style.color = 'var(--color-success)';
+  } else {
+    summaryEl.innerHTML = '⚠️ ' + passCount + '/3 通過 — 請檢查未通過項目';
+    summaryEl.style.background = 'var(--color-warning-highlight)'; summaryEl.style.color = 'var(--color-warning)';
+  }
+}
+
+function completeGate3() {
+  var allPass = g3Passed[0] && g3Passed[1] && g3Passed[2];
+  var isAdmin = document.querySelector('.badge-admin') !== null;
+  if (!allPass) {
+    if (isAdmin || confirm('部位確認未全部通過。\n管理員模式：是否強制進入第4關？')) {
+      // continue
+    } else {
+      return;
+    }
+  }
+  goToGate4();
 }
 
 function goToGate4() {
