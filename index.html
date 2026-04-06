@@ -3652,13 +3652,11 @@ function fetchWithTimeout(url, opts, timeoutMs) {
   ]);
 }
 
-// Check if tastytrade broker is bound with a valid session AND market-data works
+// tastytrade market-data/by-type requires live quote subscription.
+// This account is professional + delayed → always 403 → skip entirely.
+// When quote level is upgraded to live, change this to true.
 function isTastytradeActive() {
-  if (selectedBroker !== 'tastytrade') return false;
-  if (!localStorage.getItem('broker_tt-session')) return false;
-  // If we previously got 403 on market-data, don't try again this session
-  if (sessionStorage.getItem('tt-market-data-blocked')) return false;
-  return true;
+  return false;
 }
 
 // Build tastytrade OCC option symbol: "KO    260417C00076000"
