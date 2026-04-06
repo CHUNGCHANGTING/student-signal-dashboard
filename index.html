@@ -801,48 +801,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- Signal Input Dual-Mode Panel -->
 <div class="sp-panel" id="sp-panel">
   <button class="sp-toggle" id="sp-toggle" onclick="toggleSignalPanel()">
-
-<!-- 今日市場狀態 (from Gate 1) -->
-<div class="g1-section-title"><span class="g1-st-icon">A</span> 今日市場狀態</div>
-<div class="g1-status-grid">
-  <div class="g1-status-card" id="g1-card-bias">
-    <div class="sc-title"><span class="sc-emoji">🧭</span> 大盤方向</div>
-    <div class="sc-input">
-      <select id="g1-bias" onchange="g1Update()">
-        <option value="">— 請選擇 —</option>
-        <option value="bullish">📈 偏多 (Bullish)</option>
-        <option value="bearish">📉 偏空 (Bearish)</option>
-        <option value="neutral">➡️ 中性 (Neutral)</option>
-      </select>
-    </div>
-    <div class="sc-hint">SPX/QQQ 技術面方向</div>
-  </div>
-  <div class="g1-status-card" id="g1-card-ivr">
-    <div class="sc-title"><span class="sc-emoji">📊</span> IVR 區間</div>
-    <div class="sc-input">
-      <input type="number" id="g1-ivr" min="0" max="100" placeholder="輸入 IVR %" oninput="g1Update()">
-    </div>
-    <div class="sc-hint">27以下=進攻為主 | 27-45=收租理想 | 45+=高波</div>
-  </div>
-  <div class="g1-status-card" id="g1-card-event">
-    <div class="sc-title"><span class="sc-emoji">⚡</span> 事件風險</div>
-    <div class="g1-toggle-group" id="g1-event-toggle">
-      <button class="g1-toggle-btn" data-val="false" onclick="g1SetToggle('event','false',this)">無</button>
-      <button class="g1-toggle-btn" data-val="true" onclick="g1SetToggle('event','true',this)">有</button>
-    </div>
-    <div class="sc-hint">FOMC / CPI / 財報週</div>
-  </div>
-  <div class="g1-status-card" id="g1-card-liquidity">
-    <div class="sc-title"><span class="sc-emoji">💧</span> 流動性</div>
-    <div class="g1-toggle-group" id="g1-liq-toggle">
-      <button class="g1-toggle-btn" data-val="true" onclick="g1SetToggle('liquidity','true',this)">充足</button>
-      <button class="g1-toggle-btn" data-val="false" onclick="g1SetToggle('liquidity','false',this)">不足</button>
-    </div>
-    <div class="sc-hint">OI > 500, Spread < $0.10</div>
-  </div>
-</div>
-
-    <span>B 訊號輸入與自動判斷</span>
+    <span>📋 訊號輸入與自動判斷</span>
     <span class="sp-arrow">▼</span>
   </button>
   <div class="sp-body" id="sp-body">
@@ -1007,7 +966,52 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="regime-card"><div class="regime-label">標的</div><div class="regime-name" style="color:var(--color-orange)">個股</div><div class="regime-tags"><span class="rt tag-ic">IC_EQUITY</span><span class="rt tag-bpcs">BPCS_EQUITY</span><span class="rt tag-bccs">BCCS_EQUITY</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">收租</div><div class="regime-tags" style="margin-top:var(--space-2)"><span class="rt tag-bcds">BCDS</span><span class="rt tag-bpds">BPDS</span><span class="rt tag-cv">CV</span></div><div style="font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">進攻</div></div>
   <div class="regime-card"><div class="regime-label">主要禁止</div><div class="regime-name" style="color:var(--color-error)">混用規則</div><div class="regime-tags"><span class="rt" style="background:var(--color-error-highlight);color:var(--color-error)">SPX收租模組 ≠ 個股進攻模組</span></div></div>
 </div>
-<div class="info-block note"><p><strong>n8n 對應：</strong>Code node 第一步 <code>pickModule()</code> 根據 <code>strategy</code> + <code>is_index</code> 自動分流：IRON_CONDOR → IC_INDEX / IC_EQUITY、BULL_PUT_CREDIT_SPREAD → BPCS_INDEX / BPCS_EQUITY、BEAR_CALL_CREDIT_SPREAD → BCCS_INDEX / BCCS_EQUITY。若 <code>resolved_module === 'unknown'</code>，<code>module_resolved</code> 為 false，整筆會在 IF node 被濾掉。</p></div>
+
+<!-- 今日市場狀態 + 財報風險 -->
+<div style="margin-top:var(--space-6)">
+<div class="g1-section-title" style="font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-3);display:flex;align-items:center;gap:var(--space-2)">
+  <span style="width:22px;height:22px;border-radius:50%;background:var(--color-gold-highlight);color:var(--color-gold);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">C</span>
+  今日市場狀態
+</div>
+<div class="g1-status-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-3);margin-bottom:var(--space-4)">
+  <div class="g1-status-card" id="g0-card-bias">
+    <div class="sc-title"><span class="sc-emoji">🧭</span> 大盤方向</div>
+    <div class="sc-input">
+      <select id="g0-bias" onchange="g1Update()" style="width:100%;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text);font-size:var(--text-sm)">
+        <option value="">— 請選擇 —</option>
+        <option value="bullish">📈 偏多</option>
+        <option value="bearish">📉 偏空</option>
+        <option value="neutral">➡️ 中性</option>
+      </select>
+    </div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">SPX/QQQ 技術面</div>
+  </div>
+  <div class="g1-status-card" id="g0-card-ivr">
+    <div class="sc-title"><span class="sc-emoji">📊</span> IVR 區間</div>
+    <div class="sc-input">
+      <input type="number" id="g0-ivr" min="0" max="100" placeholder="IVR %" style="width:100%;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text);font-size:var(--text-sm)">
+    </div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">&lt;27 進攻 | 27-45 收租 | &gt;45 高波</div>
+  </div>
+  <div class="g1-status-card" id="g0-card-event">
+    <div class="sc-title"><span class="sc-emoji">⚡</span> 事件風險</div>
+    <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
+      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.nextElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface)">無</button>
+      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.previousElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface)">有</button>
+    </div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">FOMC / CPI / 財報週</div>
+  </div>
+  <div class="g1-status-card" id="g0-card-earnings">
+    <div class="sc-title"><span class="sc-emoji">📅</span> 財報日曆</div>
+    <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
+      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.nextElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface)">無財報</button>
+      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.previousElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-error);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface);color:var(--color-error)">有財報</button>
+    </div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">財報前 2 天不做該標的</div>
+  </div>
+</div>
+</div>
+
 </section>
 <!-- GATE 1-4 簡化版 -->
 <!-- Gate 1 merged into Gate 0 -->
