@@ -1120,7 +1120,20 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 </section>
 <section class="gate" id="gate2" style="display:none">
-<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上逐檔確認 OI、Bid-Ask、Delta、Width</div></div></div>
+<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在券商平台上逐檔確認 OI、Bid-Ask、Delta、Width</div></div></div>
+
+<!-- Broker Selector -->
+<div style="margin-bottom:var(--space-4);padding:var(--space-3);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-lg);border:1px solid var(--color-border)">
+  <div style="font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-2)">🏦 選擇你的券商</div>
+  <div id="broker-selector" style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+    <button class="broker-btn active" data-broker="schwab" onclick="selectBroker('schwab',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-primary);background:var(--color-primary);color:#fff;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟦</span> Schwab / TOS</button>
+    <button class="broker-btn" data-broker="tastytrade" onclick="selectBroker('tastytrade',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟣</span> tastytrade</button>
+    <button class="broker-btn" data-broker="ibkr" onclick="selectBroker('ibkr',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🔴</span> IBKR</button>
+    <button class="broker-btn" data-broker="firstrade" onclick="selectBroker('firstrade',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟢</span> Firstrade</button>
+    <button class="broker-btn" data-broker="webull" onclick="selectBroker('webull',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟠</span> Webull</button>
+  </div>
+  <div id="broker-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">選擇後，下方每檔標的的「開啟選擇權」按鈕會自動切換到你的券商平台</div>
+</div>
 
 <!-- Approved symbols will be injected here -->
 <div id="g2-approved-list" style="margin-bottom:var(--space-4)">
@@ -2912,7 +2925,8 @@ function populateGate2() {
     html += '<div style="display:flex;gap:var(--space-2);flex-wrap:wrap">';
 
     // 1. Schwab Web option chain link
-    html += '<a href="https://client.schwab.com/app/trade/options-chains/' + s.symbol + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer">📊 Schwab 選擇權</a>';
+    var brokerLink = getBrokerOptionLink(s.symbol, selectedBroker);
+    html += '<a href="' + brokerLink.url + '" target="_blank" rel="noopener" class="g2-broker-link" data-symbol="' + s.symbol + '" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer">' + brokerLink.icon + ' ' + brokerLink.label + '</a>';
 
     // 2. Copy TOS symbol to clipboard
     if (tosSymbol) {
@@ -2928,6 +2942,103 @@ function populateGate2() {
   }
   html += '</div>';
   container.innerHTML = html;
+  // Restore saved broker selection
+  restoreSavedBroker();
+}
+
+// === Multi-Broker Support for Gate 2 ===
+var selectedBroker = localStorage.getItem('g2_broker') || 'schwab';
+
+var BROKER_CONFIG = {
+  schwab: {
+    name: 'Schwab / TOS',
+    icon: '🟦',
+    // Schwab web option chain
+    optionUrl: function(sym) { return 'https://client.schwab.com/app/trade/options-chains/' + sym; },
+    label: 'Schwab 選擇權',
+    hint: '開啟 Schwab 網頁版 Option Chain，可直接下單'
+  },
+  tastytrade: {
+    name: 'tastytrade',
+    icon: '🟣',
+    optionUrl: function(sym) { return 'https://trade.tastyworks.com/index.html#/option-chain?symbol=' + sym; },
+    label: 'tastytrade 選擇權',
+    hint: '開啟 tastytrade 網頁版 Option Chain'
+  },
+  ibkr: {
+    name: 'IBKR',
+    icon: '🔴',
+    // IBKR Client Portal
+    optionUrl: function(sym) { return 'https://portal.interactivebrokers.com/portal/#/option-chain?symbol=' + sym; },
+    label: 'IBKR 選擇權',
+    hint: '開啟 IBKR Client Portal Option Chain'
+  },
+  firstrade: {
+    name: 'Firstrade',
+    icon: '🟢',
+    optionUrl: function(sym) { return 'https://invest.firstrade.com/cgi-bin/main#/content/optiontrade/' + sym; },
+    label: 'Firstrade 選擇權',
+    hint: '開啟 Firstrade 網頁版選擇權交易'
+  },
+  webull: {
+    name: 'Webull',
+    icon: '🟠',
+    optionUrl: function(sym) { return 'https://app.webull.com/trade?source=navbar&tickerId=&type=options&symbol=' + sym; },
+    label: 'Webull 選擇權',
+    hint: '開啟 Webull 網頁版選擇權'
+  }
+};
+
+function getBrokerOptionLink(symbol, broker) {
+  var config = BROKER_CONFIG[broker] || BROKER_CONFIG['schwab'];
+  return {
+    url: config.optionUrl(symbol),
+    icon: config.icon,
+    label: config.label
+  };
+}
+
+function selectBroker(broker, btn) {
+  selectedBroker = broker;
+  localStorage.setItem('g2_broker', broker);
+
+  // Update button styles
+  var allBtns = document.querySelectorAll('#broker-selector .broker-btn');
+  allBtns.forEach(function(b) {
+    b.classList.remove('active');
+    b.style.background = 'var(--color-surface)';
+    b.style.color = 'var(--color-text)';
+    b.style.borderColor = 'var(--color-border)';
+  });
+  btn.classList.add('active');
+  btn.style.background = 'var(--color-primary)';
+  btn.style.color = '#fff';
+  btn.style.borderColor = 'var(--color-primary)';
+
+  // Update hint
+  var config = BROKER_CONFIG[broker];
+  var hintEl = document.getElementById('broker-hint');
+  if (hintEl && config) hintEl.textContent = '✅ 已選擇 ' + config.name + ' — ' + config.hint;
+
+  // Update all broker links in cards
+  var links = document.querySelectorAll('.g2-broker-link');
+  links.forEach(function(a) {
+    var sym = a.getAttribute('data-symbol');
+    if (sym) {
+      var info = getBrokerOptionLink(sym, broker);
+      a.href = info.url;
+      a.innerHTML = info.icon + ' ' + info.label;
+    }
+  });
+}
+
+// Restore saved broker on page load
+function restoreSavedBroker() {
+  var saved = localStorage.getItem('g2_broker');
+  if (saved && BROKER_CONFIG[saved]) {
+    var btn = document.querySelector('#broker-selector .broker-btn[data-broker="' + saved + '"]');
+    if (btn) selectBroker(saved, btn);
+  }
 }
 
 // === Bid-Ask Spread Real-time Color Warning ===
