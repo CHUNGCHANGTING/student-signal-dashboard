@@ -888,7 +888,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
         </div>
         <!-- Buttons -->
         <div class="sp-actions">
-          <button class="btn-primary" onclick="analyzeManualForm()">🔍 判斷</button>
+          <button class="btn-primary" onclick="fetchEarningsCalendar().then(function(){analyzeManualForm();updateEarningsUI()})">🔍 判斷</button>
           <button class="btn-secondary" onclick="clearManualForm()">清除</button>
           <button class="btn-secondary" onclick="fillManualExample()">範例：NVDA IC</button>
         </div>
@@ -1763,6 +1763,101 @@ function renderSignalHistory() {
   container.innerHTML = html;
 }
 
+// ═══════════════════════════════════════════════════════════
+// Finnhub 財報日曆自動檢查
+// ═══════════════════════════════════════════════════════════
+var earningsCache = {};
+var earningsCacheTime = 0;
+
+async function fetchEarningsCalendar() {
+  var now = Date.now();
+  if (now - earningsCacheTime < 3600000 && Object.keys(earningsCache).length > 0) return earningsCache;
+  try {
+    var today = new Date().toISOString().slice(0,10);
+    var future = new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
+    var url = 'https://finnhub.io/api/v1/calendar/earnings?from=' + today + '&to=' + future + '&token=d70bb2hr01qtb4ra5aagd70bb2hr01qtb4ra5ab0';
+    var res = await fetch(url);
+    var data = await res.json();
+    earningsCache = {};
+    (data.earningsCalendar || []).forEach(function(e) { earningsCache[e.symbol] = { date: e.date, hour: e.hour || '' }; });
+    earningsCacheTime = now;
+    return earningsCache;
+  } catch(e) { return earningsCache; }
+}
+
+function checkEarningsForSymbol(symbol) {
+  var e = earningsCache[symbol];
+  if (!e) return { has_earnings: false };
+  var earningsDate = new Date(e.date + 'T00:00:00');
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  var daysUntil = Math.ceil((earningsDate - today) / 86400000);
+  return { has_earnings: true, date: e.date, hour: e.hour, days_until: daysUntil, blackout: daysUntil <= 2 };
+}
+
+async function updateEarningsUI() {
+  await fetchEarningsCalendar();
+  var cardEl = document.getElementById('g0-card-earnings');
+  if (!cardEl) return;
+  // Get symbols from current parsed signals
+  var symbols = (parsedLINESignals || []).map(function(s) { return s.symbol; });
+  var earningsSymbols = [];
+  symbols.forEach(function(sym) {
+    var check = checkEarningsForSymbol(sym);
+    if (check.has_earnings) earningsSymbols.push(sym + '(' + check.date + (check.blackout ? ' ⛔' : '') + ')');
+  });
+  var statusEl = cardEl.querySelector('.earnings-status');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.className = 'earnings-status';
+    statusEl.style.cssText = 'font-size:11px;margin-top:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);';
+    cardEl.appendChild(statusEl);
+  }
+  if (earningsSymbols.length > 0) {
+    statusEl.style.background = 'var(--color-error-highlight)';
+    statusEl.style.color = 'var(--color-error)';
+    statusEl.innerHTML = '⚠️ ' + earningsSymbols.join(', ');
+    // Auto-select "有財報" button
+    var btns = cardEl.querySelectorAll('.g1-toggle-btn');
+    if (btns.length >= 2) { btns[0].classList.remove('active'); btns[1].classList.add('active'); }
+  } else {
+    statusEl.style.background = 'var(--color-success-highlight)';
+    statusEl.style.color = 'var(--color-success)';
+    statusEl.innerHTML = '✅ 本週無財報衝突';
+    var btns = cardEl.querySelectorAll('.g1-toggle-btn');
+    if (btns.length >= 2) { btns[0].classList.add('active'); btns[1].classList.remove('active'); }
+  }
+  // Count total earnings this week
+  var total = Object.keys(earningsCache).length;
+  var hint = cardEl.querySelector('.sc-hint');
+  if (hint) hint.textContent = '本週共 ' + total + ' 家財報 | 財報前 2 天不做';
+}
+
+// Auto-fetch earnings calendar on page load
+fetchEarningsCalendar().then(function(cache) {
+  var total = Object.keys(cache).length;
+  var hint = document.querySelector('#g0-card-earnings .sc-hint');
+  if (hint) hint.textContent = '本週共 ' + total + ' 家財報 | Finnhub API 自動更新';
+  var statusEl = document.querySelector('#g0-card-earnings .earnings-status');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.className = 'earnings-status';
+    statusEl.style.cssText = 'font-size:11px;margin-top:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);background:var(--color-success-highlight);color:var(--color-success)';
+    statusEl.textContent = '✅ 貼上信號後自動檢查';
+    document.getElementById('g0-card-earnings').appendChild(statusEl);
+  }
+});
+
+// Hook into signal analysis to auto-check earnings
+var _origAnalyzeAllLINE = typeof analyzeAllLINESignals === 'function' ? analyzeAllLINESignals : null;
+function analyzeAllLINESignalsWithEarnings() {
+  if (_origAnalyzeAllLINE) _origAnalyzeAllLINE();
+  updateEarningsUI();
+}
+
+// Also enhance the judge results table to show earnings warnings
+var _origRiskFilter = typeof riskFilterSP === 'function' ? riskFilterSP : null;
+
 function clearSignalHighlights() {
   document.querySelectorAll('.sp-highlight').forEach(function(el) {
     el.classList.remove('sp-highlight');
@@ -1958,6 +2053,9 @@ function analyzePayload(payload) {
     if (!is_index && name === '個股') card.classList.add('sp-highlight');
   });
 
+  // Check earnings for this symbol
+  fetchEarningsCalendar().then(function(){ updateEarningsUI(); });
+
   // Update summary bar
   var sumMod = document.getElementById('sum-module');
   var sumStr = document.getElementById('sum-strategy');
@@ -2090,7 +2188,7 @@ function renderLINECards(signals) {
   }
   // Add "Analyze All" button
   html += '<div class="line-analyze-all-wrap">';
-  html += '<button class="btn-primary" onclick="analyzeAllLINESignals()">\ud83d\udcca \u5168\u90e8\u5224\u65b7</button>';
+  html += '<button class="btn-primary" onclick="fetchEarningsCalendar().then(function(){analyzeAllLINESignals();updateEarningsUI()})">\ud83d\udcca \u5168\u90e8\u5224\u65b7</button>';
   html += '</div>';
   container.innerHTML = html;
 }
@@ -2161,7 +2259,7 @@ function analyzeAllLINESignals() {
   html += '<h4>\ud83d\udcca \u5168\u90e8\u5224\u65b7\u7d50\u679c</h4>';
   html += '<div style="overflow-x:auto">';
   html += '<table class="line-summary-table">';
-  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>Decision</th></tr></thead>';
+  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>財報</th><th>Decision</th></tr></thead>';
   html += '<tbody>';
   for (var j = 0; j < results.length; j++) {
     var r = results[j];
@@ -2176,6 +2274,11 @@ function analyzeAllLINESignals() {
     html += '<td>' + r.dte + '</td>';
     html += '<td>' + (r.pop * 100).toFixed(1) + '%</td>';
     html += '<td class="' + (r.ev > 0 ? 'val' : r.ev < 0 ? 'val-stop' : '') + '">' + r.ev.toFixed(2) + '</td>';
+    var ec = checkEarningsForSymbol(r.symbol);
+    var earningsCell = ec.has_earnings
+      ? (ec.blackout ? '<span style="color:var(--color-error);font-weight:600">⛔ ' + ec.date + '</span>' : '<span style="color:var(--color-warning)">' + ec.date + '</span>')
+      : '<span style="color:var(--color-success)">✅</span>';
+    html += '<td>' + earningsCell + '</td>';
     html += '<td>' + decBadge + '</td>';
     html += '</tr>';
   }
