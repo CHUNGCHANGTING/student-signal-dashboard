@@ -4372,6 +4372,10 @@ function g4AdminOverride() {
   });
   var btn = document.getElementById('g4-admin-override');
   if (btn) { btn.textContent = '✅ 已解鎖'; btn.disabled = true; btn.style.opacity = '0.5'; }
+  // Also unlock the broker button for admin
+  var brokerBtn = document.getElementById('g4-open-broker-btn');
+  if (brokerBtn) { brokerBtn.style.opacity = '1'; brokerBtn.style.pointerEvents = 'auto'; }
+  window._g4AdminOverridden = true;
 }
 
 function toggleG4Manual(el) {
@@ -4401,9 +4405,9 @@ function updateGate4Progress() {
   var pFill = document.getElementById('gate4-progress-fill');
   if (pText) pText.textContent = done + ' / ' + total;
   if (pFill) pFill.style.width = (total > 0 ? done / total * 100 : 0) + '%';
-  // Unlock broker button when all done
+  // Unlock broker button when all done (or admin overridden)
   var brokerBtn = document.getElementById('g4-open-broker-btn');
-  if (brokerBtn) {
+  if (brokerBtn && !window._g4AdminOverridden) {
     if (done >= total && total > 0) {
       brokerBtn.style.opacity = '1';
       brokerBtn.style.pointerEvents = 'auto';
