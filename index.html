@@ -1131,6 +1131,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     <button class="broker-btn" data-broker="ibkr" onclick="selectBroker('ibkr',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🔴</span> IBKR</button>
     <button class="broker-btn" data-broker="firstrade" onclick="selectBroker('firstrade',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟢</span> Firstrade</button>
     <button class="broker-btn" data-broker="webull" onclick="selectBroker('webull',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟠</span> Webull</button>
+    <button class="broker-btn" data-broker="futu" onclick="selectBroker('futu',this)" style="padding:6px 14px;border-radius:var(--radius-md);border:2px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px"><span>🟡</span> Futu / moomoo</button>
   </div>
   <div id="broker-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">選擇後，下方每檔標的的「開啟選擇權」按鈕會自動切換到你的券商平台</div>
 </div>
@@ -2986,6 +2987,13 @@ var BROKER_CONFIG = {
     optionUrl: function(sym) { return 'https://app.webull.com/trade?source=navbar&tickerId=&type=options&symbol=' + sym; },
     label: 'Webull 選擇權',
     hint: '開啟 Webull 網頁版選擇權'
+  },
+  futu: {
+    name: 'Futu / moomoo',
+    icon: '🟡',
+    optionUrl: function(sym) { return 'https://www.moomoo.com/quote/us/' + sym + '/options-chain'; },
+    label: 'moomoo 選擇權',
+    hint: '開啟 moomoo 網頁版 Option Chain'
   }
 };
 
