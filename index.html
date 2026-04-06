@@ -4318,19 +4318,33 @@ function loadGate4() {
   });
   container.innerHTML = html;
 
-  // Enable manual checks only if all auto-checks pass
+  // Enable manual checks if all auto pass OR admin overridden
   var allAutoPass = autoPassCount === checks.length;
   var isAdmin = document.querySelector('.badge-admin') !== null;
+  var unlocked = allAutoPass || window._g4AdminOverridden;
   var manualItems = document.querySelectorAll('.g4-manual');
   manualItems.forEach(function(el) {
-    el.style.opacity = allAutoPass ? '1' : '0.4';
-    el.style.pointerEvents = allAutoPass ? 'auto' : 'none';
+    el.style.opacity = unlocked ? '1' : '0.4';
+    el.style.pointerEvents = unlocked ? 'auto' : 'none';
   });
 
-  // Show admin override button if not all passed and user is admin
+  // Show admin override button if not all passed and user is admin and not yet overridden
   var overrideBtn = document.getElementById('g4-admin-override');
   if (overrideBtn) {
-    overrideBtn.style.display = (!allAutoPass && isAdmin) ? 'inline-block' : 'none';
+    if (window._g4AdminOverridden) {
+      overrideBtn.style.display = 'inline-block';
+      overrideBtn.textContent = '✅ 已解鎖';
+      overrideBtn.disabled = true;
+      overrideBtn.style.opacity = '0.5';
+    } else {
+      overrideBtn.style.display = (!allAutoPass && isAdmin) ? 'inline-block' : 'none';
+    }
+  }
+
+  // Unlock broker button if admin overridden
+  if (window._g4AdminOverridden) {
+    var brokerBtn = document.getElementById('g4-open-broker-btn');
+    if (brokerBtn) { brokerBtn.style.opacity = '1'; brokerBtn.style.pointerEvents = 'auto'; }
   }
 
   // Update progress
