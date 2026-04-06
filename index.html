@@ -1374,8 +1374,9 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- Order Summary Card -->
 <div id="g4-order-summary" style="margin-top:var(--space-6);padding:var(--space-4);background:var(--color-surface);border:2px solid var(--color-primary);border-radius:var(--radius-lg)"></div>
 <div id="g4-final-action" style="text-align:center;margin-top:var(--space-4)">
-  <button id="g4-open-broker-btn" onclick="g4OpenBroker()" style="padding:var(--space-4) var(--space-8);font-size:var(--text-base);font-weight:700;background:var(--color-success);color:#fff;border:none;border-radius:var(--radius-lg);cursor:pointer;opacity:0.4;pointer-events:none">🚀 開啟券商下單</button>
-  <div style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-2)">完成所有確認後解鎖。點擊後開啟 tastytrade 選擇權頁面，照以下指令下單。</div>
+  <button id="g4-open-broker-btn" onclick="g4DryRun()" style="padding:var(--space-4) var(--space-8);font-size:var(--text-base);font-weight:700;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-lg);cursor:pointer;opacity:0.4;pointer-events:none">🔍 預覽訂單 (Dry Run)</button>
+  <div style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-2)">完成所有確認後解鎖。先預覽訂單內容，確認後再執行實際下單。</div>
+  <div id="g4-order-result" style="margin-top:var(--space-3)"></div>
 </div>
 </section>
 <!-- Live Dashboard -->
@@ -4445,15 +4446,96 @@ function renderOrderSummary() {
   container.innerHTML = html;
 }
 
-function g4OpenBroker() {
+async function g4DryRun() {
   var sig = (g2ApprovedSignals || [])[0];
-  var config = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab'];
-  var sym = sig ? sig.symbol : 'SPY';
-  // tastytrade web trading page with symbol
-  var url = (selectedBroker === 'tastytrade')
-    ? 'https://trade.tastyworks.com/index.html#/option-chain?symbol=' + sym
-    : config.optionUrl(sym);
-  window.open(url, '_blank');
+  if (!sig) { alert('無信號可下單'); return; }
+  var resultEl = document.getElementById('g4-order-result');
+  var btn = document.getElementById('g4-open-broker-btn');
+  btn.disabled = true; btn.textContent = '⏳ 預覽中...';
+  resultEl.innerHTML = '';
+
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tt-place-order', dryRun: true, signal: sig, quantity: 1 })
+    });
+    var data = await resp.json();
+
+    if (data.success) {
+      var bp = data.bpEffect || {};
+      resultEl.innerHTML = '<div style="padding:var(--space-4);background:var(--color-success-highlight);border-radius:var(--radius-md);text-align:left">' +
+        '<div style="font-weight:700;color:var(--color-success);margin-bottom:var(--space-2)">✅ Dry Run 通過！訂單預覽：</div>' +
+        '<div style="font-size:12px">' +
+        '<div>📌 標的：<strong>' + (data.symbol || sig.symbol) + '</strong></div>' +
+        '<div>📦 Legs: ' + (data.legs || []).join(' / ') + '</div>' +
+        '<div>💰 購買力影響: $' + parseFloat(bp['change-in-buying-power'] || 0).toFixed(2) + ' (' + (bp['change-in-buying-power-effect'] || '') + ')</div>' +
+        '<div>🏦 當前 BP: $' + parseFloat(bp['current-buying-power'] || 0).toFixed(2) + ' → 新 BP: $' + parseFloat(bp['new-buying-power'] || 0).toFixed(2) + '</div>' +
+        '</div>' +
+        '<div style="margin-top:var(--space-3);text-align:center">' +
+        '<button onclick="g4Execute()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-base);font-weight:700;background:var(--color-success);color:#fff;border:none;border-radius:var(--radius-lg);cursor:pointer">🚀 確認執行下單</button>' +
+        ' <button onclick="g4Cancel()" style="padding:var(--space-3) var(--space-4);font-size:var(--text-sm);background:var(--color-surface);color:var(--color-text-muted);border:1px solid var(--color-border);border-radius:var(--radius-lg);cursor:pointer">取消</button>' +
+        '</div></div>';
+      btn.textContent = '✅ Dry Run 通過'; btn.disabled = false;
+    } else {
+      resultEl.innerHTML = '<div style="padding:var(--space-4);background:var(--color-error-highlight);border-radius:var(--radius-md)">' +
+        '<div style="font-weight:700;color:var(--color-error)">❌ Dry Run 失敗</div>' +
+        '<div style="font-size:12px;margin-top:var(--space-1)">' + (data.error || 'Unknown error') + '</div>' +
+        (data.bpEffect ? '<div style="font-size:11px;margin-top:var(--space-1)">BP 影響: $' + parseFloat(data.bpEffect['change-in-buying-power']||0).toFixed(2) + '</div>' : '') +
+        '</div>';
+      btn.textContent = '🔍 預覽訂單 (Dry Run)'; btn.disabled = false;
+    }
+  } catch(e) {
+    resultEl.innerHTML = '<div style="color:var(--color-error)">❌ 錯誤: ' + e.message + '</div>';
+    btn.textContent = '🔍 預覽訂單 (Dry Run)'; btn.disabled = false;
+  }
+}
+
+async function g4Execute() {
+  var sig = (g2ApprovedSignals || [])[0];
+  if (!sig) return;
+  var resultEl = document.getElementById('g4-order-result');
+  resultEl.innerHTML = '<div style="text-align:center;padding:var(--space-4);color:var(--color-primary);font-weight:700">⏳ 執行中... 正在送出 Spread 組合單 + 止損單</div>';
+
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tt-place-order', dryRun: false, signal: sig, quantity: 1 })
+    });
+    var data = await resp.json();
+
+    if (data.success && data.stage === 'executed') {
+      var stopMsg = '';
+      if (data.stopLoss) {
+        stopMsg = data.stopLoss.success
+          ? '<div style="margin-top:var(--space-2)">🛑 止損單已設定 (Order #' + data.stopLoss.orderId + ')</div>'
+          : '<div style="margin-top:var(--space-2);color:var(--color-warning)">⚠️ 止損單設定失敗: ' + (data.stopLoss.error || '') + ' — 請手動設定</div>';
+      }
+      resultEl.innerHTML = '<div style="padding:var(--space-4);background:var(--color-success-highlight);border-radius:var(--radius-md)">' +
+        '<div style="font-size:var(--text-lg);font-weight:700;color:var(--color-success)">✅ 下單成功！</div>' +
+        '<div style="font-size:12px;margin-top:var(--space-2)">' +
+        '<div>📌 ' + data.symbol + ' ' + data.strategy + '</div>' +
+        '<div>📝 Order #' + data.orderId + ' (' + data.orderStatus + ')</div>' +
+        '<div>📊 數量: ' + data.quantity + ' 口</div>' +
+        stopMsg +
+        '</div>' +
+        '<div style="margin-top:var(--space-3);text-align:center">' +
+        '<button onclick="loadGate3();showSection(\'live-dashboard\')" style="padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-sm)">📊 查看持倉 Dashboard</button>' +
+        '</div></div>';
+    } else {
+      resultEl.innerHTML = '<div style="padding:var(--space-4);background:var(--color-error-highlight);border-radius:var(--radius-md)">' +
+        '<div style="font-weight:700;color:var(--color-error)">❌ 下單失敗</div>' +
+        '<div style="font-size:12px">' + (data.error || 'Unknown') + '</div></div>';
+    }
+  } catch(e) {
+    resultEl.innerHTML = '<div style="color:var(--color-error)">❌ 錯誤: ' + e.message + '</div>';
+  }
+}
+
+function g4Cancel() {
+  var resultEl = document.getElementById('g4-order-result');
+  resultEl.innerHTML = '';
+  var btn = document.getElementById('g4-open-broker-btn');
+  if (btn) { btn.textContent = '🔍 預覽訂單 (Dry Run)'; btn.disabled = false; }
 }
 
 function g4AdminOverride() {

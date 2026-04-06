@@ -57,6 +57,173 @@ const TT_CLIENT_ID     = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
 const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
 const TT_REFRESH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw';
 
+// === Gate 4: One-click order placement (Spread + Stop Loss) ===
+if (action === 'tt-place-order') {
+  try {
+    const body = inputData.body || {};
+    const dryRun = body.dryRun !== false; // default to dry-run for safety
+    const acct = body.account || '5WZ90854';
+    const signal = body.signal || {};
+    const qty = parseInt(body.quantity) || 1;
+
+    // Parse signal into order legs
+    const symbol = (signal.symbol || '').replace(/[^A-Z]/g, '');
+    const strategy = signal.strategy || '';
+    const orderText = signal.orderText || '';
+    const expiry = signal.expiry || '';
+    const strikes = (orderText.match(/[\d.]+/g) || []).map(Number);
+    if (!symbol || strikes.length < 2 || !expiry) {
+      return [{ json: { success: false, error: 'Missing symbol, strikes, or expiry' } }];
+    }
+
+    // Build OCC symbols (root padded to 6 + YYMMDD + C/P + strike*1000 padded to 8)
+    const root = (symbol + '      ').slice(0, 6);
+    const exp = expiry.replace(/-/g, '').slice(2); // YYMMDD
+    const optType = strategy.includes('PUT') ? 'P' : 'C';
+    const sym1 = root + exp + optType + Math.round(strikes[0] * 1000).toString().padStart(8, '0');
+    const sym2 = root + exp + optType + Math.round(strikes[1] * 1000).toString().padStart(8, '0');
+
+    // Determine leg actions based on strategy
+    let leg1Action, leg2Action, priceEffect;
+    if (strategy.includes('BULL_CALL_DEBIT') || strategy.includes('BEAR_PUT_DEBIT')) {
+      // Debit spread: BUY first strike, SELL second
+      leg1Action = 'Buy to Open';
+      leg2Action = 'Sell to Open';
+      priceEffect = 'Debit';
+    } else if (strategy.includes('BULL_PUT_CREDIT') || strategy.includes('BEAR_CALL_CREDIT')) {
+      // Credit spread: SELL first strike, BUY second
+      leg1Action = 'Sell to Open';
+      leg2Action = 'Buy to Open';
+      priceEffect = 'Credit';
+    } else {
+      return [{ json: { success: false, error: 'Unknown strategy: ' + strategy } }];
+    }
+
+    // Get OAuth token
+    const tokenResp = await this.helpers.httpRequest({
+      method: 'POST', url: 'https://api.tastyworks.com/oauth/token',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-dashboard/1.0' },
+      body: `grant_type=refresh_token&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}&refresh_token=${encodeURIComponent(TT_REFRESH_TOKEN)}`,
+      returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 10000
+    });
+    const tokenData = typeof tokenResp.body === 'string' ? JSON.parse(tokenResp.body) : tokenResp.body;
+    if (!tokenData.access_token) return [{ json: { success: false, error: 'OAuth token failed' } }];
+    const headers = { 'Authorization': 'Bearer ' + tokenData.access_token, 'Content-Type': 'application/json', 'User-Agent': 'chilldove-dashboard/1.0' };
+
+    // Calculate price (use mid from signal or default)
+    const price = parseFloat(body.price || signal.credit || signal.debit || '0');
+
+    // Build order payload
+    const orderPayload = {
+      'time-in-force': 'Day',
+      'order-type': price > 0 ? 'Limit' : 'Market',
+      'price': price > 0 ? price.toFixed(2) : undefined,
+      'price-effect': priceEffect,
+      'legs': [
+        { 'instrument-type': 'Equity Option', 'symbol': sym1, 'action': leg1Action, 'quantity': qty },
+        { 'instrument-type': 'Equity Option', 'symbol': sym2, 'action': leg2Action, 'quantity': qty }
+      ]
+    };
+
+    // Step 1: Dry-run first (always)
+    const dryRunResp = await this.helpers.httpRequest({
+      method: 'POST', url: `https://api.tastyworks.com/accounts/${acct}/orders/dry-run`,
+      headers, body: JSON.stringify(orderPayload),
+      returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 10000
+    });
+    const dryData = typeof dryRunResp.body === 'string' ? JSON.parse(dryRunResp.body) : dryRunResp.body;
+
+    // Check for errors in dry-run
+    if (dryData.error) {
+      const errMsgs = (dryData.error.errors || []).map(e => e.message).join('; ');
+      return [{ json: {
+        success: false,
+        stage: 'dry-run',
+        error: errMsgs || dryData.error.message,
+        bpEffect: dryData.data?.['buying-power-effect'] || null,
+        orderPayload
+      } }];
+    }
+
+    const bpEffect = dryData.data?.['buying-power-effect'] || {};
+
+    // If dry-run only, return here
+    if (dryRun) {
+      return [{ json: {
+        success: true,
+        stage: 'dry-run',
+        message: 'Dry-run passed. Set dryRun=false to execute.',
+        bpEffect,
+        orderPayload,
+        symbol: symbol,
+        legs: [sym1, sym2]
+      } }];
+    }
+
+    // Step 2: Place real order
+    const orderResp = await this.helpers.httpRequest({
+      method: 'POST', url: `https://api.tastyworks.com/accounts/${acct}/orders`,
+      headers, body: JSON.stringify(orderPayload),
+      returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 15000
+    });
+    const orderData = typeof orderResp.body === 'string' ? JSON.parse(orderResp.body) : orderResp.body;
+
+    if (orderData.error) {
+      return [{ json: { success: false, stage: 'order', error: orderData.error.message || JSON.stringify(orderData.error), orderPayload } }];
+    }
+
+    const orderId = orderData.data?.order?.id || null;
+    const orderStatus = orderData.data?.order?.status || 'unknown';
+
+    // Step 3: Set stop-loss order
+    let stopResult = null;
+    const stopPrice = parseFloat(body.stopPrice || signal.stopLoss || 0);
+    if (stopPrice > 0 && orderId) {
+      const stopEffect = priceEffect === 'Debit' ? 'Credit' : 'Debit'; // reverse of entry
+      const stopPayload = {
+        'time-in-force': 'GTC',
+        'order-type': 'Stop Limit',
+        'stop-trigger': stopPrice.toFixed(2),
+        'price': stopPrice.toFixed(2),
+        'price-effect': stopEffect,
+        'legs': [
+          { 'instrument-type': 'Equity Option', 'symbol': sym1, 'action': leg1Action === 'Buy to Open' ? 'Sell to Close' : 'Buy to Close', 'quantity': qty },
+          { 'instrument-type': 'Equity Option', 'symbol': sym2, 'action': leg2Action === 'Sell to Open' ? 'Buy to Close' : 'Sell to Close', 'quantity': qty }
+        ]
+      };
+
+      const stopResp = await this.helpers.httpRequest({
+        method: 'POST', url: `https://api.tastyworks.com/accounts/${acct}/orders`,
+        headers, body: JSON.stringify(stopPayload),
+        returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 10000
+      });
+      const stopData = typeof stopResp.body === 'string' ? JSON.parse(stopResp.body) : stopResp.body;
+      stopResult = {
+        success: !stopData.error,
+        orderId: stopData.data?.order?.id || null,
+        error: stopData.error?.message || null,
+        payload: stopPayload
+      };
+    }
+
+    return [{ json: {
+      success: true,
+      stage: 'executed',
+      orderId,
+      orderStatus,
+      bpEffect,
+      stopLoss: stopResult,
+      symbol,
+      strategy,
+      legs: [sym1, sym2],
+      quantity: qty
+    } }];
+
+  } catch(e) {
+    return [{ json: { success: false, error: e.message } }];
+  }
+}
+
 // === Gate 4: Log check failures to Google Sheet ===
 if (action === 'g4-log-failure') {
   try {
