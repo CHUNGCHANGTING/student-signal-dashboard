@@ -1,3 +1,36 @@
+// === CBOE Option Chain Proxy Route ===
+const inputData = $input.first().json;
+const action = (inputData.body?.action || inputData.query?.action || '').toLowerCase();
+
+if (action === 'cboe-proxy' || action === 'cboe') {
+  const symbol = (inputData.body?.symbol || inputData.query?.symbol || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (!symbol) {
+    return [{ json: { error: 'Missing symbol', options: [] } }];
+  }
+  try {
+    const cboeResp = await this.helpers.httpRequest({
+      method: 'GET',
+      url: `https://cdn.cboe.com/api/global/delayed_quotes/options/${symbol}.json`,
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+      returnFullResponse: true,
+      ignoreHttpStatusErrors: true,
+      timeout: 15000
+    });
+    if (cboeResp.statusCode !== 200) {
+      return [{ json: { error: 'CBOE ' + cboeResp.statusCode, symbol, options: [] } }];
+    }
+    const cboeData = typeof cboeResp.body === 'string' ? JSON.parse(cboeResp.body) : cboeResp.body;
+    const options = (cboeData?.data?.options || []).map(o => ({
+      option: o.option, bid: o.bid, ask: o.ask, delta: o.delta,
+      open_interest: o.open_interest, volume: o.volume, iv: o.iv
+    }));
+    return [{ json: { symbol, count: options.length, options } }];
+  } catch(e) {
+    return [{ json: { error: e.message, symbol, options: [] } }];
+  }
+}
+
+// === Original WF-08 Logic Below ===
 // ============================================================
 // WF-08【持倉同步】Position Sync — Fetch from tastytrade → Serve to Dashboard
 // ============================================================

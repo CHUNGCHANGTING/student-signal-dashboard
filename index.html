@@ -3187,9 +3187,11 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
 
   try {
     var cboeRoot = symbol.replace(/[^A-Z]/g, '');
-    var resp = await fetch('https://cdn.cboe.com/api/global/delayed_quotes/options/' + cboeRoot + '.json');
+    // Use n8n proxy to bypass CORS (CBOE blocks direct browser requests)
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbol=' + cboeRoot);
     var data = await resp.json();
-    var opts = (data && data.data && data.data.options) || [];
+    // Proxy returns { symbol, count, options } directly
+    var opts = (data && data.options) || [];
 
     if (opts.length === 0) {
       if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ CBOE 無數據，請手動輸入'; }
