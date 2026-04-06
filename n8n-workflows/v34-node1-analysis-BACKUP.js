@@ -44,10 +44,8 @@ const DTE_MAX_DEBIT  = 45;
 const DTE_MIN = 14;          // global floor for CBOE indexing
 const DTE_MAX = 45;          // global ceiling for CBOE indexing
 
-const LIQUIDITY_MAX_SPREAD_PCT = 0.10;   // bid-ask spread ≤ 10% (credit)
-const LIQUIDITY_MAX_SPREAD_PCT_DEBIT = 0.15; // debit strategies 容忍度較高
-const LIQUIDITY_MIN_OI         = 500;    // credit strategies
-const LIQUIDITY_MIN_OI_DEBIT   = 100;    // debit strategies OI 門檻較低
+const LIQUIDITY_MAX_SPREAD_PCT = 0.10;   // bid-ask spread ≤ 10 %
+const LIQUIDITY_MIN_OI         = 500;
 const KELLY_MIN                = 0.05;   // 5 %
 
 // ── Delta per strategy (aligned with Notion LV1 + LV2 rules) ──
@@ -456,20 +454,16 @@ function midRT(q) {
 // ─────────────────────────────────────────────────────────────
 // 6.  LIQUIDITY CHECK
 // ─────────────────────────────────────────────────────────────
-function passesLiquidity(opt, isDebit = false) {
+function passesLiquidity(opt) {
   const bid = parseFloat(opt.bid) || 0;
   const ask = parseFloat(opt.ask) || 0;
   const oi  = parseInt(opt.open_interest, 10) || 0;
-  // bid must be > 0 (zero-bid options are illiquid even if ask exists)
+  // Fix: bid must be > 0 (zero-bid options are illiquid even if ask exists)
   if (bid <= 0 || ask <= 0) return false;
   const spreadAbs = ask - bid;
-  const mid = (bid + ask) / 2;
-  const spreadPct = mid > 0 ? spreadAbs / mid : 1;
-  // Adaptive thresholds: debit strategies have lower OI requirement
-  // and spread tolerance scales with mid price (high-price stocks naturally have wider spreads)
-  const maxSpreadPct = isDebit ? LIQUIDITY_MAX_SPREAD_PCT_DEBIT : LIQUIDITY_MAX_SPREAD_PCT;
-  const minOI = isDebit ? LIQUIDITY_MIN_OI_DEBIT : LIQUIDITY_MIN_OI;
-  return spreadPct <= maxSpreadPct && oi >= minOI;
+  const spreadPct = spreadAbs / ask;
+  // Fix: also check absolute spread ≤ $0.15 to catch penny options with 200%+ spread
+  return spreadPct <= LIQUIDITY_MAX_SPREAD_PCT && spreadAbs <= 0.15 && oi >= LIQUIDITY_MIN_OI;
 }
 
 function midPrice(opt) {
@@ -588,10 +582,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           (parseInt(b.open_interest, 10) || 0) - (parseInt(a.open_interest, 10) || 0)
         )[0];
 
-        // Use natural price (sell@bid, buy@ask) as conservative credit estimate
-        const creditNat = (parseFloat(shortPut.bid)||0) - (parseFloat(longPut.ask)||0);
-        const creditMid = midPrice(shortPut) - midPrice(longPut);
-        const credit    = creditNat > 0 ? creditNat : creditMid; // prefer natural, fallback mid
+        const credit   = midPrice(shortPut) - midPrice(longPut);
         if (credit <= 0) continue;
         const width    = shortPut._strike - longPut._strike;
         const maxLoss  = width - credit;
@@ -676,10 +667,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           (parseInt(b.open_interest, 10) || 0) - (parseInt(a.open_interest, 10) || 0)
         )[0];
 
-        // Use natural price (sell@bid, buy@ask) as conservative credit estimate
-        const creditNat = (parseFloat(shortCall.bid)||0) - (parseFloat(longCall.ask)||0);
-        const creditMid = midPrice(shortCall) - midPrice(longCall);
-        const credit    = creditNat > 0 ? creditNat : creditMid; // prefer natural, fallback mid
+        const credit  = midPrice(shortCall) - midPrice(longCall);
         if (credit <= 0) continue;
         const width   = longCall._strike - shortCall._strike;
         const maxLoss = width - credit;
@@ -748,10 +736,10 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
       for (const longCall of calls) {
         const ld = Math.abs(parseFloat(longCall.delta) || 0);
         if (ld < DEBIT_SPREAD_DELTA_MIN || ld > DEBIT_SPREAD_DELTA_MAX) continue;
-        if (!passesLiquidity(longCall, true)) continue; // debit: relaxed OI/spread
+        if (!passesLiquidity(longCall)) continue;
 
         const shortCandidates = calls.filter(c =>
-          c._strike > longCall._strike && passesLiquidity(c, true) // debit
+          c._strike > longCall._strike && passesLiquidity(c)
         );
         if (shortCandidates.length === 0) continue;
 
@@ -760,10 +748,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           (parseInt(b.open_interest, 10) || 0) - (parseInt(a.open_interest, 10) || 0)
         )[0];
 
-        // Conservative debit: buy@ask, sell@bid (worst fill)
-        const debitNat = (parseFloat(longCall.ask)||0) - (parseFloat(shortCall.bid)||0);
-        const debitMid = midPrice(longCall) - midPrice(shortCall);
-        const debit    = debitNat > 0 ? debitNat : debitMid; // prefer natural, fallback mid
+        const debit   = midPrice(longCall) - midPrice(shortCall);
         if (debit <= 0) continue;
         const width   = shortCall._strike - longCall._strike;
         const maxGain = width - debit;
@@ -817,10 +802,10 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
       for (const longPut of puts) {
         const ld = Math.abs(parseFloat(longPut.delta) || 0);
         if (ld < DEBIT_SPREAD_DELTA_MIN || ld > DEBIT_SPREAD_DELTA_MAX) continue;
-        if (!passesLiquidity(longPut, true)) continue; // debit: relaxed OI/spread
+        if (!passesLiquidity(longPut)) continue;
 
         const shortCandidates = puts.filter(p =>
-          p._strike < longPut._strike && passesLiquidity(p, true) // debit
+          p._strike < longPut._strike && passesLiquidity(p)
         );
         if (shortCandidates.length === 0) continue;
 
@@ -828,10 +813,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           (parseInt(b.open_interest, 10) || 0) - (parseInt(a.open_interest, 10) || 0)
         )[0];
 
-        // Conservative debit: buy@ask, sell@bid (worst fill)
-        const debitNat = (parseFloat(longPut.ask)||0) - (parseFloat(shortPut.bid)||0);
-        const debitMid = midPrice(longPut) - midPrice(shortPut);
-        const debit    = debitNat > 0 ? debitNat : debitMid; // prefer natural, fallback mid
+        const debit   = midPrice(longPut) - midPrice(shortPut);
         if (debit <= 0) continue;
         const width   = longPut._strike - shortPut._strike;
         const maxGain = width - debit;
@@ -877,88 +859,70 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
       }
     }
 
-    // ─── Iron Condor: 直接從 option chain 用 IC_DELTA 範圍選 strike ───
-    // Notion LV3: IVR>30, DTE 20-30, Call/Put Delta 0.10~0.15 對稱
+    // ─── Iron Condor = Bear Call + Bull Put on same expiration ───
+    // Event risk: skip income strategies when CPI/FOMC/NFP within 2 days
     if (!hasEconEventRisk && direction === 'neutral'
         && ivr >= IVR_MIN_IC
         && dte >= DTE_MIN_IC && dte <= DTE_MAX_IC) {
+      // Notion: IVR>30, DTE 20-30, Delta ±0.10-0.15
+      // Collect qualifying bear calls and bull puts already computed above
+      // We'll assemble them after the loop by pairing best bear call + best bull put.
+      // (already pushed individually; Iron Condor is an additional entry)
+      const bcSpreads = spreads.filter(s =>
+        s.strategy === 'Bear Call Spread' && s.expDate === expDate
+      );
+      const bpSpreads = spreads.filter(s =>
+        s.strategy === 'Bull Put Spread' && s.expDate === expDate
+      );
 
-      // Find short call: Delta 0.10-0.15 OTM call (above price)
-      const icShortCallCands = calls.filter(c => {
-        const d = Math.abs(parseFloat(c.delta) || 0);
-        return d >= IC_DELTA_MIN && d <= IC_DELTA_MAX && c._strike > underlyingPrice && passesLiquidity(c);
-      });
-      // Find short put: Delta 0.10-0.15 OTM put (below price)
-      const icShortPutCands = puts.filter(p => {
-        const d = Math.abs(parseFloat(p.delta) || 0);
-        return d >= IC_DELTA_MIN && d <= IC_DELTA_MAX && p._strike < underlyingPrice && passesLiquidity(p);
-      });
+      if (bcSpreads.length > 0 && bpSpreads.length > 0) {
+        // best of each by trendScore
+        const bc = [...bcSpreads].sort((a, b) => b.trendScore - a.trendScore)[0];
+        const bp = [...bpSpreads].sort((a, b) => b.trendScore - a.trendScore)[0];
 
-      if (icShortCallCands.length > 0 && icShortPutCands.length > 0) {
-        // Pick best by OI
-        const shortCall = [...icShortCallCands].sort((a,b) => (parseInt(b.open_interest,10)||0) - (parseInt(a.open_interest,10)||0))[0];
-        const shortPut  = [...icShortPutCands].sort((a,b) => (parseInt(b.open_interest,10)||0) - (parseInt(a.open_interest,10)||0))[0];
+        // Verify no strike overlap
+        if (bp.shortStrike < bc.shortStrike) {
+          const combinedCredit  = +(bc.credit + bp.credit).toFixed(4);
+          // Fix: IC maxLoss = wider wing width - combined credit (not max of individual margins)
+          // Bear Call: longStrike > shortStrike; Bull Put: shortStrike > longStrike
+          const callWing = bc.longStrike - bc.shortStrike;
+          const putWing  = bp.shortStrike - bp.longStrike;
+          const wingWidth = Math.max(callWing, putWing);
+          const combinedMaxLoss = +(wingWidth - combinedCredit).toFixed(4);
+          if (combinedMaxLoss <= 0) continue; // sanity check
+          const combinedWinRate = bc.winRate * bp.winRate;         // both expire OTM
+          const combinedEV      = combinedCredit * combinedWinRate
+                                  - combinedMaxLoss * (1 - combinedWinRate);
 
-        // Verify no overlap: shortPut < underlyingPrice < shortCall
-        if (shortPut._strike < shortCall._strike) {
-          // Long wings: next strike out (highest OI, liquid)
-          const longCallCands = calls.filter(c => c._strike > shortCall._strike && passesLiquidity(c));
-          const longPutCands  = puts.filter(p => p._strike < shortPut._strike && passesLiquidity(p));
-
-          if (longCallCands.length > 0 && longPutCands.length > 0) {
-            const longCall = [...longCallCands].sort((a,b) => (parseInt(b.open_interest,10)||0) - (parseInt(a.open_interest,10)||0))[0];
-            const longPut  = [...longPutCands].sort((a,b) => (parseInt(b.open_interest,10)||0) - (parseInt(a.open_interest,10)||0))[0];
-
-            // Credit calculation: natural prices (sell@bid, buy@ask)
-            const putCreditNat  = (parseFloat(shortPut.bid)||0) - (parseFloat(longPut.ask)||0);
-            const callCreditNat = (parseFloat(shortCall.bid)||0) - (parseFloat(longCall.ask)||0);
-            const putCreditMid  = midPrice(shortPut) - midPrice(longPut);
-            const callCreditMid = midPrice(shortCall) - midPrice(longCall);
-            const putCredit  = putCreditNat > 0 ? putCreditNat : putCreditMid;
-            const callCredit = callCreditNat > 0 ? callCreditNat : callCreditMid;
-            const combinedCredit = +(putCredit + callCredit).toFixed(4);
-
-            if (combinedCredit > 0) {
-              const callWing = longCall._strike - shortCall._strike;
-              const putWing  = shortPut._strike - longPut._strike;
-              const wingWidth = Math.max(callWing, putWing);
-              const combinedMaxLoss = +(wingWidth - combinedCredit).toFixed(4);
-
-              if (combinedMaxLoss > 0) {
-                const scDelta = Math.abs(parseFloat(shortCall.delta) || 0);
-                const spDelta = Math.abs(parseFloat(shortPut.delta) || 0);
-                const combinedWinRate = (1 - scDelta) * (1 - spDelta); // both expire OTM
-                const combinedEV = combinedCredit * combinedWinRate - combinedMaxLoss * (1 - combinedWinRate);
-
-                if (combinedEV > 0) {
-                  const k = kelly(combinedWinRate, combinedCredit / combinedMaxLoss);
-                  if (k >= KELLY_MIN) {
-                    const icTs = trendScore({ ev: combinedEV, ivr, directionScore, winRate: combinedWinRate,
-                      spreadPct: 0.05, oi: Math.min(parseInt(shortCall.open_interest,10)||0, parseInt(shortPut.open_interest,10)||0) });
-                    spreads.push({
-                      strategy: 'Iron Condor',
-                      putShortStrike:  shortPut._strike,
-                      putLongStrike:   longPut._strike,
-                      callShortStrike: shortCall._strike,
-                      callLongStrike:  longCall._strike,
-                      expDate, dte,
-                      credit:     combinedCredit,
-                      ev:         +combinedEV.toFixed(4),
-                      kelly:      +k.toFixed(4),
-                      winRate:    +combinedWinRate.toFixed(4),
-                      margin:     +combinedMaxLoss.toFixed(4),
-                      returnRate: +(combinedCredit / combinedMaxLoss).toFixed(4),
-                      takeProfit: +(combinedCredit * 0.5).toFixed(4),
-                      stopLoss:   +(combinedCredit * 2.5).toFixed(4),
-                      shortDelta: +scDelta.toFixed(4),
-                      shortTheta: +(parseFloat(shortCall.theta) || 0).toFixed(4),
-                      shortVega:  +(parseFloat(shortCall.vega) || 0).toFixed(4),
-                      shortGamma: +(parseFloat(shortCall.gamma) || 0).toFixed(4),
-                      trendScore: +icTs.toFixed(4),
-                    });
-                  }
-                }
-              }
+          if (combinedEV > 0) {
+            const k = kelly(combinedWinRate, combinedCredit / combinedMaxLoss);
+            if (k >= KELLY_MIN) {
+              const icTs = (bc.trendScore + bp.trendScore) / 2;
+              spreads.push({
+                strategy: 'Iron Condor',
+                // put side
+                putShortStrike: bp.shortStrike,
+                putLongStrike:  bp.longStrike,
+                // call side
+                callShortStrike: bc.shortStrike,
+                callLongStrike:  bc.longStrike,
+                expDate,
+                dte,
+                credit:     combinedCredit,
+                ev:         +combinedEV.toFixed(4),
+                kelly:      +k.toFixed(4),
+                winRate:    +combinedWinRate.toFixed(4),
+                margin:     +combinedMaxLoss.toFixed(4),
+                returnRate: +(combinedCredit / combinedMaxLoss).toFixed(4),
+                takeProfit: +(combinedCredit * 0.5).toFixed(4),
+                stopLoss:   +(combinedCredit * 2.5).toFixed(4),   // backtest建議: IC credit×2.5（原2.0觸發率27%→20%）
+                // Greeks from short call (primary risk leg)
+                shortDelta: bc.shortDelta,
+                shortTheta: bc.shortTheta,
+                shortVega:  bc.shortVega,
+                shortGamma: bc.shortGamma,
+                trendScore: +icTs.toFixed(4),
+              });
             }
           }
         }
