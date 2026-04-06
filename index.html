@@ -111,7 +111,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 /* Strategy rows */
 .strategy-list { display: flex; flex-direction: column; gap: var(--space-2); }
 .strategy-row { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-surface-2); border: 1px solid var(--color-divider); }
-.strategy-tag { font-size: var(--text-xs); font-weight: 600; padding: 2px var(--space-2); border-radius: 999px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; }
+.strategy-tag { font-size: var(--text-xs); font-weight: 600; padding: 3px var(--space-3); border-radius: 999px; white-space: nowrap; flex-shrink: 0; margin-top: 1px; min-width: 60px; text-align: center; }
 .tag-ic { background: var(--color-primary-highlight); color: var(--color-primary); }
 .tag-bpcs { background: var(--color-success-highlight); color: var(--color-success); }
 .tag-bccs { background: var(--color-error-highlight); color: var(--color-error); }
@@ -948,15 +948,15 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="module-grid" id="module-grid">
   <div class="module-card income"><h3><span class="module-icon income">收</span> 收租模組</h3>
     <div class="strategy-list">
-      <div class="strategy-row"><span class="strategy-tag tag-ic">IC</span><div><div class="strategy-desc">Iron Condor</div><div class="strategy-cond">盤整收租</div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bpcs">BPCS</span><div><div class="strategy-desc">Put Credit Spread</div><div class="strategy-cond">偏多收租</div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bccs">BCCS</span><div><div class="strategy-desc">Call Credit Spread</div><div class="strategy-cond">偏空收租</div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-ic">盤整收租</span><div class="strategy-desc">Iron Condor</div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bpcs">偏多收租</span><div class="strategy-desc">Put Credit Spread</div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bccs">偏空收租</span><div class="strategy-desc">Call Credit Spread</div></div>
     </div>
   </div>
   <div class="module-card offense"><h3><span class="module-icon offense">攻</span> 進攻模組</h3>
     <div class="strategy-list">
-      <div class="strategy-row"><span class="strategy-tag tag-bcds">BCDS</span><div><div class="strategy-desc">Call Debit Spread</div><div class="strategy-cond">偏多進攻</div></div></div>
-      <div class="strategy-row"><span class="strategy-tag tag-bpds">BPDS</span><div><div class="strategy-desc">Put Debit Spread</div><div class="strategy-cond">偏空進攻</div></div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bcds">偏多進攻</span><div class="strategy-desc">Call Debit Spread</div></div>
+      <div class="strategy-row"><span class="strategy-tag tag-bpds">偏空進攻</span><div class="strategy-desc">Put Debit Spread</div></div>
     </div>
   </div>
 </div>
@@ -2152,20 +2152,19 @@ function analyzePayload(payload) {
     if (isOffense && card.classList.contains('offense')) card.classList.add('sp-highlight');
   });
 
-  var stratMap = {
-    'IRON_CONDOR': 'IC',
-    'BULL_PUT_CREDIT_SPREAD': 'BPCS',
-    'BEAR_CALL_CREDIT_SPREAD': 'BCCS',
-    'BULL_CALL_DEBIT_SPREAD': 'BCDS',
-    'BEAR_PUT_DEBIT_SPREAD': 'BPDS',
-    'CREDIT_VERTICAL': 'CV'
+  var stratClassMap = {
+    'IRON_CONDOR': 'tag-ic',
+    'BULL_PUT_CREDIT_SPREAD': 'tag-bpcs',
+    'BEAR_CALL_CREDIT_SPREAD': 'tag-bccs',
+    'BULL_CALL_DEBIT_SPREAD': 'tag-bcds',
+    'BEAR_PUT_DEBIT_SPREAD': 'tag-bpds'
   };
-  var shortTag = stratMap[strategy] || '';
-  if (shortTag) {
+  var tagClass = stratClassMap[strategy] || '';
+  if (tagClass) {
     var stratRows = document.querySelectorAll('#module-grid .strategy-row');
     stratRows.forEach(function(row) {
       var tag = row.querySelector('.strategy-tag');
-      if (tag && tag.textContent.trim() === shortTag) {
+      if (tag && tag.classList.contains(tagClass)) {
         row.classList.add('sp-highlight');
       }
     });
@@ -2418,7 +2417,7 @@ function analyzeAllLINESignals() {
   clearSignalHighlights();
   var income_strats = ['IRON_CONDOR','BULL_PUT_CREDIT_SPREAD','BEAR_CALL_CREDIT_SPREAD','CREDIT_VERTICAL'];
   var debit_strats = ['BULL_CALL_DEBIT_SPREAD','BEAR_PUT_DEBIT_SPREAD'];
-  var stratMap = {'IRON_CONDOR':'IC','BULL_PUT_CREDIT_SPREAD':'BPCS','BEAR_CALL_CREDIT_SPREAD':'BCCS','BULL_CALL_DEBIT_SPREAD':'BCDS','BEAR_PUT_DEBIT_SPREAD':'BPDS','CREDIT_VERTICAL':'CV'};
+  var stratClassMap2 = {'IRON_CONDOR':'tag-ic','BULL_PUT_CREDIT_SPREAD':'tag-bpcs','BEAR_CALL_CREDIT_SPREAD':'tag-bccs','BULL_CALL_DEBIT_SPREAD':'tag-bcds','BEAR_PUT_DEBIT_SPREAD':'tag-bpds'};
   var hasIncome = false, hasOffense = false;
   var approvedStrategies = new Set();
   var firstApproved = null;
@@ -2429,7 +2428,7 @@ function analyzeAllLINESignals() {
       if (!firstApproved) firstApproved = r2;
       if (income_strats.includes(r2.strategy)) hasIncome = true;
       if (debit_strats.includes(r2.strategy)) hasOffense = true;
-      if (stratMap[r2.strategy]) approvedStrategies.add(stratMap[r2.strategy]);
+      if (stratClassMap2[r2.strategy]) approvedStrategies.add(stratClassMap2[r2.strategy]);
     }
   }
 
@@ -2444,7 +2443,7 @@ function analyzeAllLINESignals() {
   var stratRows = document.querySelectorAll('#module-grid .strategy-row');
   stratRows.forEach(function(row) {
     var tag = row.querySelector('.strategy-tag');
-    if (tag && approvedStrategies.has(tag.textContent.trim())) {
+    if (tag && Array.from(tag.classList).some(function(c) { return approvedStrategies.has(c); })) {
       row.classList.add('sp-highlight');
     }
   });
