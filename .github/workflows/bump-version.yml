@@ -1,0 +1,55 @@
+name: Auto-bump version on deploy
+
+on:
+  push:
+    branches: [main]
+    paths: ['index.html']  # Only bump when dashboard changes
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump version.json
+        run: |
+          BUILD=$(date -u +%Y%m%d)
+          # Read current seq, increment
+          if [ -f version.json ]; then
+            CUR_BUILD=$(jq -r '.build' version.json)
+            CUR_SEQ=$(jq -r '.seq' version.json)
+            if [ "$CUR_BUILD" = "$BUILD" ]; then
+              SEQ=$((CUR_SEQ + 1))
+            else
+              SEQ=1
+            fi
+          else
+            SEQ=1
+          fi
+          HASH=$(git rev-parse --short HEAD)
+          echo "{\"version\":\"3.6.0\",\"build\":\"${BUILD}\",\"seq\":${SEQ},\"hash\":\"${HASH}\",\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > version.json
+          cat version.json
+
+      - name: Update build stamp in index.html
+        run: |
+          BUILD=$(jq -r '.build' version.json)
+          SEQ=$(jq -r '.seq' version.json)
+          HASH=$(jq -r '.hash' version.json)
+          # Update build comment
+          sed -i "s|<!-- build:.*-->|<!-- build:v3.6.0-${BUILD}.${SEQ}-${HASH} -->|" index.html
+          # Update CURRENT_BUILD in version-check script so client detects match
+          sed -i "s|var CURRENT_BUILD = '.*';|var CURRENT_BUILD = '${BUILD}.${SEQ}';|" index.html
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json index.html
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: auto-bump version [skip ci]"
+          git push
