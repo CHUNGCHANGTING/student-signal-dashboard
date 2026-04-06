@@ -705,6 +705,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 #user-display-name { font-size: var(--text-xs); font-weight: 500; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge-admin { background: var(--color-purple-highlight); color: var(--color-purple); }
 .badge-student { background: var(--color-primary-highlight); color: var(--color-primary); }
+.badge-visitor { background: var(--color-gold-highlight); color: var(--color-gold); }
 .btn-logout { padding: 2px var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; background: none; }
 .btn-logout:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
 /* === Admin Panel === */
@@ -933,12 +934,12 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="sidebar-section">決策流程</div>
   <button class="nav-item active" onclick="showSection('gate0',this)"><span class="nav-dot gate"></span>第1關　盤前訊號</button>
   <!-- Gate 1 merged into Gate 0 -->
-  <button class="nav-item" onclick="showSection('gate2',this)"><span class="nav-dot gate"></span>第2關　TOS 試算</button>
-  <button class="nav-item" onclick="showSection('gate3',this)"><span class="nav-dot gate"></span>第3關　部位確認</button>
-  <button class="nav-item" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
-  <div class="sidebar-divider"></div>
-  <div class="sidebar-section">即時系統</div>
-  <button class="nav-item" onclick="showSection('live-dashboard',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
+  <button class="nav-item student-only" onclick="showSection('gate2',this)"><span class="nav-dot gate"></span>第2關　TOS 試算</button>
+  <button class="nav-item student-only" onclick="showSection('gate3',this)"><span class="nav-dot gate"></span>第3關　部位確認</button>
+  <button class="nav-item student-only" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
+  <div class="sidebar-divider student-only"></div>
+  <div class="sidebar-section student-only">即時系統</div>
+  <button class="nav-item student-only" onclick="showSection('live-dashboard',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">收租模組</div>
   <button class="nav-item" onclick="showSection('s-ic',this)"><span class="nav-dot income"></span>Iron Condor</button>
@@ -948,9 +949,9 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <button class="nav-item" onclick="showSection('s-bcds',this)"><span class="nav-dot offense"></span>Bull Call Debit Spread</button>
   <button class="nav-item" onclick="showSection('s-bpds',this)"><span class="nav-dot offense"></span>Bear Put Debit Spread</button>
 
-  <div class="sidebar-divider"></div>
-  <div class="sidebar-section">券商設定</div>
-  <div class="sidebar-broker" id="sidebar-broker-badge" onclick="showBrokerSetup()">
+  <div class="sidebar-divider student-only"></div>
+  <div class="sidebar-section student-only">券商設定</div>
+  <div class="sidebar-broker student-only" id="sidebar-broker-badge" onclick="showBrokerSetup()">
     <span class="broker-icon" id="sb-broker-icon">🟦</span>
     <span class="broker-name" id="sb-broker-name">Schwab / TOS</span>
     <span class="broker-change">變更</span>
@@ -1589,7 +1590,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 </section>
 </div><!-- end main-wrapper -->
 <!-- Summary bar -->
-<div class="summary-bar" id="summary-bar">
+<div class="summary-bar student-only" id="summary-bar">
   <div class="summary-item"><div class="summary-key">模組</div><div class="summary-val blue" id="sum-module">—</div></div>
   <div class="summary-item"><div class="summary-key">策略</div><div class="summary-val" id="sum-strategy">—</div></div>
   <div class="summary-item"><div class="summary-key">確認清單</div><div class="summary-val red" id="sum-checks">0 / 8</div></div>
@@ -5073,6 +5074,29 @@ try {
 let currentUser = null;
 let userRole = 'student';
 
+// 訪客權限控制: 隱藏 .student-only 元素，顯示升級提示
+function applyRoleRestrictions() {
+  var isVisitor = (userRole === 'visitor');
+  // 隱藏/顯示學生專屬元素
+  document.querySelectorAll('.student-only').forEach(function(el) {
+    el.style.display = isVisitor ? 'none' : '';
+  });
+  // 訪客升級橫幅
+  var existingBanner = document.getElementById('visitor-upgrade-banner');
+  if (isVisitor && !existingBanner) {
+    var banner = document.createElement('div');
+    banner.id = 'visitor-upgrade-banner';
+    banner.style.cssText = 'padding:var(--space-3) var(--space-4);background:var(--color-gold-highlight);border-bottom:1px solid var(--color-gold);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap;font-size:var(--text-xs)';
+    banner.innerHTML = '<span style="color:var(--color-gold);font-weight:600">' +
+      '✨ 您目前為訪客模式，可瀏覽策略模組。開通學生帳號即可使用即時信號、持倉管理、一鍵下單等完整功能</span>' +
+      '<button onclick="logout();" style="padding:4px 12px;border-radius:var(--radius-sm);border:1px solid var(--color-gold);background:none;color:var(--color-gold);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">切換帳號 / 開通</button>';
+    var mainWrapper = document.getElementById('main-wrapper');
+    if (mainWrapper) mainWrapper.parentElement.insertBefore(banner, mainWrapper);
+  } else if (!isVisitor && existingBanner) {
+    existingBanner.remove();
+  }
+}
+
 async function checkAuth() {
   if (!supabaseClient) { showLogin(); return; }
   try {
@@ -5094,11 +5118,17 @@ async function checkAuth() {
           selectedBroker = cloudBroker;
         }
         showApp();
+        applyRoleRestrictions();
         updateUserDisplay();
       } else if (profile && profile.status !== 'active') {
         showAccessDenied('您的帳號已被停用，請聯絡老師');
       } else {
-        showAccessDenied('帳號尚未開通，請聯絡老師申請權限');
+        // 無 profile = 訪客（LINE 或 Google 登入但未開通）
+        // 讓訪客進入查看策略模組，但限制學生專屬功能
+        userRole = 'visitor';
+        showApp();
+        applyRoleRestrictions();
+        updateUserDisplay();
       }
     } else {
       showLogin();
@@ -5258,8 +5288,10 @@ function updateUserDisplay() {
     userInfo.style.display = 'flex';
     const displayName = currentUser.user_metadata?.full_name || currentUser.email || '';
     nameEl.textContent = displayName;
-    roleEl.textContent = userRole === 'admin' ? '管理員' : '學生';
-    roleEl.className = 'badge ' + (userRole === 'admin' ? 'badge-admin' : 'badge-student');
+    var roleLabels = { admin: '管理員', student: '學生', visitor: '訪客' };
+    var roleClasses = { admin: 'badge-admin', student: 'badge-student', visitor: 'badge-visitor' };
+    roleEl.textContent = roleLabels[userRole] || '學生';
+    roleEl.className = 'badge ' + (roleClasses[userRole] || 'badge-student');
     // Avatar
     const avatarUrl = currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture;
     if (avatarUrl) {
