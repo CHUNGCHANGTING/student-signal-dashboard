@@ -35,6 +35,13 @@ const timeStr = `${twTime.getHours()}:${String(twTime.getMinutes()).padStart(2,'
 // Direction emoji
 const dirEmoji = { bullish: '🟢', bearish: '🔴', neutral: '⚪' };
 const dirLabel = { bullish: '看多', bearish: '看空', neutral: '中性' };
+const stratLabel = {
+  'Bull Put Spread': '【偏多收租】Put Credit Spread',
+  'Bear Call Spread': '【偏空收租】Call Credit Spread',
+  'Bull Call Spread': '【偏多進攻】Call Debit Spread',
+  'Bear Put Spread': '【偏空進攻】Put Debit Spread',
+  'Iron Condor': '【盤整收租】Iron Condor'
+};
 
 // Score and rank symbols
 const ranked = results
@@ -120,10 +127,11 @@ ranked.forEach((sym, idx) => {
     const amount = parseFloat(s.credit || s.debit || 0).toFixed(2);
     const wr = s.winRate ? `勝率${s.winRate}` : '';
 
+    const sLabel = stratLabel[s.strategy] || s.strategy;
     if (s.strategy === 'Iron Condor') {
-      msg += `➡️ IC ${s.shortStrike}\n`;
+      msg += `➡️ ${sLabel} ${s.shortStrike}\n`;
     } else {
-      msg += `➡️ ${s.strategy} ${s.shortStrike}/${s.longStrike}\n`;
+      msg += `➡️ ${sLabel} ${s.shortStrike}/${s.longStrike}\n`;
     }
     msg += `   ${action}$${amount} | EV $${parseFloat(s.ev).toFixed(2)} | Kelly ${s.kelly}\n`;
     msg += `   ${s.dte}DTE | ${wr} | Δ${s.shortDelta || '?'}\n`;
