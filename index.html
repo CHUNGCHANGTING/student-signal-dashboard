@@ -1833,20 +1833,133 @@ async function updateEarningsUI() {
   if (hint) hint.textContent = '本週共 ' + total + ' 家財報 | 財報前 2 天不做';
 }
 
-// Auto-fetch earnings calendar on page load
-fetchEarningsCalendar().then(function(cache) {
-  var total = Object.keys(cache).length;
-  var hint = document.querySelector('#g0-card-earnings .sc-hint');
+// ═══════════════════════════════════════════════════════════
+// 市場狀態全自動化 — 頁面載入時抓取即時數據
+// ═══════════════════════════════════════════════════════════
+var FINNHUB = 'd70bb2hr01qtb4ra5aagd70bb2hr01qtb4ra5ab0';
+
+async function autoFetchMarketStatus() {
+  var cardBias = document.getElementById('g0-card-bias');
+  var cardIvr = document.getElementById('g0-card-ivr');
+  var cardEvent = document.getElementById('g0-card-event');
+  var cardEarnings = document.getElementById('g0-card-earnings');
+
+  // Helper: add/update status line under a card
+  function setCardStatus(card, text, color) {
+    if (!card) return;
+    var el = card.querySelector('.auto-status');
+    if (!el) { el = document.createElement('div'); el.className = 'auto-status'; el.style.cssText = 'font-size:11px;margin-top:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm)'; card.appendChild(el); }
+    el.style.background = color === 'green' ? 'var(--color-success-highlight)' : color === 'red' ? 'var(--color-error-highlight)' : 'var(--color-warning-highlight)';
+    el.style.color = color === 'green' ? 'var(--color-success)' : color === 'red' ? 'var(--color-error)' : 'var(--color-warning)';
+    el.innerHTML = text;
+  }
+
+  // === 1. 大盤方向: SPY + QQQ quote from Finnhub ===
+  try {
+    var [spyRes, qqqRes] = await Promise.all([
+      fetch('https://finnhub.io/api/v1/quote?symbol=SPY&token=' + FINNHUB).then(function(r){return r.json()}),
+      fetch('https://finnhub.io/api/v1/quote?symbol=QQQ&token=' + FINNHUB).then(function(r){return r.json()})
+    ]);
+    var spyPrice = spyRes.c || 0;
+    var spyChange = spyRes.dp || 0;
+    var qqqPrice = qqqRes.c || 0;
+    var qqqChange = qqqRes.dp || 0;
+    var avgChange = (spyChange + qqqChange) / 2;
+
+    var bias = avgChange > 0.3 ? 'bullish' : avgChange < -0.3 ? 'bearish' : 'neutral';
+    var biasLabel = bias === 'bullish' ? '📈 偏多' : bias === 'bearish' ? '📉 偏空' : '➡️ 中性';
+    var biasColor = bias === 'bullish' ? 'green' : bias === 'bearish' ? 'red' : 'yellow';
+
+    // Auto-select the dropdown
+    var sel = document.getElementById('g0-bias');
+    if (sel) sel.value = bias;
+    setCardStatus(cardBias, biasLabel + ' | SPY $' + spyPrice.toFixed(1) + ' (' + (spyChange >= 0 ? '+' : '') + spyChange.toFixed(2) + '%) QQQ ' + (qqqChange >= 0 ? '+' : '') + qqqChange.toFixed(2) + '%', biasColor);
+
+    var hint = cardBias ? cardBias.querySelector('.sc-hint') : null;
+    if (hint) hint.textContent = 'Finnhub 即時報價 | 自動更新';
+  } catch(e) {
+    setCardStatus(cardBias, '⚠️ 報價取得失敗', 'yellow');
+  }
+
+  // === 2. IVR 區間: 用 VIX 近似值 ===
+  // VIX 在 Finnhub 免費版不直接提供，用 ^VIX ETF proxy 或 CBOE quote
+  try {
+    // Try UVXY as VIX proxy, or use SPY implied vol
+    var vixRes = await fetch('https://finnhub.io/api/v1/quote?symbol=VIXY&token=' + FINNHUB).then(function(r){return r.json()});
+    var vixyPrice = vixRes.c || 0;
+    var vixyChange = vixRes.dp || 0;
+    // VIXY tracks VIX short-term futures; rough VIX estimate
+    // Better: use the IVR from signal data when available
+    var ivrEstimate = 0;
+
+    // Also try fetching SPY options implied vol from the signal data
+    if (parsedLINESignals && parsedLINESignals.length > 0) {
+      var totalIvr = 0; var count = 0;
+      parsedLINESignals.forEach(function(s) { if (s.ivr > 0) { totalIvr += s.ivr; count++; } });
+      if (count > 0) ivrEstimate = totalIvr / count;
+    }
+
+    if (ivrEstimate > 0) {
+      var ivrInput = document.getElementById('g0-ivr');
+      if (ivrInput) ivrInput.value = ivrEstimate.toFixed(1);
+      var ivrLabel = ivrEstimate < 27 ? '進攻為主' : ivrEstimate <= 45 ? '收租理想' : '高波動';
+      var ivrColor = ivrEstimate < 27 ? 'yellow' : ivrEstimate <= 45 ? 'green' : 'red';
+      setCardStatus(cardIvr, 'IVR ≈ ' + ivrEstimate.toFixed(1) + '% (' + ivrLabel + ') | 信號平均值', ivrColor);
+    } else if (vixyPrice > 0) {
+      setCardStatus(cardIvr, 'VIXY $' + vixyPrice.toFixed(2) + ' (' + (vixyChange >= 0 ? '+' : '') + vixyChange.toFixed(1) + '%) | 貼上信號後自動計算', 'yellow');
+    } else {
+      setCardStatus(cardIvr, '💡 貼上信號後從 IVR 欄位自動帶入', 'yellow');
+    }
+  } catch(e) {
+    setCardStatus(cardIvr, '💡 貼上信號後從 IVR 欄位自動帶入', 'yellow');
+  }
+
+  // === 3. 事件風險: Finnhub Economic Calendar ===
+  try {
+    var today = new Date().toISOString().slice(0,10);
+    var future = new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
+    var ecoRes = await fetch('https://finnhub.io/api/v1/calendar/economic?from=' + today + '&to=' + future + '&token=' + FINNHUB).then(function(r){return r.json()});
+    var events = (ecoRes.economicCalendar || []).filter(function(e) {
+      if (e.country !== 'US') return false;
+      var ev = (e.event || '').toUpperCase();
+      return ev.includes('FOMC') || ev.includes('CPI') || ev.includes('NFP') || ev.includes('NONFARM') || ev.includes('FED') || ev.includes('INTEREST RATE') || ev.includes('PPI') || ev.includes('RETAIL SALES') || ev.includes('GDP');
+    });
+    var btns = cardEvent ? cardEvent.querySelectorAll('.g1-toggle-btn') : [];
+    if (events.length > 0) {
+      var eventList = events.slice(0,3).map(function(e) { return e.date.slice(5) + ' ' + e.event.substring(0,20); }).join(', ');
+      setCardStatus(cardEvent, '⚠️ ' + eventList, 'red');
+      if (btns.length >= 2) { btns[0].classList.remove('active'); btns[1].classList.add('active'); }
+    } else {
+      setCardStatus(cardEvent, '✅ 本週無重大經濟事件', 'green');
+      if (btns.length >= 2) { btns[0].classList.add('active'); btns[1].classList.remove('active'); }
+    }
+    var hint = cardEvent ? cardEvent.querySelector('.sc-hint') : null;
+    if (hint) hint.textContent = 'Finnhub 經濟日曆 | 自動更新';
+  } catch(e) {
+    setCardStatus(cardEvent, '⚠️ 經濟日曆取得失敗', 'yellow');
+  }
+
+  // === 4. 財報日曆: Already handled by fetchEarningsCalendar ===
+  await fetchEarningsCalendar();
+  var total = Object.keys(earningsCache).length;
+  var hint = cardEarnings ? cardEarnings.querySelector('.sc-hint') : null;
   if (hint) hint.textContent = '本週共 ' + total + ' 家財報 | Finnhub API 自動更新';
-  var statusEl = document.querySelector('#g0-card-earnings .earnings-status');
-  if (!statusEl) {
+  var statusEl = cardEarnings ? cardEarnings.querySelector('.earnings-status') : null;
+  if (!statusEl && cardEarnings) {
     statusEl = document.createElement('div');
     statusEl.className = 'earnings-status';
     statusEl.style.cssText = 'font-size:11px;margin-top:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);background:var(--color-success-highlight);color:var(--color-success)';
     statusEl.textContent = '✅ 貼上信號後自動檢查';
-    document.getElementById('g0-card-earnings').appendChild(statusEl);
+    cardEarnings.appendChild(statusEl);
   }
-});
+}
+
+// Run on page load
+autoFetchMarketStatus();
+
+// Also update IVR when signals are parsed
+var _origParseLINE = typeof parseLINEText === 'function' ? parseLINEText : null;
+
 
 // Hook into signal analysis to auto-check earnings
 var _origAnalyzeAllLINE = typeof analyzeAllLINESignals === 'function' ? analyzeAllLINESignals : null;
@@ -1857,6 +1970,25 @@ function analyzeAllLINESignalsWithEarnings() {
 
 // Also enhance the judge results table to show earnings warnings
 var _origRiskFilter = typeof riskFilterSP === 'function' ? riskFilterSP : null;
+
+function autoUpdateIVRFromSignals() {
+  if (!parsedLINESignals || !parsedLINESignals.length) return;
+  var totalIvr = 0, count = 0;
+  parsedLINESignals.forEach(function(s) { if (s.ivr > 0) { totalIvr += s.ivr; count++; } });
+  if (count === 0) return;
+  var avgIvr = totalIvr / count;
+  var ivrInput = document.getElementById('g0-ivr');
+  if (ivrInput) ivrInput.value = avgIvr.toFixed(1);
+  var card = document.getElementById('g0-card-ivr');
+  if (!card) return;
+  var label = avgIvr < 27 ? '進攻為主' : avgIvr <= 45 ? '收租理想' : '高波動';
+  var color = avgIvr < 27 ? 'yellow' : avgIvr <= 45 ? 'green' : 'red';
+  var el = card.querySelector('.auto-status');
+  if (!el) { el = document.createElement('div'); el.className = 'auto-status'; el.style.cssText = 'font-size:11px;margin-top:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm)'; card.appendChild(el); }
+  el.style.background = color === 'green' ? 'var(--color-success-highlight)' : color === 'red' ? 'var(--color-error-highlight)' : 'var(--color-warning-highlight)';
+  el.style.color = color === 'green' ? 'var(--color-success)' : color === 'red' ? 'var(--color-error)' : 'var(--color-warning)';
+  el.innerHTML = 'IVR ≈ ' + avgIvr.toFixed(1) + '% (' + label + ') | ' + count + ' 檔信號平均';
+}
 
 function clearSignalHighlights() {
   document.querySelectorAll('.sp-highlight').forEach(function(el) {
@@ -2053,8 +2185,10 @@ function analyzePayload(payload) {
     if (!is_index && name === '個股') card.classList.add('sp-highlight');
   });
 
-  // Check earnings for this symbol
+  // Check earnings for this symbol & update market status
   fetchEarningsCalendar().then(function(){ updateEarningsUI(); });
+  // Auto-update IVR from signal data
+  if (typeof autoUpdateIVRFromSignals === 'function') autoUpdateIVRFromSignals();
 
   // Update summary bar
   var sumMod = document.getElementById('sum-module');
