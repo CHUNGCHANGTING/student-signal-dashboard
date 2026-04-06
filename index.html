@@ -414,6 +414,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .g1-toggle-btn:not(:last-child) { border-right: 1px solid var(--color-border); }
 .g1-toggle-btn.active-green { background: var(--color-success); color: #fff; }
 .g1-toggle-btn.active-red { background: var(--color-error); color: #fff; }
+.g1-toggle-btn.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); font-weight: 600; }
 /* Section titles */
 .g1-section-title { font-size: var(--text-base); font-weight: 700; margin-bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-2); letter-spacing: -0.01em; }
 .g1-section-title .g1-st-icon { font-size: var(--text-sm); }
@@ -1814,13 +1815,13 @@ async function updateEarningsUI() {
     statusEl.innerHTML = '⚠️ ' + earningsSymbols.join(', ');
     // Auto-select "有財報" button
     var btns = cardEl.querySelectorAll('.g1-toggle-btn');
-    if (btns.length >= 2) { btns[0].classList.remove('active'); btns[1].classList.add('active'); }
+    if (btns.length >= 2) { btns[0].classList.remove('active'); btns[0].style.background=''; btns[0].style.color=''; btns[1].classList.add('active'); btns[1].style.background='var(--color-error)'; btns[1].style.color='#fff'; btns[1].style.fontWeight='600'; }
   } else {
     statusEl.style.background = 'var(--color-success-highlight)';
     statusEl.style.color = 'var(--color-success)';
     statusEl.innerHTML = '✅ 本週無財報衝突';
     var btns = cardEl.querySelectorAll('.g1-toggle-btn');
-    if (btns.length >= 2) { btns[0].classList.add('active'); btns[1].classList.remove('active'); }
+    if (btns.length >= 2) { btns[0].classList.add('active'); btns[0].style.background='var(--color-success)'; btns[0].style.color='#fff'; btns[0].style.fontWeight='600'; btns[1].classList.remove('active'); btns[1].style.background=''; btns[1].style.color=''; }
   }
   // Count total earnings this week
   var total = Object.keys(earningsCache).length;
@@ -1894,6 +1895,7 @@ async function autoFetchMarketStatus() {
       if (count > 0) ivrEstimate = totalIvr / count;
     }
 
+    // Estimate IVR from VIXY price: VIXY ~$20=low vol, ~$35=medium, ~$50+=high
     if (ivrEstimate > 0) {
       var ivrInput = document.getElementById('g0-ivr');
       if (ivrInput) ivrInput.value = ivrEstimate.toFixed(1);
@@ -1901,9 +1903,16 @@ async function autoFetchMarketStatus() {
       var ivrColor = ivrEstimate < 27 ? 'yellow' : ivrEstimate <= 45 ? 'green' : 'red';
       setCardStatus(cardIvr, 'IVR ≈ ' + ivrEstimate.toFixed(1) + '% (' + ivrLabel + ') | 信號平均值', ivrColor);
     } else if (vixyPrice > 0) {
-      setCardStatus(cardIvr, 'VIXY $' + vixyPrice.toFixed(2) + ' (' + (vixyChange >= 0 ? '+' : '') + vixyChange.toFixed(1) + '%) | 貼上信號後自動計算', 'yellow');
+      // Rough VIX estimate from VIXY: VIXY $33 ≈ VIX 20
+      var estVix = (vixyPrice / 33) * 20;
+      var estIvr = Math.min(100, Math.max(0, (estVix - 12) * (100 / 40))); // Scale 12-52 VIX to 0-100 IVR
+      var ivrInput = document.getElementById('g0-ivr');
+      if (ivrInput) ivrInput.value = estIvr.toFixed(0);
+      var ivrLabel = estIvr < 27 ? '進攻為主' : estIvr <= 45 ? '收租理想' : '高波動';
+      var ivrColor = estIvr < 27 ? 'yellow' : estIvr <= 45 ? 'green' : 'red';
+      setCardStatus(cardIvr, 'IVR ≈ ' + estIvr.toFixed(0) + '% (' + ivrLabel + ') | VIXY $' + vixyPrice.toFixed(1) + ' 估算', ivrColor);
     } else {
-      setCardStatus(cardIvr, '💡 貼上信號後從 IVR 欄位自動帶入', 'yellow');
+      setCardStatus(cardIvr, '💡 貼上信號後自動帶入', 'yellow');
     }
   } catch(e) {
     setCardStatus(cardIvr, '💡 貼上信號後從 IVR 欄位自動帶入', 'yellow');
@@ -1923,10 +1932,10 @@ async function autoFetchMarketStatus() {
     if (events.length > 0) {
       var eventList = events.slice(0,3).map(function(e) { return e.date.slice(5) + ' ' + e.event.substring(0,20); }).join(', ');
       setCardStatus(cardEvent, '⚠️ ' + eventList, 'red');
-      if (btns.length >= 2) { btns[0].classList.remove('active'); btns[1].classList.add('active'); }
+      if (btns.length >= 2) { btns[0].classList.remove('active'); btns[0].style.background=''; btns[1].classList.add('active'); btns[1].style.background='var(--color-error)'; btns[1].style.color='#fff'; btns[1].style.fontWeight='600'; }
     } else {
       setCardStatus(cardEvent, '✅ 本週無重大經濟事件', 'green');
-      if (btns.length >= 2) { btns[0].classList.add('active'); btns[1].classList.remove('active'); }
+      if (btns.length >= 2) { btns[0].classList.add('active'); btns[0].style.background='var(--color-success)'; btns[0].style.color='#fff'; btns[0].style.fontWeight='600'; btns[1].classList.remove('active'); btns[1].style.background=''; btns[1].style.color=''; }
     }
     var hint = cardEvent ? cardEvent.querySelector('.sc-hint') : null;
     if (hint) hint.textContent = 'Finnhub 經濟日曆 | 自動更新';
@@ -1990,6 +1999,18 @@ function clearSignalHighlights() {
     el.classList.remove('sp-highlight');
   });
 }
+
+
+// Module/Strategy 中文對照
+var moduleLabel = { 'income': '收租', 'offense': '進攻', 'unknown': '未知' };
+var strategyLabelMap = {
+  'IRON_CONDOR': '【盤整收租】Iron Condor',
+  'BULL_PUT_CREDIT_SPREAD': '【偏多收租】Put Credit Spread',
+  'BEAR_CALL_CREDIT_SPREAD': '【偏空收租】Call Credit Spread',
+  'BULL_CALL_DEBIT_SPREAD': '【偏多進攻】Call Debit Spread',
+  'BEAR_PUT_DEBIT_SPREAD': '【偏空進攻】Put Debit Spread',
+  'CREDIT_VERTICAL': '【收租】Credit Vertical'
+};
 
 function pickModuleSP(symbol, strategy) {
   var spx_qqq = ['SPX', 'QQQ', '/ES', '/NQ'];
@@ -2188,11 +2209,11 @@ function analyzePayload(payload) {
   var sumMod = document.getElementById('sum-module');
   var sumStr = document.getElementById('sum-strategy');
   if (sumMod) {
-    sumMod.textContent = resolved_module;
+    sumMod.textContent = moduleLabel[resolved_module] || resolved_module;
     sumMod.className = 'summary-val ' + (module_resolved ? 'blue' : 'red');
   }
   if (sumStr) {
-    sumStr.textContent = symbol + ' / ' + strategy;
+    sumStr.textContent = symbol + ' / ' + (strategyLabelMap[strategy] || strategy);
     sumStr.className = 'summary-val ' + (decision === 'approved' ? 'green' : decision === 'blocked' ? 'red' : 'amber');
   }
 }
@@ -2454,11 +2475,11 @@ function analyzeAllLINESignals() {
     var sumStr = document.getElementById('sum-strategy');
     if (sumMod) {
       var mod = firstApproved.module;
-      sumMod.textContent = mod;
+      sumMod.textContent = moduleLabel[mod] || mod;
       sumMod.className = 'summary-val ' + (mod !== 'unknown' ? 'blue' : 'red');
     }
     if (sumStr) {
-      sumStr.textContent = firstApproved.symbol + ' / ' + firstApproved.strategy;
+      sumStr.textContent = firstApproved.symbol + ' / ' + (strategyLabelMap[firstApproved.strategy] || firstApproved.strategy);
       sumStr.className = 'summary-val';
     }
   }
