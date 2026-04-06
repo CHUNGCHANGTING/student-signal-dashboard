@@ -2945,10 +2945,8 @@ function populateGate2() {
     html += '<span>EV: ' + s.ev.toFixed(2) + '</span>';
     html += '</div>';
     html += '<div id="g2-check-' + s.symbol + '" style="margin-top:var(--space-2)">';
-    // Auto-fetch data row + Bid-Ask display
-    html += '<div style="margin-bottom:6px">';
-    html += '<button onclick="autoFetchOptionData(\'' + s.symbol + '\',\'' + s.strategy + '\',\'' + (s.expiry || '') + '\',\'' + (s.orderText || '') + '\')" style="width:100%;padding:6px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer" id="g2-fetch-btn-' + s.symbol + '">⚡ 自動篩選（OI / Delta / Bid-Ask）</button>';
-    html += '</div>';
+    // Status badge (auto-filled by autoFetchAll)
+    html += '<div id="g2-fetch-btn-' + s.symbol + '" style="padding:6px;text-align:center;font-size:12px;font-weight:600;border-radius:var(--radius-md);background:var(--color-surface-alt,rgba(128,128,128,0.05));color:var(--color-text-muted)">⚡ 等待自動篩選...</div>';
     // Auto-fill results area
     html += '<div id="g2-auto-data-' + s.symbol + '" style="display:none;font-size:11px;margin-bottom:6px;padding:6px;background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm)"></div>';
     // Bid-Ask row (auto-filled or manual)
@@ -3293,13 +3291,15 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
     }
     html += '</table>';
 
-    // Summary
+    // Summary + tracking
     if (allOk) {
+      g2FetchResults.passed.push(symbol);
       html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-success-highlight);color:var(--color-success);border-radius:var(--radius-sm);font-weight:600">✅ 結構篩選通過 — OI 充足、流動性合格</div>';
-      html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px">💡 Bid/Ask 為 CBOE 延遲報價（~15min），下單前請開啟券商確認即時價格。權利金可能有 $0.02-0.10 差距。</div>';
+      html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px">💡 Bid/Ask 為延遲報價，下單前請開啟券商確認即時價格</div>';
     } else {
-      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-weight:600">⚠️ 部分條件未達標 — 請留意 OI 或流動性</div>';
-      html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-sm);font-size:10px">⚠️ 此標的流動性或 OI 不足，建議開啟券商仔細確認後再決定是否進場</div>';
+      g2FetchResults.warned.push(symbol);
+      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-sm);font-weight:600">🚫 流動性不足 — 建議跳過此標的</div>';
+      html += '<div style="margin-top:3px;font-size:10px;color:var(--color-text-muted)">OI 或 Bid-Ask 過寬，就算信號通過也難以以合理價格成交</div>';
     }
 
     if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = html; }
@@ -3324,12 +3324,19 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
       updateGate2Progress();
     }
 
+    // Update status badge (not a button anymore)
     if (btn) {
-      btn.textContent = allOk ? '✅ 篩選通過 — 開啟券商確認即時報價' : '⚠️ 篩選完成（有警告）';
-      btn.style.background = allOk ? 'var(--color-success)' : 'var(--color-warning)';
-      btn.disabled = false;
-      // After screening passes, clicking the button opens broker option chain
-      btn.onclick = function() { var config = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab']; window.open(config.optionUrl(symbol), '_blank'); };
+      if (allOk) {
+        btn.style.background = 'var(--color-success-highlight)';
+        btn.style.color = 'var(--color-success)';
+        btn.style.cursor = 'pointer';
+        btn.innerHTML = '✅ 篩選通過 — 點擊開啟券商確認即時報價';
+        btn.onclick = function() { var config = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab']; window.open(config.optionUrl(symbol), '_blank'); };
+      } else {
+        btn.style.background = 'var(--color-warning-highlight)';
+        btn.style.color = 'var(--color-warning)';
+        btn.innerHTML = '⚠️ 流動性不足 — 建議跳過此標的';
+      }
     }
 
   } catch(e) {
@@ -3339,20 +3346,33 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
 }
 
 // Fetch all approved symbols at once
+var g2FetchResults = { passed: [], warned: [], failed: [] };
+
 async function autoFetchAll() {
   var statusText = document.getElementById('g2-auto-status-text');
+  g2FetchResults = { passed: [], warned: [], failed: [] };
   if (statusText) statusText.innerHTML = '⚡ 自動篩選中... (0/' + g2ApprovedSignals.length + ')';
   for (var i = 0; i < g2ApprovedSignals.length; i++) {
     var s = g2ApprovedSignals[i];
     if (statusText) statusText.innerHTML = '⚡ 篩選中 ' + s.symbol + '... (' + (i+1) + '/' + g2ApprovedSignals.length + ')';
     await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '');
-    await new Promise(function(r) { setTimeout(r, 500); });
+    await new Promise(function(r) { setTimeout(r, 300); });
   }
-  // Update status to complete
+  // Summary
   if (statusText) {
     var brokerConfig = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab'];
-    statusText.innerHTML = '✅ 篩選完成 — 已綁定 ' + brokerConfig.icon + ' ' + brokerConfig.name + '，點擊各標的綠色按鈕開啟券商確認即時報價';
-    statusText.style.color = 'var(--color-success)';
+    var p = g2FetchResults.passed.length;
+    var w = g2FetchResults.warned.length;
+    if (p > 0 && w === 0) {
+      statusText.innerHTML = '✅ 全部通過 (' + p + '檔) — 點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name + ' 確認即時報價';
+      statusText.style.color = 'var(--color-success)';
+    } else if (p > 0) {
+      statusText.innerHTML = '✅ ' + p + ' 檔通過，' + w + ' 檔流動性不足建議跳過 — 點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name;
+      statusText.style.color = 'var(--color-success)';
+    } else {
+      statusText.innerHTML = '⚠️ 全部標的流動性不足 — 建議今日觀望或換標的';
+      statusText.style.color = 'var(--color-warning)';
+    }
   }
 }
 

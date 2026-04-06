@@ -1,0 +1,337 @@
+{
+  "updatedAt": "2026-04-06T02:41:25.141Z",
+  "createdAt": "2026-04-05T20:50:28.388Z",
+  "id": "nGYCG2l7JRVP9D6s",
+  "name": "【學生下單】WF-06 Multi-Broker Order",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "student-order",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh06",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "student-order"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// WF-06 v2【多券商下單】Multi-Broker Order Execution\n// Webhook → Broker Switch → OAuth → OTOCO/OTO/Simple → Sheet\n// ============================================================\n// POST /webhook/student-order\n// {\n//   broker: \"tastytrade\" | \"schwab\" | \"ibkr\",  ← NEW\n//   student_id, account_number, refresh_token,\n//   // Schwab/IBKR additional:\n//   client_id, client_secret, account_hash,\n//   // Order data (same for all brokers):\n//   symbol, strategy, legs[], quantity,\n//   limit_price, price_effect,\n//   stop_loss_price, profit_target_price,\n//   ev, kelly, pop, tracking_id, dry_run\n// }\n// ============================================================\n\nlet input;\ntry { const raw = $input.first().json; input = raw.body || raw; }\ncatch (e) { return [{ json: { success: false, error: 'Input read failed: ' + e.message } }]; }\n\nconst brokerName = (input.broker || 'tastytrade').toLowerCase();\nconst { student_id, account_number, refresh_token, client_id, client_secret,\n        account_hash, symbol, strategy, legs, quantity, limit_price, price_effect,\n        stop_loss_price, profit_target_price, ev, kelly, pop, tracking_id } = input;\nconst dry_run = input.dry_run === true || input.dry_run === 'true';\nconst timestamp = new Date().toISOString();\n\n// ─────────────────────────────────────────────────────────────\n// BROKER ADAPTERS (inline for n8n Code Node compatibility)\n// ─────────────────────────────────────────────────────────────\n\nconst TT = {\n  API: 'https://api.tastyworks.com',\n  CID: 'ec8b4453-d7e5-418e-8170-43e9b3e0b460',\n  CSEC: 'b09387c27e0cd0325cae0a910e43fc5f158ca109',\n\n  async getToken(ctx, rt) {\n    const r = await ctx.helpers.httpRequest({ method:'POST', url: this.API+'/oauth/token',\n      headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'chilldove/2.0'},\n      body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(rt)}&client_id=${this.CID}&client_secret=${this.CSEC}` });\n    return r.access_token || r['access-token'];\n  },\n  hdr(t) { return {'Authorization':'Bearer '+t,'Content-Type':'application/json','User-Agent':'chilldove/2.0'}; },\n\n  async order(ctx, t, acct, od) {\n    const h = this.hdr(t);\n    const oLegs = od.legs.map(l => ({'instrument-type':l.instrument_type||'Equity Option','symbol':l.symbol,'action':l.action,'quantity':l.quantity||1}));\n    const cLegs = oLegs.map(l => ({'instrument-type':l['instrument-type'],'symbol':l.symbol,\n      'action':l.action==='Sell to Open'?'Buy to Close':l.action==='Buy to Open'?'Sell to Close':l.action,'quantity':l.quantity}));\n    const cEffect = od.price_effect==='Credit'?'Debit':'Credit';\n\n    if (od.stop_loss_price && od.profit_target_price) {\n      const body = {'type':'OTOCO','trigger-order':{'time-in-force':'Day','order-type':'Limit','price':parseFloat(od.limit_price),'price-effect':od.price_effect,'legs':oLegs},\n        'orders':[{'time-in-force':'GTC','order-type':'Limit','price':parseFloat(od.profit_target_price),'price-effect':cEffect,'legs':cLegs},\n                  {'time-in-force':'GTC','order-type':'Stop','stop-trigger':parseFloat(od.stop_loss_price),'price-effect':cEffect,'legs':cLegs}]};\n      const ep = od.dry_run ? 'complex-orders/dry-run' : 'complex-orders';\n      const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acct}/${ep}`,headers:h,body:JSON.stringify(body),ignoreHttpStatusErrors:true});\n      const d = typeof r==='string'?JSON.parse(r):r;\n      const bp = d?.data?.['buying-power-effect']||{};\n      return {success:!d?.error?.code||od.dry_run, broker:'tastytrade', order_type:'OTOCO', dry_run:od.dry_run,\n        order_id:d?.data?.order?.id||null, status:od.dry_run?'DRY_RUN':'SENT',\n        buying_power_change:bp['change-in-buying-power']||null, margin_req:bp['isolated-order-margin-requirement']||null, is_spread:bp['is-spread']||null, raw:d};\n    }\n    if (od.stop_loss_price) {\n      const body = {'type':'OTO','trigger-order':{'time-in-force':'Day','order-type':'Limit','price':parseFloat(od.limit_price),'price-effect':od.price_effect,'legs':oLegs},\n        'orders':[{'time-in-force':'GTC','order-type':'Stop','stop-trigger':parseFloat(od.stop_loss_price),'price-effect':cEffect,'legs':cLegs}]};\n      const ep = od.dry_run ? 'complex-orders/dry-run' : 'complex-orders';\n      const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acct}/${ep}`,headers:h,body:JSON.stringify(body),ignoreHttpStatusErrors:true});\n      const d = typeof r==='string'?JSON.parse(r):r;\n      return {success:!d?.error?.code||od.dry_run, broker:'tastytrade', order_type:'OTO', dry_run:od.dry_run, raw:d};\n    }\n    const body = {'time-in-force':'Day','order-type':'Limit','price':parseFloat(od.limit_price),'price-effect':od.price_effect,'legs':oLegs};\n    const ep = od.dry_run ? 'orders/dry-run' : 'orders';\n    const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acct}/${ep}`,headers:h,body:JSON.stringify(body),ignoreHttpStatusErrors:true});\n    const d = typeof r==='string'?JSON.parse(r):r;\n    const bp = d?.data?.['buying-power-effect']||{};\n    return {success:!d?.error?.code||od.dry_run, broker:'tastytrade', order_type:'Simple', dry_run:od.dry_run,\n      buying_power_change:bp['change-in-buying-power']||null, margin_req:bp['isolated-order-margin-requirement']||null, raw:d};\n  }\n};\n\nconst SCHWAB = {\n  API: 'https://api.schwabapi.com/trader/v1',\n  TOKEN_URL: 'https://api.schwabapi.com/v1/oauth/token',\n\n  async getToken(ctx, rt, cid, csec) {\n    const ba = Buffer.from(cid+':'+csec).toString('base64');\n    const r = await ctx.helpers.httpRequest({method:'POST',url:this.TOKEN_URL,\n      headers:{'Content-Type':'application/x-www-form-urlencoded','Authorization':'Basic '+ba},\n      body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(rt)});\n    return r.access_token;\n  },\n  hdr(t) { return {'Authorization':'Bearer '+t,'Content-Type':'application/json'}; },\n\n  async order(ctx, t, acctHash, od) {\n    const h = this.hdr(t);\n    const am = {'Sell to Open':'SELL_TO_OPEN','Buy to Open':'BUY_TO_OPEN','Sell to Close':'SELL_TO_CLOSE','Buy to Close':'BUY_TO_CLOSE'};\n    const oLegs = od.legs.map((l,i) => ({orderLegType:'OPTION',legId:i+1,instrument:{symbol:l.symbol,assetType:'OPTION'},instruction:am[l.action]||l.action,quantity:l.quantity||1}));\n    const cLegs = od.legs.map((l,i) => ({orderLegType:'OPTION',legId:i+1,instrument:{symbol:l.symbol,assetType:'OPTION'},\n      instruction:l.action==='Sell to Open'?'BUY_TO_CLOSE':'SELL_TO_CLOSE',quantity:l.quantity||1}));\n\n    let orderBody;\n    if (od.stop_loss_price && od.profit_target_price) {\n      orderBody = {orderType:'LIMIT',session:'NORMAL',duration:'DAY',price:od.limit_price,orderStrategyType:'TRIGGER',\n        orderLegCollection:oLegs, complexOrderStrategyType:'CUSTOM',\n        childOrderStrategies:[\n          {orderType:'LIMIT',session:'NORMAL',duration:'GOOD_TILL_CANCEL',price:od.profit_target_price,orderStrategyType:'SINGLE',orderLegCollection:cLegs},\n          {orderType:'STOP',session:'NORMAL',duration:'GOOD_TILL_CANCEL',stopPrice:od.stop_loss_price,orderStrategyType:'SINGLE',orderLegCollection:cLegs}\n        ]};\n      if (od.dry_run) return {success:true,broker:'schwab',order_type:'BRACKET',dry_run:true,data:orderBody,message:'Schwab: payload validated locally (no dry-run API)'};\n    } else if (od.stop_loss_price) {\n      orderBody = {orderType:'LIMIT',session:'NORMAL',duration:'DAY',price:od.limit_price,orderStrategyType:'TRIGGER',\n        orderLegCollection:oLegs,\n        childOrderStrategies:[{orderType:'STOP',session:'NORMAL',duration:'GOOD_TILL_CANCEL',stopPrice:od.stop_loss_price,orderStrategyType:'SINGLE',orderLegCollection:cLegs}]};\n      if (od.dry_run) return {success:true,broker:'schwab',order_type:'OTO',dry_run:true,data:orderBody};\n    } else {\n      orderBody = {orderType:'LIMIT',session:'NORMAL',duration:'DAY',price:od.limit_price,orderStrategyType:'SINGLE',orderLegCollection:oLegs};\n      if (od.dry_run) return {success:true,broker:'schwab',order_type:'Simple',dry_run:true,data:orderBody};\n    }\n\n    const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acctHash}/orders`,headers:h,body:JSON.stringify(orderBody),returnFullResponse:true,ignoreHttpStatusErrors:true});\n    const oid = r.headers?.location?.split('/').pop()||null;\n    return {success:r.statusCode<300, broker:'schwab', order_type:od.stop_loss_price?'BRACKET':'Simple', order_id:oid, status:r.statusCode<300?'ACCEPTED':'FAILED', raw:r.body};\n  }\n};\n\nconst IBKR = {\n  API: 'https://api.ibkr.com/v1/api',\n\n  async getToken(ctx, rt, cid, csec) {\n    const r = await ctx.helpers.httpRequest({method:'POST',url:this.API.replace('/v1/api','')+'/v1/api/oauth/token',\n      headers:{'Content-Type':'application/x-www-form-urlencoded'},\n      body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(rt)}&client_id=${cid}&client_secret=${csec}`});\n    return r.access_token;\n  },\n  hdr(t) { return {'Authorization':'Bearer '+t,'Content-Type':'application/json'}; },\n\n  async order(ctx, t, acctId, od) {\n    const h = this.hdr(t);\n    // IBKR requires conid — legs must include conid field\n    const orders = od.legs.map(l => ({\n      conid: l.conid || 0, // Must be pre-resolved\n      orderType: 'LMT', price: parseFloat(od.limit_price),\n      side: l.action.includes('Buy') ? 'BUY' : 'SELL',\n      quantity: l.quantity || 1, tif: 'DAY'\n    }));\n\n    if (od.dry_run) return {success:true,broker:'ibkr',order_type:'Simple',dry_run:true,data:orders,message:'IBKR: payload validated locally'};\n\n    const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/iserver/account/${acctId}/orders`,\n      headers:h,body:JSON.stringify({orders}),ignoreHttpStatusErrors:true});\n    return {success:!r?.error, broker:'ibkr', data:r};\n  }\n};\n\n// ─────────────────────────────────────────────────────────────\n// MAIN: Route to correct broker\n// ─────────────────────────────────────────────────────────────\nconst required = ['student_id','account_number','refresh_token','symbol','strategy','legs','limit_price'];\nfor (const f of required) { if (!input[f]) return [{json:{success:false,error:`Missing: ${f}`}}]; }\n\nlet result;\ntry {\n  const orderData = { legs, limit_price, price_effect, stop_loss_price, profit_target_price, dry_run };\n\n  if (brokerName === 'schwab') {\n    if (!client_id || !client_secret) return [{json:{success:false,error:'Schwab requires client_id and client_secret'}}];\n    const acct = account_hash || account_number;\n    const token = await SCHWAB.getToken(this, refresh_token, client_id, client_secret);\n    result = await SCHWAB.order(this, token, acct, orderData);\n\n  } else if (brokerName === 'ibkr') {\n    if (!client_id) return [{json:{success:false,error:'IBKR requires client_id'}}];\n    const token = await IBKR.getToken(this, refresh_token, client_id, client_secret || '');\n    result = await IBKR.order(this, token, account_number, orderData);\n\n  } else {\n    // Default: tastytrade\n    const token = await TT.getToken(this, refresh_token);\n    result = await TT.order(this, token, account_number, orderData);\n  }\n} catch (e) {\n  result = { success: false, broker: brokerName, error: e.message };\n}\n\n// ─────────────────────────────────────────────────────────────\n// Record for Google Sheet\n// ─────────────────────────────────────────────────────────────\nconst record = {\n  timestamp, student_id, account_number, tracking_id: tracking_id || `ORD-${Date.now()}`,\n  broker: brokerName, symbol, strategy, order_type: result.order_type || '',\n  order_id: result.order_id || '', limit_price, price_effect,\n  stop_loss_price: stop_loss_price || '', profit_target_price: profit_target_price || '',\n  quantity, ev: ev || '', kelly: kelly || '', pop: pop || '',\n  status: result.success ? (dry_run ? 'DRY_RUN' : 'SENT') : 'FAILED',\n  dry_run: dry_run ? 'YES' : 'NO', error: result.error || '', legs_json: JSON.stringify(legs)\n};\n\nreturn [{ json: { ...result, student_id, symbol, strategy, tracking_id: record.tracking_id, record, _sheetData: record } }];\n"
+      },
+      "id": "code06",
+      "name": "Execute Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "signal_orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "sheet06",
+      "name": "Write to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        690,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "R7T5tZ42DGFAymM7",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "resp06",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        690,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Order": {
+      "main": [
+        [
+          {
+            "node": "Write to Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+  "activeVersionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+  "versionCounter": 48,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-05T20:50:28.390Z",
+      "createdAt": "2026-04-05T20:50:28.390Z",
+      "role": "workflow:owner",
+      "workflowId": "nGYCG2l7JRVP9D6s",
+      "projectId": "XDZLu6ZcPKkiq9Uq",
+      "project": {
+        "updatedAt": "2026-03-14T06:53:51.790Z",
+        "createdAt": "2026-03-14T06:53:45.726Z",
+        "id": "XDZLu6ZcPKkiq9Uq",
+        "name": "CHILLDOVE   <joseph010409@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-05T21:20:23.827Z",
+    "createdAt": "2026-04-05T21:20:23.827Z",
+    "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+    "workflowId": "nGYCG2l7JRVP9D6s",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "student-order",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wh06",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          250,
+          300
+        ],
+        "webhookId": "student-order"
+      },
+      {
+        "parameters": {
+          "jsCode": "// ============================================================\n// WF-06 v2【多券商下單】Multi-Broker Order Execution\n// Webhook → Broker Switch → OAuth → OTOCO/OTO/Simple → Sheet\n// ============================================================\n// POST /webhook/student-order\n// {\n//   broker: \"tastytrade\" | \"schwab\" | \"ibkr\",  ← NEW\n//   student_id, account_number, refresh_token,\n//   // Schwab/IBKR additional:\n//   client_id, client_secret, account_hash,\n//   // Order data (same for all brokers):\n//   symbol, strategy, legs[], quantity,\n//   limit_price, price_effect,\n//   stop_loss_price, profit_target_price,\n//   ev, kelly, pop, tracking_id, dry_run\n// }\n// ============================================================\n\nlet input;\ntry { const raw = $input.first().json; input = raw.body || raw; }\ncatch (e) { return [{ json: { success: false, error: 'Input read failed: ' + e.message } }]; }\n\nconst brokerName = (input.broker || 'tastytrade').toLowerCase();\nconst { student_id, account_number, refresh_token, client_id, client_secret,\n        account_hash, symbol, strategy, legs, quantity, limit_price, price_effect,\n        stop_loss_price, profit_target_price, ev, kelly, pop, tracking_id } = input;\nconst dry_run = input.dry_run === true || input.dry_run === 'true';\nconst timestamp = new Date().toISOString();\n\n// ─────────────────────────────────────────────────────────────\n// BROKER ADAPTERS (inline for n8n Code Node compatibility)\n// ─────────────────────────────────────────────────────────────\n\nconst TT = {\n  API: 'https://api.tastyworks.com',\n  CID: 'ec8b4453-d7e5-418e-8170-43e9b3e0b460',\n  CSEC: 'b09387c27e0cd0325cae0a910e43fc5f158ca109',\n\n  async getToken(ctx, rt) {\n    const r = await ctx.helpers.httpRequest({ method:'POST', url: this.API+'/oauth/token',\n      headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'chilldove/2.0'},\n      body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(rt)}&client_id=${this.CID}&client_secret=${this.CSEC}` });\n    return r.access_token || r['access-token'];\n  },\n  hdr(t) { return {'Authorization':'Bearer '+t,'Content-Type':'application/json','User-Agent':'chilldove/2.0'}; },\n\n  async order(ctx, t, acct, od) {\n    const h = this.hdr(t);\n    const oLegs = od.legs.map(l => ({'instrument-type':l.instrument_type||'Equity Option','symbol':l.symbol,'action':l.action,'quantity':l.quantity||1}));\n    const cLegs = oLegs.map(l => ({'instrument-type':l['instrument-type'],'symbol':l.symbol,\n      'action':l.action==='Sell to Open'?'Buy to Close':l.action==='Buy to Open'?'Sell to Close':l.action,'quantity':l.quantity}));\n    const cEffect = od.price_effect==='Credit'?'Debit':'Credit';\n\n    if (od.stop_loss_price && od.profit_target_price) {\n      const body = {'type':'OTOCO','trigger-order':{'time-in-force':'Day','order-type':'Limit','price':parseFloat(od.limit_price),'price-effect':od.price_effect,'legs':oLegs},\n        'orders':[{'time-in-force':'GTC','order-type':'Limit','price':parseFloat(od.profit_target_price),'price-effect':cEffect,'legs':cLegs},\n                  {'time-in-force':'GTC','order-type':'Stop','stop-trigger':parseFloat(od.stop_loss_price),'price-effect':cEffect,'legs':cLegs}]};\n      const ep = od.dry_run ? 'complex-orders/dry-run' : 'complex-orders';\n      const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acct}/${ep}`,headers:h,body:JSON.stringify(body),ignoreHttpStatusErrors:true});\n      const d = typeof r==='string'?JSON.parse(r):r;\n      const bp = d?.data?.['buying-power-effect']||{};\n      return {success:!d?.error?.code||od.dry_run, broker:'tastytrade', order_type:'OTOCO', dry_run:od.dry_run,\n        order_id:d?.data?.order?.id||null, status:od.dry_run?'DRY_RUN':'SENT',\n        buying_power_change:bp['change-in-buying-power']||null, margin_req:bp['isolated-order-margin-requirement']||null, is_spread:bp['is-spread']||null, raw:d};\n    }\n    if (od.stop_loss_price) {\n      const body = {'type':'OTO','trigger-order':{'time-in-force':'Day','order-type':'Limit','price':parseFloat(od.limit_price),'price-effect':od.price_effect,'legs':oLegs},\n        'orders':[{'time-in-force':'GTC','order-type':'Stop','stop-trigger':parseFloat(od.stop_loss_price),'price-effect':cEffect,'legs':cLegs}]};\n      const ep = od.dry_run ? 'complex-orders/dry-run' : 'complex-orders';\n      const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acct}/${ep}`,headers:h,body:JSON.stringify(body),ignoreHttpStatusErrors:true});\n      const d = typeof r==='string'?JSON.parse(r):r;\n      return {success:!d?.error?.code||od.dry_run, broker:'tastytrade', order_type:'OTO', dry_run:od.dry_run, raw:d};\n    }\n    const body = {'time-in-force':'Day','order-type':'Limit','price':parseFloat(od.limit_price),'price-effect':od.price_effect,'legs':oLegs};\n    const ep = od.dry_run ? 'orders/dry-run' : 'orders';\n    const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acct}/${ep}`,headers:h,body:JSON.stringify(body),ignoreHttpStatusErrors:true});\n    const d = typeof r==='string'?JSON.parse(r):r;\n    const bp = d?.data?.['buying-power-effect']||{};\n    return {success:!d?.error?.code||od.dry_run, broker:'tastytrade', order_type:'Simple', dry_run:od.dry_run,\n      buying_power_change:bp['change-in-buying-power']||null, margin_req:bp['isolated-order-margin-requirement']||null, raw:d};\n  }\n};\n\nconst SCHWAB = {\n  API: 'https://api.schwabapi.com/trader/v1',\n  TOKEN_URL: 'https://api.schwabapi.com/v1/oauth/token',\n\n  async getToken(ctx, rt, cid, csec) {\n    const ba = Buffer.from(cid+':'+csec).toString('base64');\n    const r = await ctx.helpers.httpRequest({method:'POST',url:this.TOKEN_URL,\n      headers:{'Content-Type':'application/x-www-form-urlencoded','Authorization':'Basic '+ba},\n      body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(rt)});\n    return r.access_token;\n  },\n  hdr(t) { return {'Authorization':'Bearer '+t,'Content-Type':'application/json'}; },\n\n  async order(ctx, t, acctHash, od) {\n    const h = this.hdr(t);\n    const am = {'Sell to Open':'SELL_TO_OPEN','Buy to Open':'BUY_TO_OPEN','Sell to Close':'SELL_TO_CLOSE','Buy to Close':'BUY_TO_CLOSE'};\n    const oLegs = od.legs.map((l,i) => ({orderLegType:'OPTION',legId:i+1,instrument:{symbol:l.symbol,assetType:'OPTION'},instruction:am[l.action]||l.action,quantity:l.quantity||1}));\n    const cLegs = od.legs.map((l,i) => ({orderLegType:'OPTION',legId:i+1,instrument:{symbol:l.symbol,assetType:'OPTION'},\n      instruction:l.action==='Sell to Open'?'BUY_TO_CLOSE':'SELL_TO_CLOSE',quantity:l.quantity||1}));\n\n    let orderBody;\n    if (od.stop_loss_price && od.profit_target_price) {\n      orderBody = {orderType:'LIMIT',session:'NORMAL',duration:'DAY',price:od.limit_price,orderStrategyType:'TRIGGER',\n        orderLegCollection:oLegs, complexOrderStrategyType:'CUSTOM',\n        childOrderStrategies:[\n          {orderType:'LIMIT',session:'NORMAL',duration:'GOOD_TILL_CANCEL',price:od.profit_target_price,orderStrategyType:'SINGLE',orderLegCollection:cLegs},\n          {orderType:'STOP',session:'NORMAL',duration:'GOOD_TILL_CANCEL',stopPrice:od.stop_loss_price,orderStrategyType:'SINGLE',orderLegCollection:cLegs}\n        ]};\n      if (od.dry_run) return {success:true,broker:'schwab',order_type:'BRACKET',dry_run:true,data:orderBody,message:'Schwab: payload validated locally (no dry-run API)'};\n    } else if (od.stop_loss_price) {\n      orderBody = {orderType:'LIMIT',session:'NORMAL',duration:'DAY',price:od.limit_price,orderStrategyType:'TRIGGER',\n        orderLegCollection:oLegs,\n        childOrderStrategies:[{orderType:'STOP',session:'NORMAL',duration:'GOOD_TILL_CANCEL',stopPrice:od.stop_loss_price,orderStrategyType:'SINGLE',orderLegCollection:cLegs}]};\n      if (od.dry_run) return {success:true,broker:'schwab',order_type:'OTO',dry_run:true,data:orderBody};\n    } else {\n      orderBody = {orderType:'LIMIT',session:'NORMAL',duration:'DAY',price:od.limit_price,orderStrategyType:'SINGLE',orderLegCollection:oLegs};\n      if (od.dry_run) return {success:true,broker:'schwab',order_type:'Simple',dry_run:true,data:orderBody};\n    }\n\n    const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/accounts/${acctHash}/orders`,headers:h,body:JSON.stringify(orderBody),returnFullResponse:true,ignoreHttpStatusErrors:true});\n    const oid = r.headers?.location?.split('/').pop()||null;\n    return {success:r.statusCode<300, broker:'schwab', order_type:od.stop_loss_price?'BRACKET':'Simple', order_id:oid, status:r.statusCode<300?'ACCEPTED':'FAILED', raw:r.body};\n  }\n};\n\nconst IBKR = {\n  API: 'https://api.ibkr.com/v1/api',\n\n  async getToken(ctx, rt, cid, csec) {\n    const r = await ctx.helpers.httpRequest({method:'POST',url:this.API.replace('/v1/api','')+'/v1/api/oauth/token',\n      headers:{'Content-Type':'application/x-www-form-urlencoded'},\n      body:`grant_type=refresh_token&refresh_token=${encodeURIComponent(rt)}&client_id=${cid}&client_secret=${csec}`});\n    return r.access_token;\n  },\n  hdr(t) { return {'Authorization':'Bearer '+t,'Content-Type':'application/json'}; },\n\n  async order(ctx, t, acctId, od) {\n    const h = this.hdr(t);\n    // IBKR requires conid — legs must include conid field\n    const orders = od.legs.map(l => ({\n      conid: l.conid || 0, // Must be pre-resolved\n      orderType: 'LMT', price: parseFloat(od.limit_price),\n      side: l.action.includes('Buy') ? 'BUY' : 'SELL',\n      quantity: l.quantity || 1, tif: 'DAY'\n    }));\n\n    if (od.dry_run) return {success:true,broker:'ibkr',order_type:'Simple',dry_run:true,data:orders,message:'IBKR: payload validated locally'};\n\n    const r = await ctx.helpers.httpRequest({method:'POST',url:`${this.API}/iserver/account/${acctId}/orders`,\n      headers:h,body:JSON.stringify({orders}),ignoreHttpStatusErrors:true});\n    return {success:!r?.error, broker:'ibkr', data:r};\n  }\n};\n\n// ─────────────────────────────────────────────────────────────\n// MAIN: Route to correct broker\n// ─────────────────────────────────────────────────────────────\nconst required = ['student_id','account_number','refresh_token','symbol','strategy','legs','limit_price'];\nfor (const f of required) { if (!input[f]) return [{json:{success:false,error:`Missing: ${f}`}}]; }\n\nlet result;\ntry {\n  const orderData = { legs, limit_price, price_effect, stop_loss_price, profit_target_price, dry_run };\n\n  if (brokerName === 'schwab') {\n    if (!client_id || !client_secret) return [{json:{success:false,error:'Schwab requires client_id and client_secret'}}];\n    const acct = account_hash || account_number;\n    const token = await SCHWAB.getToken(this, refresh_token, client_id, client_secret);\n    result = await SCHWAB.order(this, token, acct, orderData);\n\n  } else if (brokerName === 'ibkr') {\n    if (!client_id) return [{json:{success:false,error:'IBKR requires client_id'}}];\n    const token = await IBKR.getToken(this, refresh_token, client_id, client_secret || '');\n    result = await IBKR.order(this, token, account_number, orderData);\n\n  } else {\n    // Default: tastytrade\n    const token = await TT.getToken(this, refresh_token);\n    result = await TT.order(this, token, account_number, orderData);\n  }\n} catch (e) {\n  result = { success: false, broker: brokerName, error: e.message };\n}\n\n// ─────────────────────────────────────────────────────────────\n// Record for Google Sheet\n// ─────────────────────────────────────────────────────────────\nconst record = {\n  timestamp, student_id, account_number, tracking_id: tracking_id || `ORD-${Date.now()}`,\n  broker: brokerName, symbol, strategy, order_type: result.order_type || '',\n  order_id: result.order_id || '', limit_price, price_effect,\n  stop_loss_price: stop_loss_price || '', profit_target_price: profit_target_price || '',\n  quantity, ev: ev || '', kelly: kelly || '', pop: pop || '',\n  status: result.success ? (dry_run ? 'DRY_RUN' : 'SENT') : 'FAILED',\n  dry_run: dry_run ? 'YES' : 'NO', error: result.error || '', legs_json: JSON.stringify(legs)\n};\n\nreturn [{ json: { ...result, student_id, symbol, strategy, tracking_id: record.tracking_id, record, _sheetData: record } }];\n"
+        },
+        "id": "code06",
+        "name": "Execute Order",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          470,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": {
+            "__rl": true,
+            "value": "1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4",
+            "mode": "id"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "signal_orders",
+            "mode": "name"
+          },
+          "columns": {
+            "mappingMode": "autoMapInputData",
+            "value": {}
+          },
+          "options": {}
+        },
+        "id": "sheet06",
+        "name": "Write to Sheet",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.5,
+        "position": [
+          690,
+          200
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "R7T5tZ42DGFAymM7",
+            "name": "Google Sheets OAuth2 API"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($json) }}",
+          "options": {}
+        },
+        "id": "resp06",
+        "name": "Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          690,
+          400
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Execute Order",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Order": {
+        "main": [
+          [
+            {
+              "node": "Write to Sheet",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "CHILLDOVE  ",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-05T21:20:24.051Z",
+        "id": 432,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-05T21:20:24.820Z",
+        "id": 434,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T02:41:25.416Z",
+        "id": 437,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T02:41:25.892Z",
+        "id": 439,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "activated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-05T21:20:23.938Z",
+        "id": 431,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-05T21:20:24.700Z",
+        "id": 433,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T02:41:25.268Z",
+        "id": 436,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      },
+      {
+        "createdAt": "2026-04-06T02:41:25.756Z",
+        "id": 438,
+        "workflowId": "nGYCG2l7JRVP9D6s",
+        "versionId": "ce0ac8ef-eb3f-4adf-b0dd-f05b09bdd8d4",
+        "event": "deactivated",
+        "userId": "d8a06e27-fb9e-46b2-b12b-04131e2d67e3"
+      }
+    ]
+  }
+}
