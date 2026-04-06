@@ -3093,10 +3093,7 @@ function populateGate2() {
     // 1. Schwab Web option chain link
     // Broker link removed — now integrated into the auto-fetch result badge
 
-    // 2. Copy TOS symbol to clipboard
-    if (tosSymbol) {
-      html += '<button onclick="copyToClipboard(\'' + tosSymbol + '\',this)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-surface-alt,#333);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:11px;font-weight:600;cursor:pointer">📋 複製 TOS 代碼</button>';
-    }
+    // TOS symbol button removed — students use tastytrade, not ThinkorSwim
 
     // 3. Quick info chip: strikes + expiry
     html += '<span style="display:inline-flex;align-items:center;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px;font-weight:600">⚡ ' + strikeInfo + ' | ' + (s.expiry || '').slice(5) + '</span>';
@@ -3495,22 +3492,8 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetch
       return;
     }
 
-    // Use pre-fetched tastytrade quotes (batch fetched in autoFetchAll)
+    // Use pre-fetched tastytrade quotes (batch fetched in autoFetchAll, no per-symbol retry)
     var tastyQuotes = preFetchedTastyQuotes || {};
-    if (useTasty && Object.keys(tastyQuotes).length === 0) {
-      // Fallback: fetch individually if batch cache is empty
-      try {
-        var tastySymbols = legs.map(function(leg) {
-          return buildTastyOptionSymbol(cboeRoot, expiry, leg.type, leg.strike);
-        }).filter(function(s) { return !!s; });
-        if (tastySymbols.length > 0) {
-          tastyQuotes = await fetchTastytradeQuotes(tastySymbols);
-        }
-      } catch(tastyErr) {
-        console.log('tastytrade quote fetch failed, falling back to CBOE:', tastyErr.message);
-        useTasty = false;
-      }
-    }
 
     // Look up each leg
     var srcTag = useTasty ? '🟣 即時' : 'CBOE';
@@ -3793,6 +3776,10 @@ async function autoFetchAll() {
       }
     } catch(tastyBatchErr) {
       console.log('Batch tastytrade fetch failed:', tastyBatchErr.message);
+      useTasty = false; // Don't retry per-symbol, use CBOE fallback
+      g2DataSource = 'cboe';
+      if (statusText) statusText.innerHTML = '⚡ tastytrade 不可用，改用 CBOE 篩選...';
+      if (statusSub) statusSub.innerHTML = 'CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）';
     }
   }
 
