@@ -1421,11 +1421,83 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="orders-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
 </section>
 <!-- Strategy detail pages (simplified) -->
-<section class="gate" id="s-ic" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">IC</div><div><div class="gate-title">Iron Condor</div><div class="gate-subtitle">SPX / QQQ 專用 • IVR ≥ 30</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bpcs" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BPCS</div><div><div class="gate-title">Bull Put Credit Spread</div><div class="gate-subtitle">SPX/QQQ • IVR ≥ 27</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bccs" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BCCS</div><div><div class="gate-title">Bear Call Credit Spread</div><div class="gate-subtitle">SPX/QQQ • IVR ≥ 27</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bcds" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-orange-highlight);color:var(--color-orange);font-size:var(--text-xs)">BCDS</div><div><div class="gate-title">Bull Call Debit Spread</div><div class="gate-subtitle">個股 • IV 低到中</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
-<section class="gate" id="s-bpds" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-error-highlight);color:var(--color-error);font-size:var(--text-xs)">BPDS</div><div><div class="gate-title">Bear Put Debit Spread</div><div class="gate-subtitle">個股 • IV 低到中</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
+<section class="gate" id="s-ic" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">IC</div><div><div class="gate-title">Iron Condor　盤整收租</div><div class="gate-subtitle">SPX / QQQ 專用 • IVR ≥ 30 • 方向中性</div></div></div>
+<div class="info-block note" style="margin-bottom:var(--space-3)"><p><strong>適用情境：</strong>市場盤整、無明確方向、IVR 偏高時同時賣 Put 和 Call 兩端收取時間價值</p></div>
+<table class="param-table">
+<tr><th>參數</th><th>設定</th><th>說明</th></tr>
+<tr><td>賣腳 Delta</td><td>0.10 – 0.15</td><td>Put 和 Call 兩端各自的賣腳 Delta</td></tr>
+<tr><td>IVR 門檻</td><td>≥ 30</td><td>IV Rank 越高收到的權利金越多</td></tr>
+<tr><td>DTE</td><td>20 – 30 天</td><td>Theta 衰減最快區間</td></tr>
+<tr><td>Wing Width</td><td>5 – 10 點</td><td>SPX 建議 10、QQQ 建議 5</td></tr>
+<tr><td>止盈</td><td>credit × 50%</td><td>獲利過半即平倉</td></tr>
+<tr><td>止損</td><td>credit × 2.5</td><td>停損是紀律（回測觸發率≈ 20%）</td></tr>
+<tr><td>報酬比</td><td>≥ 1:3</td><td>credit / maxLoss 至少 33%</td></tr>
+</table>
+<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>風控提醒：</strong>同一板塊最多 2 檔，總部位不超過 5 檔。財報 / FOMC / CPI 前 2 天不開新倉。</p></div>
+</section>
+<section class="gate" id="s-bpcs" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BPCS</div><div><div class="gate-title">Bull Put Credit Spread　偏多收租</div><div class="gate-subtitle">SPX / QQQ / 個股 • IVR ≥ 27 • RSI ≥ 50 偏多</div></div></div>
+<div class="info-block note" style="margin-bottom:var(--space-3)"><p><strong>適用情境：</strong>看多或中性偏多時，賣支撐位下方的 Put Spread 收取權利金</p></div>
+<table class="param-table">
+<tr><th>參數</th><th>設定</th><th>說明</th></tr>
+<tr><td>賣腳 Delta</td><td>0.20 – 0.25</td><td>在支撐位下方選擇賣腳</td></tr>
+<tr><td>IVR 門檻</td><td>≥ 27</td><td>IV Rank 越高收租越劃算</td></tr>
+<tr><td>DTE</td><td>14 – 30 天</td><td>Theta 效率最佳區間</td></tr>
+<tr><td>Width</td><td>5 點</td><td>賣腳與買腳差距</td></tr>
+<tr><td>RSI 方向</td><td>≥ 50 = 偏多</td><td>RSI < 50 不做偏多收租</td></tr>
+<tr><td>止盈</td><td>credit × 50%</td><td>獲利過半即平倉</td></tr>
+<tr><td>止損</td><td>credit × 2.0</td><td>停損是紀律（回測觸發率≈ 19%）</td></tr>
+<tr><td>報酬比</td><td>≥ 1:3</td><td>credit / maxLoss 至少 33%</td></tr>
+</table>
+<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>風控提醒：</strong>同一板塊最多 2 檔，總部位不超過 5 檔。財報 / FOMC / CPI 前 2 天不開新倉。</p></div>
+</section>
+<section class="gate" id="s-bccs" style="display:none">
+<div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">BCCS</div><div><div class="gate-title">Bear Call Credit Spread　偏空收租</div><div class="gate-subtitle">SPX / QQQ / 個股 • IVR ≥ 27 • RSI < 50 偏空</div></div></div>
+<div class="info-block note" style="margin-bottom:var(--space-3)"><p><strong>適用情境：</strong>看空或中性偏空時，賣壓力位上方的 Call Spread 收取權利金</p></div>
+<table class="param-table">
+<tr><th>參數</th><th>設定</th><th>說明</th></tr>
+<tr><td>賣腳 Delta</td><td>0.10 – 0.20</td><td>在壓力位上方選擇賣腳</td></tr>
+<tr><td>IVR 門檻</td><td>≥ 27</td><td>IV Rank 越高收租越劃算</td></tr>
+<tr><td>DTE</td><td>14 – 30 天</td><td>Theta 效率最佳區間</td></tr>
+<tr><td>Width</td><td>5 點</td><td>賣腳與買腳差距</td></tr>
+<tr><td>RSI 方向</td><td>< 50 = 偏空</td><td>RSI ≥ 50 不做偏空收租</td></tr>
+<tr><td>止盈</td><td>credit × 50%</td><td>獲利過半即平倉</td></tr>
+<tr><td>止損</td><td>credit × 2.0</td><td>停損是紀律（回測觸發率≈ 19%）</td></tr>
+<tr><td>報酬比</td><td>≥ 1:3</td><td>credit / maxLoss 至少 33%</td></tr>
+</table>
+<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>風控提醒：</strong>同一板塊最多 2 檔，總部位不超過 5 檔。財報 / FOMC / CPI 前 2 天不開新倉。</p></div>
+</section>
+<section class="gate" id="s-bcds" style="display:none">
+<div class="gate-header"><div class="gate-num" style="background:var(--color-orange-highlight);color:var(--color-orange);font-size:var(--text-xs)">BCDS</div><div><div class="gate-title">Bull Call Debit Spread　偏多進攻</div><div class="gate-subtitle">個股 • IVP 20–50 • RSI ≥ 50 看多突破</div></div></div>
+<div class="info-block note" style="margin-bottom:var(--space-3)"><p><strong>適用情境：</strong>看多突破時，IV 偏低，買入受限風險的多頭 Spread，利用方向性走勢獲利</p></div>
+<table class="param-table">
+<tr><th>參數</th><th>設定</th><th>說明</th></tr>
+<tr><td>買腳 Delta</td><td>0.40 – 0.60</td><td>ATM 附近選擇買腳（方向性越強）</td></tr>
+<tr><td>IVP 範圍</td><td>20 – 50</td><td>IV 偏低時買進比較劃算</td></tr>
+<tr><td>DTE</td><td>14 – 45 天</td><td>給方向性走勢足夠時間</td></tr>
+<tr><td>Width</td><td>5 點</td><td>買腳與賣腳差距</td></tr>
+<tr><td>RSI 方向</td><td>≥ 50 = 偏多</td><td>趨勢跟隨，確認多頭動能</td></tr>
+<tr><td>止盈</td><td>debit × 2.0</td><td>獲利 100% 即平倉</td></tr>
+<tr><td>止損</td><td>debit × 0.5</td><td>停損是紀律（回測觸發率≈ 20%）</td></tr>
+</table>
+<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>風控提醒：</strong>同一板塊最多 2 檔，總部位不超過 5 檔。進攻策略單筆不超過帳戶 2% 風險。</p></div>
+</section>
+<section class="gate" id="s-bpds" style="display:none">
+<div class="gate-header"><div class="gate-num" style="background:var(--color-error-highlight);color:var(--color-error);font-size:var(--text-xs)">BPDS</div><div><div class="gate-title">Bear Put Debit Spread　偏空進攻</div><div class="gate-subtitle">個股 • IVP 20–50 • RSI < 50 看空跌破</div></div></div>
+<div class="info-block note" style="margin-bottom:var(--space-3)"><p><strong>適用情境：</strong>看空跌破時，IV 偏低，買入受限風險的空頭 Spread，利用方向性下跌獲利</p></div>
+<table class="param-table">
+<tr><th>參數</th><th>設定</th><th>說明</th></tr>
+<tr><td>買腳 Delta</td><td>0.40 – 0.60</td><td>ATM 附近選擇買腳（方向性越強）</td></tr>
+<tr><td>IVP 範圍</td><td>20 – 50</td><td>IV 偏低時買進比較劃算</td></tr>
+<tr><td>DTE</td><td>14 – 45 天</td><td>給方向性走勢足夠時間</td></tr>
+<tr><td>Width</td><td>5 點</td><td>買腳與賣腳差距</td></tr>
+<tr><td>RSI 方向</td><td>< 50 = 偏空</td><td>趨勢跟隨，確認空頭動能</td></tr>
+<tr><td>止盈</td><td>debit × 2.0</td><td>獲利 100% 即平倉</td></tr>
+<tr><td>止損</td><td>debit × 0.5</td><td>停損是紀律（回測觸發率≈ 20%）</td></tr>
+</table>
+<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>風控提醒：</strong>同一板塊最多 2 檔，總部位不超過 5 檔。進攻策略單筆不超過帳戶 2% 風險。</p></div>
+</section>
 <section class="gate" id="s-cv" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-gold-highlight);color:var(--color-gold);font-size:var(--text-xs)">CV</div><div><div class="gate-title">Credit Vertical（次要）</div><div class="gate-subtitle">高 IV 環境專用</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
 
 <!-- Admin Panel -->
