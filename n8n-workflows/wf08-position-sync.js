@@ -182,11 +182,11 @@ if (action === 'tt-place-order') {
     // Auto-calculate stop price if not provided
     if (stopPrice <= 0 && limitPrice > 0) {
       if (strategy.includes('IRON')) {
-        stopPrice = limitPrice * 2.0; // IC: 2× credit
+        stopPrice = limitPrice * 2.5; // IC: 2.5× credit (backtest建議)
       } else if (priceEffect === 'Credit') {
-        stopPrice = limitPrice * 1.3; // Credit spread: 1.3× credit
+        stopPrice = limitPrice * 2.0; // Credit spread: 2.0× credit (backtest建議)
       } else {
-        stopPrice = limitPrice * 0.7; // Debit spread: 0.7× debit
+        stopPrice = limitPrice * 0.5; // Debit spread: maxLoss×50% (backtest建議)
       }
     }
     if (stopPrice > 0 && orderId) {

@@ -388,7 +388,7 @@ function recalcSpreadWithRealtime(spread, tastyQuotes, ticker) {
       margin:         +combinedMaxLoss.toFixed(4),
       returnRate:     +(combinedCredit / combinedMaxLoss).toFixed(4),
       takeProfit:     +(combinedCredit * 0.5).toFixed(4),
-      stopLoss:       +(combinedCredit * 2.0).toFixed(4),
+      stopLoss:       +(combinedCredit * 2.5).toFixed(4),   // backtest建議: IC credit×2.5
       ev:             +(combinedCredit * spread.winRate - combinedMaxLoss * (1 - spread.winRate)).toFixed(4),
       bidAskSource:   'tastytrade-realtime',
     };
@@ -409,7 +409,7 @@ function recalcSpreadWithRealtime(spread, tastyQuotes, ticker) {
     const width = Math.abs(spread.shortStrike - spread.longStrike);
     const maxLoss = width - credit;
     if (maxLoss <= 0) return null;
-    const stopMult = spread.strategy === 'Iron Condor' ? 2.0 : 1.3;
+    const stopMult = spread.strategy === 'Iron Condor' ? 2.5 : 2.0; // backtest建議: credit×2.0, IC×2.5
     return {
       ...spread,
       credit:       +credit.toFixed(4),
@@ -417,7 +417,7 @@ function recalcSpreadWithRealtime(spread, tastyQuotes, ticker) {
       margin:       +maxLoss.toFixed(4),
       returnRate:   +(credit / maxLoss).toFixed(4),
       takeProfit:   +(credit * 0.5).toFixed(4),
-      stopLoss:     +(credit * 1.3).toFixed(4),
+      stopLoss:     +(credit * 2.0).toFixed(4),   // backtest建議: credit×2.0（原1.3觸發率過高43%→19%）
       ev:           +(credit * spread.winRate - maxLoss * (1 - spread.winRate)).toFixed(4),
       evRange: {
         evBest:  +((parseFloat(qShort.ask)||0) - (parseFloat(qLong.bid)||0)).toFixed(4),
@@ -440,7 +440,7 @@ function recalcSpreadWithRealtime(spread, tastyQuotes, ticker) {
       margin:       +debit.toFixed(4),
       returnRate:   +(maxGain / debit).toFixed(4),
       takeProfit:   +(debit * 2.0).toFixed(4),
-      stopLoss:     +(debit * 0.7).toFixed(4),
+      stopLoss:     +(debit * 0.5).toFixed(4),   // backtest建議: maxLoss×50%（原0.7觸發率84%→~20%）
       ev:           +(maxGain * spread.winRate - debit * (1 - spread.winRate)).toFixed(4),
       bidAskSource: 'tastytrade-realtime',
     };
@@ -637,7 +637,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           margin: +maxLoss.toFixed(4),
           returnRate: +(credit / maxLoss).toFixed(4),
           takeProfit: +(credit * 0.5).toFixed(4),   // 50% credit 止盈
-          stopLoss:   +(credit * 1.3).toFixed(4),   // Notion: credit×1.3 = 虧損30%出場
+          stopLoss:   +(credit * 2.0).toFixed(4),   // backtest建議: credit×2.0（原1.3觸發率43%→19%）
           shortDelta: +(parseFloat(shortPut.delta) || 0).toFixed(4),
           shortTheta: +(parseFloat(shortPut.theta) || 0).toFixed(4),
           shortVega:  +(parseFloat(shortPut.vega)  || 0).toFixed(4),
@@ -718,7 +718,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           margin: +maxLoss.toFixed(4),
           returnRate: +(credit / maxLoss).toFixed(4),
           takeProfit: +(credit * 0.5).toFixed(4),   // 50% credit 止盈
-          stopLoss:   +(credit * 1.3).toFixed(4),   // Notion: credit×1.3 = 虧損30%出場
+          stopLoss:   +(credit * 2.0).toFixed(4),   // backtest建議: credit×2.0（原1.3觸發率43%→19%）
           shortDelta: +(parseFloat(shortCall.delta) || 0).toFixed(4),
           shortTheta: +(parseFloat(shortCall.theta) || 0).toFixed(4),
           shortVega:  +(parseFloat(shortCall.vega)  || 0).toFixed(4),
@@ -784,7 +784,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           margin: +debit.toFixed(4),
           returnRate: +(maxGain / debit).toFixed(4),
           takeProfit: +(debit * 2.0).toFixed(4),   // 100% gain
-          stopLoss:   +(debit * 0.7).toFixed(4),   // Notion: debit×70% = 虧損30%出場
+          stopLoss:   +(debit * 0.5).toFixed(4),   // backtest建議: maxLoss×50%（原0.7觸發率84%→~20%）
           shortDelta: +(parseFloat(shortCall.delta) || 0).toFixed(4),
           shortTheta: +(parseFloat(shortCall.theta) || 0).toFixed(4),
           shortVega:  +(parseFloat(shortCall.vega)  || 0).toFixed(4),
@@ -849,7 +849,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           margin: +debit.toFixed(4),
           returnRate: +(maxGain / debit).toFixed(4),
           takeProfit: +(debit * 2.0).toFixed(4),   // 100% gain
-          stopLoss:   +(debit * 0.7).toFixed(4),   // Notion: debit×70% = 虧損30%出場
+          stopLoss:   +(debit * 0.5).toFixed(4),   // backtest建議: maxLoss×50%（原0.7觸發率84%→~20%）
           shortDelta: +(parseFloat(shortPut.delta) || 0).toFixed(4),
           shortTheta: +(parseFloat(shortPut.theta) || 0).toFixed(4),
           shortVega:  +(parseFloat(shortPut.vega)  || 0).toFixed(4),
@@ -915,7 +915,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
                 margin:     +combinedMaxLoss.toFixed(4),
                 returnRate: +(combinedCredit / combinedMaxLoss).toFixed(4),
                 takeProfit: +(combinedCredit * 0.5).toFixed(4),
-                stopLoss:   +(combinedCredit * 2.0).toFixed(4),
+                stopLoss:   +(combinedCredit * 2.5).toFixed(4),   // backtest建議: IC credit×2.5（原2.0觸發率27%→20%）
                 // Greeks from short call (primary risk leg)
                 shortDelta: bc.shortDelta,
                 shortTheta: bc.shortTheta,

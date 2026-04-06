@@ -1350,7 +1350,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   </div>
   <div class="check-item g4-manual" onclick="toggleG4Manual(this)" style="opacity:0.4;pointer-events:none" data-key="stoploss">
     <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">我已計算好停損價格</div><div class="check-detail">收租: credit×1.3 / 進攻: debit×0.7 / IC: credit×2.0。下單後立即設定 STPLMT 止損單</div></div>
+    <div class="check-content"><div class="check-label">我已計算好停損價格</div><div class="check-detail">收租: credit×2.0 / 進攻: debit×0.5 / IC: credit×2.5。下單後立即設定 STPLMT 止損單</div></div>
   </div>
   <div class="check-item g4-manual" onclick="toggleG4Manual(this)" style="opacity:0.4;pointer-events:none" data-key="confirm">
     <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -4436,16 +4436,16 @@ function renderOrderSummary() {
     // Calculate stop loss if not provided
     if ((!stopLoss || stopLoss <= 0) && credit > 0) {
       if ((s.strategy || '').includes('IRON')) {
-        stopLoss = credit * 2.0;
+        stopLoss = credit * 2.5;  // backtest建議: IC credit×2.5
       } else if (isCredit) {
-        stopLoss = credit * 1.3;
+        stopLoss = credit * 2.0;  // backtest建議: credit×2.0
       } else {
-        stopLoss = credit * 0.7;
+        stopLoss = credit * 0.5;  // backtest建議: maxLoss×50%
       }
     }
     // If still no stop loss, use a fallback from CBOE mid price
     if ((!stopLoss || stopLoss <= 0) && maxLoss > 0) {
-      stopLoss = isCredit ? (5 - maxLoss) * 1.3 : maxLoss * 0.7;
+      stopLoss = isCredit ? (5 - maxLoss) * 2.0 : maxLoss * 0.5;  // backtest新倍數
     }
 
     html += '<div style="padding:var(--space-3);background:var(--color-primary-highlight);border-radius:var(--radius-md);margin-bottom:var(--space-3)">';
