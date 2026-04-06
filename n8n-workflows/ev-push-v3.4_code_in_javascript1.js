@@ -8,8 +8,8 @@ if ($input.first().json.halted) {
   const d = $input.first().json;
   const haltMsg = `🚨 正EV推播 — 全面暫停\n━━━━━━━━━━━━━━\n\n${d.haltReason}\n\n盤勢狀態: ${d.marketRegime}\nVIX: ${d.vix?.toFixed(1) || 'N/A'}\nSPY方向: ${d.spyDirection || 'N/A'} (score=${d.spyDirScore || 0})\n\n⚠️ 極端恐慌環境，建議觀望不操作`;
   // Push halt notification to LINE + TG
-  const LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';
-  const TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';
+  const LINE_TOKEN = '<LINE_CHANNEL_TOKEN>';
+  const TG_TOKEN = '<TG_BOT_TOKEN>';
   const TG_CHAT = '-1003799249092';
   try { await this.helpers.httpRequest({ method: 'POST', url: 'https://api.line.me/v2/bot/message/broadcast', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_TOKEN }, body: JSON.stringify({ messages: [{ type: 'text', text: haltMsg }] }), returnFullResponse: true, ignoreHttpStatusErrors: true }); } catch(e) {}
   try { await this.helpers.httpRequest({ method: 'POST', url: `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_CHAT, text: haltMsg }) }); } catch(e) {}
@@ -20,8 +20,8 @@ if ($input.first().json.halted) {
   return [{ json: { message: haltMsg, halted: true, version: 'v3.4' } }];
 }
 
-const LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';
-const TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';
+const LINE_TOKEN = '<LINE_CHANNEL_TOKEN>';
+const TG_TOKEN = '<TG_BOT_TOKEN>';
 const TG_CHAT = '-1003799249092';
 
 const data = $input.first().json;

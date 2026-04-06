@@ -56,7 +56,7 @@
 ```json
 {
   "broker": "tastytrade",
-  "account_number": "你的帳號(如5WZ90854)",
+  "account_number": "你的帳號(如5XX00000)",
   "refresh_token": "你的refresh_token"
 }
 ```

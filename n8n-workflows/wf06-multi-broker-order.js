@@ -34,7 +34,7 @@ const timestamp = new Date().toISOString();
 const TT = {
   API: 'https://api.tastyworks.com',
   CID: 'ec8b4453-d7e5-418e-8170-43e9b3e0b460',
-  CSEC: 'b09387c27e0cd0325cae0a910e43fc5f158ca109',
+  CSEC: '<TT_CLIENT_SECRET>',
 
   async getToken(ctx, rt) {
     const r = await ctx.helpers.httpRequest({ method:'POST', url: this.API+'/oauth/token',

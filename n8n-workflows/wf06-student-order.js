@@ -14,7 +14,7 @@
 
 const TT_API = 'https://api.tastyworks.com';
 const TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
-const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
+const TT_CLIENT_SECRET = '<TT_CLIENT_SECRET>';
 const SHEET_ID = '1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4';
 
 const input = $input.first().json;

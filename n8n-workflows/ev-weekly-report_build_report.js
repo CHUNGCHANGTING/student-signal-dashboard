@@ -142,8 +142,8 @@ msg += `\n━━━━━━━━━━━━━━\n`;
 msg += `v3.4 | 自動週報 | 下次: 下週一 10:00`;
 
 // ─── 推播 ───
-const LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';
-const TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';
+const LINE_TOKEN = '<LINE_CHANNEL_TOKEN>';
+const TG_TOKEN = '<TG_BOT_TOKEN>';
 const TG_CHAT = '-1003799249092';
 
 let lineResult = 'not sent';

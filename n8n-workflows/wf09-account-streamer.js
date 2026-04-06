@@ -5,9 +5,9 @@
 
 const TT_API = 'https://api.tastyworks.com';
 const TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
-const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
-const LINE_TOKEN = 'y7xe8HwlQP5M0WQ3a9jzALbSSZ6/HtOyf4yQs4Eve0QJKa/JKgLFMYZiR7u4ErA/mvHoe8qRJBwiD21VSL1rb7BsJUmxzx+7OtvRXMChRRkwU87nWDRaC1dhXaYSafma3k2+Pk/QcSRwm7oG2VmxawdB04t89/1O/w1cDnyilFU=';
-const TG_TOKEN = '8680833770:AAHutju73oP6c5X90GErYXn3hTvqjZIb7po';
+const TT_CLIENT_SECRET = '<TT_CLIENT_SECRET>';
+const LINE_TOKEN = '<LINE_CHANNEL_TOKEN>';
+const TG_TOKEN = '<TG_BOT_TOKEN>';
 const TG_CHAT = '-1003799249092';
 
 // ─── Market Hours Check ───
@@ -19,9 +19,9 @@ if (utcHour < 13 || utcHour > 21) return [{ json: { skipped: true, reason: 'Outs
 
 // ─── Student Accounts ───
 const STUDENTS = [
-  { student_id: 'S001', name: '老師', account_number: '5WZ90854',
-    refresh_token: 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw',
-    line_user_id: 'U457d141fef9c4ccc372dc32dd0c8f45c' }
+  { student_id: 'S001', name: '老師', account_number: 'STUDENT_ACCOUNT',
+    refresh_token: '<REFRESH_TOKEN_FROM_ENV>',
+    line_user_id: '<LINE_USER_ID>' }
 ];
 
 const allEvents = [];

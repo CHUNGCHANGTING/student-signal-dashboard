@@ -13,7 +13,7 @@ const tastytrade = {
   name: 'tastytrade',
   API: 'https://api.tastyworks.com',
   CLIENT_ID: 'ec8b4453-d7e5-418e-8170-43e9b3e0b460',
-  CLIENT_SECRET: 'b09387c27e0cd0325cae0a910e43fc5f158ca109',
+  CLIENT_SECRET: '<TT_CLIENT_SECRET>',
 
   async getToken(ctx, refreshToken) {
     const res = await ctx.helpers.httpRequest({

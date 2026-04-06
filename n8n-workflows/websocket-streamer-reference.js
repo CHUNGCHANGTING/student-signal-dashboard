@@ -14,7 +14,7 @@ const CONFIG = {
   TT_API: 'https://api.tastyworks.com',
   TT_STREAMER: 'wss://streamer.tastyworks.com',
   TT_CLIENT_ID: 'ec8b4453-d7e5-418e-8170-43e9b3e0b460',
-  TT_CLIENT_SECRET: 'b09387c27e0cd0325cae0a910e43fc5f158ca109',
+  TT_CLIENT_SECRET: '<TT_CLIENT_SECRET>',
   N8N_WEBHOOK: 'https://chilldove.app.n8n.cloud/webhook/streamer-event',
   HEARTBEAT_INTERVAL: 30000, // 30 seconds
   RECONNECT_DELAY: 5000,
@@ -22,7 +22,7 @@ const CONFIG = {
 
 // Student accounts to monitor
 const STUDENTS = [
-  { student_id: 'S001', account_number: '5WZ90854', refresh_token: '' }
+  { student_id: 'S001', account_number: 'STUDENT_ACCOUNT', refresh_token: '' }
 ];
 
 // ─────────────────────────────────────────────────────────────

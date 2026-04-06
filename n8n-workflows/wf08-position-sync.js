@@ -66,7 +66,7 @@ if (action === 'cboe-proxy' || action === 'cboe') {
 
 const TT_API = 'https://api.tastyworks.com';
 const TT_CLIENT_ID = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
-const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
+const TT_CLIENT_SECRET = '<TT_CLIENT_SECRET>';
 
 let input;
 try {
@@ -85,7 +85,7 @@ const method = input.method || 'GET';
 const STUDENT_DB = {
   'S001': {
     name: '老師 (Demo)',
-    account_number: '5WZ90854',
+    account_number: 'STUDENT_ACCOUNT',
     refresh_token: '' // Will be set via Dashboard binding
   }
   // Add more students as they bind accounts
