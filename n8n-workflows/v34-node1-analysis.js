@@ -297,9 +297,12 @@ function passesLiquidity(opt) {
   const bid = parseFloat(opt.bid) || 0;
   const ask = parseFloat(opt.ask) || 0;
   const oi  = parseInt(opt.open_interest, 10) || 0;
-  if (ask <= 0) return false;
-  const spreadPct = (ask - bid) / ask;
-  return spreadPct <= LIQUIDITY_MAX_SPREAD_PCT && oi >= LIQUIDITY_MIN_OI;
+  // Fix: bid must be > 0 (zero-bid options are illiquid even if ask exists)
+  if (bid <= 0 || ask <= 0) return false;
+  const spreadAbs = ask - bid;
+  const spreadPct = spreadAbs / ask;
+  // Fix: also check absolute spread ≤ $0.15 to catch penny options with 200%+ spread
+  return spreadPct <= LIQUIDITY_MAX_SPREAD_PCT && spreadAbs <= 0.15 && oi >= LIQUIDITY_MIN_OI;
 }
 
 function midPrice(opt) {
@@ -680,7 +683,13 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
         // Verify no strike overlap
         if (bp.shortStrike < bc.shortStrike) {
           const combinedCredit  = +(bc.credit + bp.credit).toFixed(4);
-          const combinedMaxLoss = Math.max(bc.margin, bp.margin); // wider of the two
+          // Fix: IC maxLoss = wider wing width - combined credit (not max of individual margins)
+          // Bear Call: longStrike > shortStrike; Bull Put: shortStrike > longStrike
+          const callWing = bc.longStrike - bc.shortStrike;
+          const putWing  = bp.shortStrike - bp.longStrike;
+          const wingWidth = Math.max(callWing, putWing);
+          const combinedMaxLoss = +(wingWidth - combinedCredit).toFixed(4);
+          if (combinedMaxLoss <= 0) continue; // sanity check
           const combinedWinRate = bc.winRate * bp.winRate;         // both expire OTM
           const combinedEV      = combinedCredit * combinedWinRate
                                   - combinedMaxLoss * (1 - combinedWinRate);
@@ -1058,10 +1067,18 @@ for (const sym of symbols) {
   log(`${ticker}: direction=${direction} score=${directionScore} regime=${marketRegime}`);
 
   // ── 12b-vi. Build spreads ───────────────────────────────────
-  const positiveEVSpreads = buildSpreads(
+  let positiveEVSpreads = buildSpreads(
     optsByExpType, underlyingPrice, direction, ivr, ivPercentile, directionScore, support, resistance, volumeAnalysis
   );
   log(`${ticker}: ${positiveEVSpreads.length} positive-EV spreads found`);
+
+  // Fix: Credit fallback — if no credit spreads found and direction allows it,
+  // log warning for teacher review (debit spreads may still be available)
+  const hasCreditSpread = positiveEVSpreads.some(s => ['Bull Put Spread', 'Bear Call Spread', 'Iron Condor'].includes(s.strategy));
+  const hasDebitSpread = positiveEVSpreads.some(s => ['Bull Call Spread', 'Bear Put Spread'].includes(s.strategy));
+  if (!hasCreditSpread && (direction === 'bullish' || direction === 'bearish') && ivr >= 0.25) {
+    log(`${ticker}: ⚠️ Credit fallback — no credit spreads passed filters (IVR=${(ivr*100).toFixed(0)}%, direction=${direction}). Only debit spreads available. Check if reward:risk threshold is too strict.`);
+  }
 
   results.push({
     ticker,
