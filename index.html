@@ -3256,14 +3256,17 @@ async function testBrokerConnection() {
       }
       var resp = await fetch('https://api.tastyworks.com/sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login: username, password: password })
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'chilldove-dashboard/1.0' },
+        body: JSON.stringify({ login: username, password: password, 'remember-me': true })
       });
       var data = await resp.json();
       if (resp.ok && data.data) {
         result.innerHTML = '<span style="color:var(--color-success)">✅ 連線成功！帳戶: ' + (data.data?.user?.email || username) + '</span>';
         if (data.data?.['session-token']) {
           localStorage.setItem('broker_tt-session', data.data['session-token']);
+        }
+        if (data.data?.['remember-token']) {
+          localStorage.setItem('broker_tt-remember', data.data['remember-token']);
         }
       } else {
         var errMsg = (data.error?.message || data.error?.code || '請確認帳號密碼');
