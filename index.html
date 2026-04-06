@@ -1120,8 +1120,38 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 </section>
 <section class="gate" id="gate2" style="display:none">
-<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上確認 Delta、DTE、Wing 寬度、Credit/Width 比</div></div></div>
-<div class="info-block note"><p>詳細參數請參考原始 SOP 文件。包含 IC / Credit Spread / Debit Spread / CV 分頁籤參數表。</p></div>
+<div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在 TOS 上逐檔確認 OI、Bid-Ask、Delta、Width</div></div></div>
+
+<!-- Approved symbols will be injected here -->
+<div id="g2-approved-list" style="margin-bottom:var(--space-4)">
+  <div class="info-block note"><p>請先在第1關完成批次判斷，通過的標的會自動帶入此處。</p></div>
+</div>
+
+<!-- TOS Parameter Reference -->
+<div style="margin-top:var(--space-4)">
+<div class="g1-section-title" style="font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-3)">📋 TOS 確認項目（逐檔檢查）</div>
+<div style="overflow-x:auto">
+<table class="line-summary-table" style="font-size:12px">
+<thead><tr><th>項目</th><th>收租（Credit Spread / IC）</th><th>進攻（Debit Spread）</th><th>標準</th></tr></thead>
+<tbody>
+<tr><td style="font-weight:600">OI (Open Interest)</td><td colspan="2">Short leg OI ≥ 500</td><td>流動性充足才能順利成交</td></tr>
+<tr><td style="font-weight:600">Bid-Ask Spread</td><td colspan="2">≤ $0.10 或 ≤ 10%</td><td>太寬會增加滑價成本</td></tr>
+<tr><td style="font-weight:600">Delta</td><td>PCS: 0.20-0.25<br>CCS: 0.10-0.20<br>IC: 0.10-0.15</td><td>0.40-0.60</td><td>Notion 教學標準</td></tr>
+<tr><td style="font-weight:600">DTE</td><td>14-30 天</td><td>14-45 天</td><td>時間衰減最有效率</td></tr>
+<tr><td style="font-weight:600">Wing 寬度</td><td>$5 或 $2.5</td><td>$5 或 $7.5</td><td>控制最大虧損</td></tr>
+<tr><td style="font-weight:600">Credit/Width</td><td>≥ 30%</td><td>—</td><td>Credit ÷ Wing Width</td></tr>
+<tr><td style="font-weight:600">Reward:Risk</td><td>≥ 1:3</td><td>≥ 1:2</td><td>報酬風險比</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- Per-symbol TOS checklist -->
+<div id="g2-symbol-checklists" style="margin-top:var(--space-4)"></div>
+
+<div style="margin-top:var(--space-4);text-align:center">
+  <button class="btn-primary" onclick="completeGate2()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-sm)">✅ TOS 確認完成 → 進入第3關</button>
+</div>
 </section>
 <section class="gate" id="gate3" style="display:none">
 <div class="gate-header"><div class="gate-num g3">3</div><div><div class="gate-title">部位確認</div><div class="gate-subtitle">帳戶風險、相關性、BP使用率</div></div></div>
@@ -2660,7 +2690,7 @@ function analyzeAllLINESignals() {
   html += '<h4>\ud83d\udcca \u5168\u90e8\u5224\u65b7\u7d50\u679c</h4>';
   html += '<div style="overflow-x:auto">';
   html += '<table class="line-summary-table">';
-  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>OI</th><th>財報</th><th>Decision</th></tr></thead>';
+  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>財報</th><th>Decision</th></tr></thead>';
   html += '<tbody>';
   for (var j = 0; j < results.length; j++) {
     var r = results[j];
@@ -2675,9 +2705,6 @@ function analyzeAllLINESignals() {
     html += '<td>' + r.dte + '</td>';
     html += '<td>' + (r.pop * 100).toFixed(1) + '%</td>';
     html += '<td class="' + (r.ev > 0 ? 'val' : r.ev < 0 ? 'val-stop' : '') + '">' + r.ev.toFixed(2) + '</td>';
-    // OI liquidity estimate from symbol tier
-    var oiStatus = estimateOILiquidity(r.symbol);
-    html += '<td>' + oiStatus.html + '</td>';
     var ec = checkEarningsForSymbol(r.symbol);
     var earningsCell = ec.has_earnings
       ? (ec.blackout ? '<span style="color:var(--color-error);font-weight:600">⛔ ' + ec.date + '</span>' : '<span style="color:var(--color-warning)">' + ec.date + '</span>')
@@ -2726,6 +2753,8 @@ function analyzeAllLINESignals() {
 
   // 更新底部 summary bar: 顯示所有 approved 標的
   var approvedList = results.filter(function(r) { return r.decision === 'approved'; });
+  // Store for Gate 2
+  g2ApprovedSignals = approvedList;
   var blockedList = results.filter(function(r) { return r.decision !== 'approved'; });
 
   var sumMod = document.getElementById('sum-module');
@@ -2748,8 +2777,8 @@ function analyzeAllLINESignals() {
     }
     // 送單狀態：顯示下一步指引
     if (sumStatus) {
-      sumStatus.innerHTML = '→ 第2關 TOS 試算';
-      sumStatus.className = 'summary-val amber';
+      sumStatus.innerHTML = '<button onclick="goToGate2()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">→ 第2關 TOS 試算</button>';
+      sumStatus.className = 'summary-val';
     }
     // Quality: 取最高分的
     var bestQr = null;
@@ -2770,6 +2799,133 @@ function analyzeAllLINESignals() {
 function fillLINESample() {
   var sample = '\u3010KO\u3011 \u73fe\u50f9:76.72 (IV:14.63%)\n\u8a0a\u865f: \u8da8\u52e2\u7a69\u5b9a (2/3)\n\u7b56\u7565: \ud83d\udcc8 \u770b\u6f32\u9032\u653b\n\u6307\u4ee4: BUY CALL 76.0 / SELL CALL 81.0\nEV: 1.45 | \u52dd\u7387: 61.0%\n\u76c8\u8667: +340.0/-160.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:74.07 | \u58d3\u529b:78.43\n\n\u3010JNJ\u3011 \u73fe\u50f9:156.54 (IV:23.17%)\n\u8a0a\u865f: \u8da8\u52e2\u5f37\u52c1 (3/3)\n\u7b56\u7565: \ud83d\udcc8 \u770b\u6f32\u9032\u653b\n\u6307\u4ee4: BUY CALL 155.0 / SELL CALL 162.5\nEV: 2.18 | \u52dd\u7387: 58.0%\n\u76c8\u8667: +430.0/-320.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:152.30 | \u58d3\u529b:159.80\n\n\u3010CBOE\u3011 \u73fe\u50f9:217.80 (IV:19.45%)\n\u8a0a\u865f: \u8da8\u52e2\u7a69\u5b9a (2/3)\n\u7b56\u7565: \ud83d\udcc9 \u770b\u8dcc\u9032\u653b\n\u6307\u4ee4: BUY PUT 220.0 / SELL PUT 215.0\nEV: 0.87 | \u52dd\u7387: 54.0%\n\u76c8\u8667: +280.0/-220.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:214.50 | \u58d3\u529b:221.00\n\n\u3010SPY\u3011 \u73fe\u50f9:549.01 (IV:26.88%)\n\u8a0a\u865f: \u8da8\u52e2\u4e2d\u6027 (1/3)\n\u7b56\u7565: \u2696\ufe0f \u4e2d\u6027\u6536\u79df\n\u6307\u4ee4: SELL PUT 540.0 / BUY PUT 535.0\nEV: 1.12 | \u52dd\u7387: 72.0%\n\u76c8\u8667: +180.0/-320.0\n\ud83d\udcc5 \u5230\u671f: 2026-05-01 (\u526928\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:541.20 | \u58d3\u529b:556.80\n\n\u3010QQQ\u3011 \u73fe\u50f9:462.35 (IV:30.12%)\n\u8a0a\u865f: \u8da8\u52e2\u4e2d\u6027 (1/3)\n\u7b56\u7565: \u2696\ufe0f \u4e2d\u6027\u6536\u79df\n\u6307\u4ee4: SELL CALL 475.0 / BUY CALL 480.0\nEV: 0.95 | \u52dd\u7387: 68.0%\n\u76c8\u8667: +160.0/-340.0\n\ud83d\udcc5 \u5230\u671f: 2026-05-01 (\u526928\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:455.10 | \u58d3\u529b:470.50';
   document.getElementById('line-textarea').value = sample;
+}
+
+// === Gate 2 Navigation & Population ===
+var g2ApprovedSignals = []; // Store approved signals for Gate 2
+
+function goToGate2() {
+  // Navigate to Gate 2
+  var navItems = document.querySelectorAll('.nav-item');
+  var gate2Nav = null;
+  navItems.forEach(function(n) { if (n.textContent.includes('第2關')) gate2Nav = n; });
+  showSection('gate2', gate2Nav);
+  // Populate with approved signals
+  populateGate2();
+  // Scroll to top
+  window.scrollTo(0, 0);
+}
+
+function populateGate2() {
+  var container = document.getElementById('g2-approved-list');
+  var checklistContainer = document.getElementById('g2-symbol-checklists');
+  if (!container || !g2ApprovedSignals.length) {
+    if (container) container.innerHTML = '<div class="info-block warn"><p>⚠️ 尚無通過的標的。請先在第1關完成批次判斷。</p></div>';
+    return;
+  }
+
+  // Summary cards for each approved symbol
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-3)">';
+  for (var i = 0; i < g2ApprovedSignals.length; i++) {
+    var s = g2ApprovedSignals[i];
+    var stratCn = {
+      'BULL_CALL_DEBIT_SPREAD': '偏多進攻', 'BEAR_PUT_DEBIT_SPREAD': '偏空進攻',
+      'BULL_PUT_CREDIT_SPREAD': '偏多收租', 'BEAR_CALL_CREDIT_SPREAD': '偏空收租',
+      'IRON_CONDOR': '盤整收租'
+    };
+    var label = stratCn[s.strategy] || s.strategy;
+    var isIncome = ['IRON_CONDOR','BULL_PUT_CREDIT_SPREAD','BEAR_CALL_CREDIT_SPREAD','CREDIT_VERTICAL'].includes(s.strategy);
+    var borderColor = isIncome ? 'var(--color-success)' : 'var(--color-primary)';
+
+    html += '<div style="border:2px solid ' + borderColor + ';border-radius:var(--radius-lg);padding:var(--space-3);background:var(--color-surface)">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2)">';
+    html += '<span style="font-weight:700;font-size:var(--text-base)">' + s.symbol + '</span>';
+    html += '<span style="font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-sm);background:' + borderColor + ';color:#fff;font-weight:600">' + label + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:11px;color:var(--color-text-muted);display:grid;grid-template-columns:1fr 1fr;gap:2px">';
+    html += '<span>IVR: ' + s.ivr.toFixed(1) + '%</span>';
+    html += '<span>DTE: ' + s.dte + '天</span>';
+    html += '<span>POP: ' + (s.pop * 100).toFixed(1) + '%</span>';
+    html += '<span>EV: ' + s.ev.toFixed(2) + '</span>';
+    html += '</div>';
+    html += '<div id="g2-check-' + s.symbol + '" style="margin-top:var(--space-2)">';
+    // Per-symbol TOS checklist
+    var checks = [
+      { key: 'oi', label: 'OI ≥ 500', detail: '在 TOS Option Chain 確認 Short Leg OI' },
+      { key: 'bidask', label: 'Bid-Ask ≤ $0.10', detail: '確認價差不會太大' },
+      { key: 'delta', label: 'Delta 符合', detail: isIncome ? 'Short Delta 0.10-0.25' : 'Long Delta 0.40-0.60' },
+      { key: 'width', label: 'Wing 寬度確認', detail: '確認 Strike Width' }
+    ];
+    for (var c = 0; c < checks.length; c++) {
+      html += '<div class="g2-check-row" data-symbol="' + s.symbol + '" data-key="' + checks[c].key + '" onclick="toggleG2Check(this)" style="display:flex;align-items:center;gap:var(--space-2);padding:4px 0;cursor:pointer;font-size:11px">';
+      html += '<div class="g2-checkbox" style="width:16px;height:16px;border:2px solid var(--color-border);border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" style="display:none"><polyline points="20 6 9 17 4 12"/></svg></div>';
+      html += '<div><span style="font-weight:600">' + checks[c].label + '</span><span style="color:var(--color-text-muted);margin-left:4px">' + checks[c].detail + '</span></div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function toggleG2Check(el) {
+  el.classList.toggle('checked');
+  var box = el.querySelector('.g2-checkbox');
+  var svg = box.querySelector('svg');
+  if (el.classList.contains('checked')) {
+    box.style.background = 'var(--color-success)';
+    box.style.borderColor = 'var(--color-success)';
+    svg.style.display = 'block';
+  } else {
+    box.style.background = '';
+    box.style.borderColor = 'var(--color-border)';
+    svg.style.display = 'none';
+  }
+  // Check if all symbols have all checks done
+  updateGate2Progress();
+}
+
+function updateGate2Progress() {
+  var allChecks = document.querySelectorAll('.g2-check-row');
+  var doneChecks = document.querySelectorAll('.g2-check-row.checked');
+  var total = allChecks.length;
+  var done = doneChecks.length;
+  // Update summary bar
+  var sumChecks = document.getElementById('sum-checks');
+  if (sumChecks) {
+    sumChecks.textContent = done + ' / ' + total;
+    sumChecks.className = 'summary-val ' + (done === total && total > 0 ? 'green' : done > 0 ? 'amber' : 'red');
+  }
+}
+
+function completeGate2() {
+  var allChecks = document.querySelectorAll('.g2-check-row');
+  var doneChecks = document.querySelectorAll('.g2-check-row.checked');
+  if (doneChecks.length < allChecks.length) {
+    alert('請先完成所有 TOS 確認項目（' + doneChecks.length + '/' + allChecks.length + '）');
+    return;
+  }
+  // Navigate to Gate 3
+  var navItems = document.querySelectorAll('.nav-item');
+  var gate3Nav = null;
+  navItems.forEach(function(n) { if (n.textContent.includes('第3關')) gate3Nav = n; });
+  showSection('gate3', gate3Nav);
+  window.scrollTo(0, 0);
+  // Update summary
+  var sumStatus = document.getElementById('sum-status');
+  if (sumStatus) {
+    sumStatus.innerHTML = '<button onclick="goToGate4()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">→ 第4關 送單</button>';
+    sumStatus.className = 'summary-val';
+  }
+}
+
+function goToGate4() {
+  var navItems = document.querySelectorAll('.nav-item');
+  var gate4Nav = null;
+  navItems.forEach(function(n) { if (n.textContent.includes('第4關')) gate4Nav = n; });
+  showSection('gate4', gate4Nav);
+  window.scrollTo(0, 0);
 }
 
 // Toggle earnings detail panel
