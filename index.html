@@ -5357,7 +5357,7 @@ function renderStudentTable(students) {
     const email = s.email || '—';
     const role = s.role || 'student';
     const status = s.status || 'pending';
-    const skool = s.skool_member ? '<span class="badge-active">VIP</span>' : '<span style="color:var(--color-text-faint)">—</span>';
+    const skool = s.skool_member ? '<span class="badge-active">Premium</span>' : '<span style="color:var(--color-text-faint)">—</span>';
     const date = s.created_at ? new Date(s.created_at).toLocaleDateString('zh-TW') : '—';
 
     let statusBadge = '';
