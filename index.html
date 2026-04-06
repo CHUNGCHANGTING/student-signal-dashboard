@@ -189,6 +189,16 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .quality-badge.grade-c { background: var(--color-error); color: #fff; box-shadow: 0 0 8px rgba(255,69,58,0.4); }
 .quality-legend { display: flex; gap: var(--space-1); align-items: center; font-size: 10px; color: var(--color-text-muted); margin-top: 2px; }
 .quality-legend span { font-weight: 600; }
+.auto-display { font-size: var(--text-base); font-weight: 700; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); text-align: center; min-height: 36px; display: flex; align-items: center; justify-content: center; gap: var(--space-2); }
+.auto-display.bullish { background: var(--color-success-highlight); color: var(--color-success); }
+.auto-display.bearish { background: var(--color-error-highlight); color: var(--color-error); }
+.auto-display.neutral { background: var(--color-warning-highlight); color: var(--color-warning); }
+.auto-display.loading { background: var(--color-surface-alt, rgba(128,128,128,0.1)); color: var(--color-text-muted); font-weight: 400; font-size: var(--text-sm); }
+.auto-display.safe { background: var(--color-success-highlight); color: var(--color-success); }
+.auto-display.danger { background: var(--color-error-highlight); color: var(--color-error); }
+.auto-display.ivr-low { background: var(--color-warning-highlight); color: var(--color-warning); }
+.auto-display.ivr-ideal { background: var(--color-success-highlight); color: var(--color-success); }
+.auto-display.ivr-high { background: var(--color-error-highlight); color: var(--color-error); }
 .btn-reset { margin-left: auto; font-size: var(--text-xs); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); color: var(--color-text-muted); }
 .btn-reset:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
 /* Live Dashboard section */
@@ -978,38 +988,25 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="g1-status-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-3);margin-bottom:var(--space-4)">
   <div class="g1-status-card" id="g0-card-bias">
     <div class="sc-title"><span class="sc-emoji">🧭</span> 大盤方向</div>
-    <div class="sc-input">
-      <select id="g0-bias" onchange="g1Update()" style="width:100%;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text);font-size:var(--text-sm)">
-        <option value="">— 請選擇 —</option>
-        <option value="bullish">📈 偏多</option>
-        <option value="bearish">📉 偏空</option>
-        <option value="neutral">➡️ 中性</option>
-      </select>
-    </div>
-    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">SPX/QQQ 技術面</div>
+    <div id="g0-bias-display" class="auto-display loading">⏳ 載入中...</div>
+    <input type="hidden" id="g0-bias" value="">
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">Finnhub SPY/QQQ 即時報價 | 自動更新</div>
   </div>
   <div class="g1-status-card" id="g0-card-ivr">
     <div class="sc-title"><span class="sc-emoji">📊</span> IVR 區間</div>
-    <div class="sc-input">
-      <input type="number" id="g0-ivr" min="0" max="100" placeholder="IVR %" style="width:100%;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text);font-size:var(--text-sm)">
-    </div>
+    <div id="g0-ivr-display" class="auto-display loading">⏳ 載入中...</div>
+    <input type="hidden" id="g0-ivr" value="">
     <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">&lt;27 進攻 | 27-45 收租 | &gt;45 高波</div>
   </div>
   <div class="g1-status-card" id="g0-card-event">
     <div class="sc-title"><span class="sc-emoji">⚡</span> 事件風險</div>
-    <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
-      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.nextElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface)">無</button>
-      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.previousElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface)">有</button>
-    </div>
-    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">FOMC / CPI / 財報週</div>
+    <div id="g0-event-display" class="auto-display loading">⏳ 載入中...</div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">Finnhub 經濟日曆 | 自動更新</div>
   </div>
   <div class="g1-status-card" id="g0-card-earnings">
     <div class="sc-title"><span class="sc-emoji">📅</span> 財報日曆</div>
-    <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2)">
-      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.nextElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface)">無財報</button>
-      <button class="g1-toggle-btn" onclick="this.classList.add('active');this.previousElementSibling.classList.remove('active')" style="flex:1;padding:var(--space-2);border:1px solid var(--color-error);border-radius:var(--radius-md);font-size:var(--text-xs);cursor:pointer;background:var(--color-surface);color:var(--color-error)">有財報</button>
-    </div>
-    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">財報前 2 天不做該標的</div>
+    <div id="g0-earnings-display" class="auto-display loading">⏳ 載入中...</div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">Finnhub 財報 API | 自動更新</div>
   </div>
 </div>
 </div>
@@ -1822,15 +1819,15 @@ async function updateEarningsUI() {
     statusEl.style.background = 'var(--color-error-highlight)';
     statusEl.style.color = 'var(--color-error)';
     statusEl.innerHTML = '⚠️ ' + earningsSymbols.join(', ');
-    // Auto-select "有財報" button
-    var btns = cardEl.querySelectorAll('.g1-toggle-btn');
-    if (btns.length >= 2) { btns[0].classList.remove('active'); btns[0].style.background=''; btns[0].style.color=''; btns[1].classList.add('active'); btns[1].style.background='var(--color-error)'; btns[1].style.color='#fff'; btns[1].style.fontWeight='600'; }
+    // Auto-update display
+    var earningsDisp = document.getElementById('g0-earnings-display');
+    if (earningsDisp) { earningsDisp.className = 'auto-display danger'; earningsDisp.innerHTML = '⚠️ ' + earningsSymbols.join(', '); }
   } else {
     statusEl.style.background = 'var(--color-success-highlight)';
     statusEl.style.color = 'var(--color-success)';
     statusEl.innerHTML = '✅ 本週無財報衝突';
-    var btns = cardEl.querySelectorAll('.g1-toggle-btn');
-    if (btns.length >= 2) { btns[0].classList.add('active'); btns[0].style.background='var(--color-success)'; btns[0].style.color='#fff'; btns[0].style.fontWeight='600'; btns[1].classList.remove('active'); btns[1].style.background=''; btns[1].style.color=''; }
+    var earningsDisp = document.getElementById('g0-earnings-display');
+    if (earningsDisp) { earningsDisp.className = 'auto-display safe'; earningsDisp.innerHTML = '✅ 本週無財報衝突'; }
   }
   // Count total earnings this week
   var total = Object.keys(earningsCache).length;
@@ -1875,13 +1872,18 @@ async function autoFetchMarketStatus() {
     var biasLabel = bias === 'bullish' ? '📈 偏多' : bias === 'bearish' ? '📉 偏空' : '➡️ 中性';
     var biasColor = bias === 'bullish' ? 'green' : bias === 'bearish' ? 'red' : 'yellow';
 
-    // Auto-select the dropdown
-    var sel = document.getElementById('g0-bias');
-    if (sel) sel.value = bias;
-    setCardStatus(cardBias, biasLabel + ' | SPY $' + spyPrice.toFixed(1) + ' (' + (spyChange >= 0 ? '+' : '') + spyChange.toFixed(2) + '%) QQQ ' + (qqqChange >= 0 ? '+' : '') + qqqChange.toFixed(2) + '%', biasColor);
-
-    var hint = cardBias ? cardBias.querySelector('.sc-hint') : null;
-    if (hint) hint.textContent = 'Finnhub 即時報價 | 自動更新';
+    // Auto-fill display + sync g1State
+    var biasDisplay = document.getElementById('g0-bias-display');
+    var biasHidden = document.getElementById('g0-bias');
+    if (biasHidden) biasHidden.value = bias;
+    if (biasDisplay) {
+      biasDisplay.className = 'auto-display ' + bias;
+      biasDisplay.innerHTML = biasLabel + '<span style="font-size:11px;font-weight:400;opacity:0.8">SPY $' + spyPrice.toFixed(1) + ' (' + (spyChange >= 0 ? '+' : '') + spyChange.toFixed(2) + '%)</span>';
+    }
+    // Sync to g1State + g1 hidden select
+    g1State.bias = bias;
+    var g1Sel = document.getElementById('g1-bias');
+    if (g1Sel) g1Sel.value = bias;
   } catch(e) {
     setCardStatus(cardBias, '⚠️ 報價取得失敗', 'yellow');
   }
@@ -1909,19 +1911,28 @@ async function autoFetchMarketStatus() {
       var ivrInput = document.getElementById('g0-ivr');
       if (ivrInput) ivrInput.value = ivrEstimate.toFixed(1);
       var ivrLabel = ivrEstimate < 27 ? '進攻為主' : ivrEstimate <= 45 ? '收租理想' : '高波動';
-      var ivrColor = ivrEstimate < 27 ? 'yellow' : ivrEstimate <= 45 ? 'green' : 'red';
-      setCardStatus(cardIvr, 'IVR ≈ ' + ivrEstimate.toFixed(1) + '% (' + ivrLabel + ') | 信號平均值', ivrColor);
+      var ivrCls = ivrEstimate < 27 ? 'ivr-low' : ivrEstimate <= 45 ? 'ivr-ideal' : 'ivr-high';
+      var ivrDisplay = document.getElementById('g0-ivr-display');
+      if (ivrDisplay) { ivrDisplay.className = 'auto-display ' + ivrCls; ivrDisplay.innerHTML = 'IVR ≈ ' + ivrEstimate.toFixed(1) + '% <span style="font-size:11px;font-weight:400">(' + ivrLabel + ')</span>'; }
+      g1State.ivr = ivrEstimate;
+      var g1IvrInput = document.getElementById('g1-ivr');
+      if (g1IvrInput) g1IvrInput.value = ivrEstimate.toFixed(1);
     } else if (vixyPrice > 0) {
       // Rough VIX estimate from VIXY: VIXY $33 ≈ VIX 20
       var estVix = (vixyPrice / 33) * 20;
-      var estIvr = Math.min(100, Math.max(0, (estVix - 12) * (100 / 40))); // Scale 12-52 VIX to 0-100 IVR
+      var estIvr = Math.min(100, Math.max(0, (estVix - 12) * (100 / 40)));
       var ivrInput = document.getElementById('g0-ivr');
       if (ivrInput) ivrInput.value = estIvr.toFixed(0);
       var ivrLabel = estIvr < 27 ? '進攻為主' : estIvr <= 45 ? '收租理想' : '高波動';
-      var ivrColor = estIvr < 27 ? 'yellow' : estIvr <= 45 ? 'green' : 'red';
-      setCardStatus(cardIvr, 'IVR ≈ ' + estIvr.toFixed(0) + '% (' + ivrLabel + ') | VIXY $' + vixyPrice.toFixed(1) + ' 估算', ivrColor);
+      var ivrCls = estIvr < 27 ? 'ivr-low' : estIvr <= 45 ? 'ivr-ideal' : 'ivr-high';
+      var ivrDisplay = document.getElementById('g0-ivr-display');
+      if (ivrDisplay) { ivrDisplay.className = 'auto-display ' + ivrCls; ivrDisplay.innerHTML = 'IVR ≈ ' + estIvr.toFixed(0) + '% <span style="font-size:11px;font-weight:400">(' + ivrLabel + ') VIXY $' + vixyPrice.toFixed(1) + '</span>'; }
+      g1State.ivr = estIvr;
+      var g1IvrInput = document.getElementById('g1-ivr');
+      if (g1IvrInput) g1IvrInput.value = estIvr.toFixed(0);
     } else {
-      setCardStatus(cardIvr, '💡 貼上信號後自動帶入', 'yellow');
+      var ivrDisplay = document.getElementById('g0-ivr-display');
+      if (ivrDisplay) { ivrDisplay.className = 'auto-display loading'; ivrDisplay.textContent = '⏳ 等待信號帶入 IVR'; }
     }
   } catch(e) {
     setCardStatus(cardIvr, '💡 貼上信號後從 IVR 欄位自動帶入', 'yellow');
@@ -1937,17 +1948,19 @@ async function autoFetchMarketStatus() {
       var ev = (e.event || '').toUpperCase();
       return ev.includes('FOMC') || ev.includes('CPI') || ev.includes('NFP') || ev.includes('NONFARM') || ev.includes('FED') || ev.includes('INTEREST RATE') || ev.includes('PPI') || ev.includes('RETAIL SALES') || ev.includes('GDP');
     });
-    var btns = cardEvent ? cardEvent.querySelectorAll('.g1-toggle-btn') : [];
+    var eventDisplay = document.getElementById('g0-event-display');
     if (events.length > 0) {
       var eventList = events.slice(0,3).map(function(e) { return e.date.slice(5) + ' ' + e.event.substring(0,20); }).join(', ');
-      setCardStatus(cardEvent, '⚠️ ' + eventList, 'red');
-      if (btns.length >= 2) { btns[0].classList.remove('active'); btns[0].style.background=''; btns[1].classList.add('active'); btns[1].style.background='var(--color-error)'; btns[1].style.color='#fff'; btns[1].style.fontWeight='600'; }
+      if (eventDisplay) { eventDisplay.className = 'auto-display danger'; eventDisplay.innerHTML = '⚠️ ' + eventList; }
+      g1State.eventRisk = true;
+      cardEvent.className = 'g1-status-card tint-red';
     } else {
-      setCardStatus(cardEvent, '✅ 本週無重大經濟事件', 'green');
-      if (btns.length >= 2) { btns[0].classList.add('active'); btns[0].style.background='var(--color-success)'; btns[0].style.color='#fff'; btns[0].style.fontWeight='600'; btns[1].classList.remove('active'); btns[1].style.background=''; btns[1].style.color=''; }
+      if (eventDisplay) { eventDisplay.className = 'auto-display safe'; eventDisplay.innerHTML = '✅ 本週無重大經濟事件'; }
+      g1State.eventRisk = false;
+      cardEvent.className = 'g1-status-card tint-green';
     }
-    var hint = cardEvent ? cardEvent.querySelector('.sc-hint') : null;
-    if (hint) hint.textContent = 'Finnhub 經濟日曆 | 自動更新';
+    // Auto-set liquidity: default OK unless VIX spike detected
+    g1State.liquidityOk = true;
   } catch(e) {
     setCardStatus(cardEvent, '⚠️ 經濟日曆取得失敗', 'yellow');
   }
@@ -1955,16 +1968,22 @@ async function autoFetchMarketStatus() {
   // === 4. 財報日曆: Already handled by fetchEarningsCalendar ===
   await fetchEarningsCalendar();
   var total = Object.keys(earningsCache).length;
-  var hint = cardEarnings ? cardEarnings.querySelector('.sc-hint') : null;
-  if (hint) hint.textContent = '本週共 ' + total + ' 家財報 | Finnhub API 自動更新';
-  var statusEl = cardEarnings ? cardEarnings.querySelector('.earnings-status') : null;
-  if (!statusEl && cardEarnings) {
-    statusEl = document.createElement('div');
-    statusEl.className = 'earnings-status';
-    statusEl.style.cssText = 'font-size:11px;margin-top:var(--space-2);padding:var(--space-2);border-radius:var(--radius-sm);background:var(--color-success-highlight);color:var(--color-success)';
-    statusEl.textContent = '✅ 貼上信號後自動檢查';
-    cardEarnings.appendChild(statusEl);
+  var earningsDisplay = document.getElementById('g0-earnings-display');
+  var hintE = cardEarnings ? cardEarnings.querySelector('.sc-hint') : null;
+  if (hintE) hintE.textContent = '本週共 ' + total + ' 家財報 | Finnhub API 自動更新';
+  if (earningsDisplay) {
+    if (total > 0) {
+      var symbols = Object.keys(earningsCache).slice(0, 5).join(', ');
+      var more = total > 5 ? ' +' + (total - 5) + '家' : '';
+      earningsDisplay.className = 'auto-display danger';
+      earningsDisplay.innerHTML = '⚠️ ' + total + ' 家財報 <span style="font-size:10px;font-weight:400">(' + symbols + more + ')</span>';
+    } else {
+      earningsDisplay.className = 'auto-display safe';
+      earningsDisplay.innerHTML = '✅ 本週無財報衝突';
+    }
   }
+  // Trigger Gate 1 recommendation update with all auto-filled values
+  g1Update();
 }
 
 // Run on page load
@@ -1991,6 +2010,7 @@ function autoUpdateIVRFromSignals() {
   if (count === 0) return;
   var avgIvr = totalIvr / count;
   var ivrInput = document.getElementById('g0-ivr');
+  var ivrDisplay = document.getElementById('g0-ivr-display');
   if (ivrInput) ivrInput.value = avgIvr.toFixed(1);
   var card = document.getElementById('g0-card-ivr');
   if (!card) return;
