@@ -110,14 +110,15 @@ if (action === 'tt-place-order') {
     if (!tokenData.access_token) return [{ json: { success: false, error: 'OAuth token failed' } }];
     const headers = { 'Authorization': 'Bearer ' + tokenData.access_token, 'Content-Type': 'application/json', 'User-Agent': 'chilldove-dashboard/1.0' };
 
-    // Calculate price (use mid from signal or default)
-    const price = parseFloat(body.price || signal.credit || signal.debit || '0');
+    // Calculate price: try multiple field names, fallback to 0.01 (never use Market for multi-leg)
+    const price = parseFloat(body.price || signal.credit || signal.debit || signal.credit_received || signal.debit_paid || '0');
+    const limitPrice = price > 0 ? price : 0.01; // Spread orders MUST be Limit
 
     // Build order payload
     const orderPayload = {
       'time-in-force': 'Day',
-      'order-type': price > 0 ? 'Limit' : 'Market',
-      'price': price > 0 ? price.toFixed(2) : undefined,
+      'order-type': 'Limit',
+      'price': limitPrice.toFixed(2),
       'price-effect': priceEffect,
       'legs': [
         { 'instrument-type': 'Equity Option', 'symbol': sym1, 'action': leg1Action, 'quantity': qty },
@@ -177,7 +178,17 @@ if (action === 'tt-place-order') {
 
     // Step 3: Set stop-loss order
     let stopResult = null;
-    const stopPrice = parseFloat(body.stopPrice || signal.stopLoss || 0);
+    let stopPrice = parseFloat(body.stopPrice || signal.stopLoss || 0);
+    // Auto-calculate stop price if not provided
+    if (stopPrice <= 0 && limitPrice > 0) {
+      if (strategy.includes('IRON')) {
+        stopPrice = limitPrice * 2.0; // IC: 2× credit
+      } else if (priceEffect === 'Credit') {
+        stopPrice = limitPrice * 1.3; // Credit spread: 1.3× credit
+      } else {
+        stopPrice = limitPrice * 0.7; // Debit spread: 0.7× debit
+      }
+    }
     if (stopPrice > 0 && orderId) {
       const stopEffect = priceEffect === 'Debit' ? 'Credit' : 'Debit'; // reverse of entry
       const stopPayload = {

@@ -4388,13 +4388,13 @@ function renderOrderSummary() {
     var isCredit = (s.strategy || '').includes('CREDIT') || (s.strategy || '').includes('PUT_CREDIT') || (s.strategy || '').includes('CALL_CREDIT') || (s.strategy || '').includes('IRON');
     var label = s.strategyLabel || s.strategy || '';
     var orderText = s.orderText || '';
-    var credit = parseFloat(s.credit || s.debit || 0);
+    var credit = parseFloat(s.credit || s.debit || s.credit_received || s.debit_paid || 0);
     var stopLoss = parseFloat(s.stopLoss || 0);
     var takeProfit = parseFloat(s.takeProfit || 0);
     var maxLoss = parseFloat(s.max_loss || s.margin || 0);
 
     // Calculate stop loss if not provided
-    if (!stopLoss && credit > 0) {
+    if ((!stopLoss || stopLoss <= 0) && credit > 0) {
       if ((s.strategy || '').includes('IRON')) {
         stopLoss = credit * 2.0;
       } else if (isCredit) {
@@ -4402,6 +4402,10 @@ function renderOrderSummary() {
       } else {
         stopLoss = credit * 0.7;
       }
+    }
+    // If still no stop loss, use a fallback from CBOE mid price
+    if ((!stopLoss || stopLoss <= 0) && maxLoss > 0) {
+      stopLoss = isCredit ? (5 - maxLoss) * 1.3 : maxLoss * 0.7;
     }
 
     html += '<div style="padding:var(--space-3);background:var(--color-primary-highlight);border-radius:var(--radius-md);margin-bottom:var(--space-3)">';
