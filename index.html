@@ -183,6 +183,12 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .summary-val.amber { color: var(--color-gold); }
 .summary-val.red { color: var(--color-error); }
 .summary-val.blue { color: var(--color-primary); }
+.quality-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 800; font-size: var(--text-sm); letter-spacing: -0.02em; }
+.quality-badge.grade-a { background: var(--color-success); color: #fff; box-shadow: 0 0 8px rgba(52,199,89,0.4); }
+.quality-badge.grade-b { background: var(--color-gold); color: #1a1a1a; box-shadow: 0 0 8px rgba(255,204,0,0.4); }
+.quality-badge.grade-c { background: var(--color-error); color: #fff; box-shadow: 0 0 8px rgba(255,69,58,0.4); }
+.quality-legend { display: flex; gap: var(--space-1); align-items: center; font-size: 10px; color: var(--color-text-muted); margin-top: 2px; }
+.quality-legend span { font-weight: 600; }
 .btn-reset { margin-left: auto; font-size: var(--text-xs); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); color: var(--color-text-muted); }
 .btn-reset:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
 /* Live Dashboard section */
@@ -1262,6 +1268,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="summary-item"><div class="summary-key">模組</div><div class="summary-val blue" id="sum-module">—</div></div>
   <div class="summary-item"><div class="summary-key">策略</div><div class="summary-val" id="sum-strategy">—</div></div>
   <div class="summary-item"><div class="summary-key">確認清單</div><div class="summary-val red" id="sum-checks">0 / 8</div></div>
+  <div class="summary-item"><div class="summary-key">信號品質</div><div id="sum-quality"><span class="quality-badge grade-c">—</span></div></div>
   <div class="summary-item"><div class="summary-key">送單狀態</div><div class="summary-val red" id="sum-status">未完成</div></div>
   <button class="btn-reset" onclick="resetAll()">↺ 重置</button>
 </div>
@@ -1595,6 +1602,7 @@ function clearManualForm() {
   var sumStr = document.getElementById('sum-strategy');
   if (sumMod) { sumMod.textContent = '\u2014'; sumMod.className = 'summary-val blue'; }
   if (sumStr) { sumStr.textContent = '\u2014'; sumStr.className = 'summary-val'; }
+  var sumQ = document.getElementById('sum-quality'); if (sumQ) sumQ.innerHTML = '<span class="quality-badge grade-c">—</span>';
 }
 
 function analyzeManualForm() {
@@ -1642,6 +1650,7 @@ function clearSignal() {
   var sumStr = document.getElementById('sum-strategy');
   if (sumMod) { sumMod.textContent = '\u2014'; sumMod.className = 'summary-val blue'; }
   if (sumStr) { sumStr.textContent = '\u2014'; sumStr.className = 'summary-val'; }
+  var sumQ = document.getElementById('sum-quality'); if (sumQ) sumQ.innerHTML = '<span class="quality-badge grade-c">—</span>';
 }
 
 // === Auto-Receive ===
@@ -2031,6 +2040,78 @@ function pickModuleSP(symbol, strategy) {
   return { module: module, is_index: is_index };
 }
 
+// === Signal Quality Score: A/B/C ===
+function calcSignalQuality(ivr, strategy, eventRisk, g1LiquidityOk) {
+  var score = 0;
+  var details = [];
+  var income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];
+  var debit_strats = ['BULL_CALL_DEBIT_SPREAD', 'BEAR_PUT_DEBIT_SPREAD'];
+  var isIncome = income_strats.includes(strategy);
+  var isDebit = debit_strats.includes(strategy);
+
+  // --- IVR 評分 (0-2 分) ---
+  if (isIncome) {
+    // 收租: IVR 27-45 理想=2, 45-60 可接受=1, 其他=0
+    if (ivr >= 27 && ivr <= 45) { score += 2; details.push('IVR ✓ 理想'); }
+    else if (ivr > 45 && ivr <= 60) { score += 1; details.push('IVR △ 偏高'); }
+    else { details.push('IVR ✗ 不符'); }
+  } else if (isDebit) {
+    // 進攻: IVR 20-50 理想=2, 50-65 可接受=1, 其他=0
+    if (ivr >= 20 && ivr <= 50) { score += 2; details.push('IVR ✓ 適合進攻'); }
+    else if (ivr > 50 && ivr <= 65) { score += 1; details.push('IVR △ 成本偏高'); }
+    else { details.push('IVR ✗ 不符'); }
+  } else {
+    if (ivr >= 20 && ivr <= 60) { score += 2; details.push('IVR ✓'); }
+    else if (ivr > 0) { score += 1; details.push('IVR △'); }
+    else { details.push('IVR ✗'); }
+  }
+
+  // --- 事件風險 (0-2 分) ---
+  var hasEventRisk = eventRisk === true || eventRisk === 'true';
+  if (!hasEventRisk) {
+    // Check market status cards for auto-detected risks
+    var eventCard = document.getElementById('g1-card-event');
+    var earningsCard = document.getElementById('g1-card-earnings');
+    var eventSafe = !eventCard || !eventCard.classList.contains('tint-red');
+    var earningsSafe = !earningsCard || !earningsCard.classList.contains('tint-red');
+    if (eventSafe && earningsSafe) { score += 2; details.push('事件 ✓ 安全'); }
+    else if (eventSafe || earningsSafe) { score += 1; details.push('事件 △ 部分風險'); }
+    else { details.push('事件 ✗ 高風險'); }
+  } else {
+    details.push('事件 ✗ 高風險');
+  }
+
+  // --- 流動性 (0-2 分) ---
+  // Check g1State first, then fall back to card status
+  var liqOk = g1LiquidityOk;
+  if (liqOk === null || liqOk === undefined) {
+    var liqCard = document.getElementById('g1-card-liquidity');
+    if (liqCard && liqCard.classList.contains('tint-green')) liqOk = true;
+    else if (liqCard && liqCard.classList.contains('tint-red')) liqOk = false;
+    else liqOk = null;
+  }
+  if (liqOk === true) { score += 2; details.push('流動性 ✓ 充足'); }
+  else if (liqOk === null) { score += 1; details.push('流動性 △ 未確認'); }
+  else { details.push('流動性 ✗ 不足'); }
+
+  // --- Grade: 6=A, 4-5=B, 0-3=C ---
+  var grade = score >= 5 ? 'A' : score >= 3 ? 'B' : 'C';
+  return { grade: grade, score: score, maxScore: 6, details: details };
+}
+
+function renderQualityBadge(qr) {
+  var cls = qr.grade === 'A' ? 'grade-a' : qr.grade === 'B' ? 'grade-b' : 'grade-c';
+  return '<span class="quality-badge ' + cls + '">' + qr.grade + '</span>';
+}
+
+function renderQualityRow(qr) {
+  var cls = qr.grade === 'A' ? 'grade-a' : qr.grade === 'B' ? 'grade-b' : 'grade-c';
+  var html = '<span class="quality-badge ' + cls + '" style="vertical-align:middle">' + qr.grade + '</span>';
+  html += ' <span style="font-size:11px;color:var(--color-text-muted);margin-left:6px">' + qr.score + '/' + qr.maxScore + ' — ';
+  html += qr.details.join(' · ') + '</span>';
+  return html;
+}
+
 function riskFilterSP(module, strategy, ivr, dte, event_risk) {
   var income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];
   var is_income = income_strats.includes(strategy);
@@ -2114,6 +2195,9 @@ function analyzePayload(payload) {
   // EV
   var ev = calcEVSignal(pop, credit_received, debit_paid, max_loss_raw, target_value);
 
+  // Signal Quality
+  var qr = calcSignalQuality(ivr, strategy, event_risk, g1State.liquidityOk);
+
   // Determine module type for highlight
   var income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];
   var debit_strats = ['BULL_CALL_DEBIT_SPREAD', 'BEAR_PUT_DEBIT_SPREAD'];
@@ -2157,6 +2241,7 @@ function analyzePayload(payload) {
   html += '<tr><td>POP</td><td><span class="' + popClass + '">' + (pop * 100).toFixed(1) + '%</span></td></tr>';
   html += '<tr><td>EV</td><td><span class="' + evClass + '">$' + ev.toFixed(2) + '</span></td></tr>';
   html += '<tr><td>event_risk</td><td>' + (event_risk === true || event_risk === 'true' ? '<span class="val-stop">⚠ true</span>' : '<span class="val">false</span>') + '</td></tr>';
+  html += '<tr><td>信號品質</td><td>' + renderQualityRow(qr) + '</td></tr>';
   html += '<tr><td>Decision</td><td><span class="badge ' + (decision === 'approved' ? 'decision-approved' : decision === 'blocked' ? 'decision-blocked' : 'decision-review') + '" style="font-size:var(--text-xs);padding:2px 10px">' + decisionLabel + '</span></td></tr>';
   if (reject_reason) {
     html += '<tr><td>Reject Reason</td><td><span class="val-stop">' + reject_reason + '</span><div style="font-size:11px;color:var(--color-text-muted);margin-top:2px">' + getReasonLabel(reject_reason) + '</div></td></tr>';
@@ -2216,6 +2301,9 @@ function analyzePayload(payload) {
     sumStr.textContent = symbol + ' / ' + (strategyLabelMap[strategy] || strategy);
     sumStr.className = 'summary-val ' + (decision === 'approved' ? 'green' : decision === 'blocked' ? 'red' : 'amber');
   }
+  // Update quality badge
+  var sumQ = document.getElementById('sum-quality');
+  if (sumQ) sumQ.innerHTML = renderQualityBadge(qr);
 }
 
 // === LINE Signal Parser ===
@@ -2317,6 +2405,8 @@ function renderLINECards(signals) {
     html += '</div>';
     // Right: EV + POP + PnL
     html += '<div class="line-card-right">';
+    var cardQr = calcSignalQuality(s.ivr, s.strategy, s.event_risk, g1State.liquidityOk);
+    html += '<div style="margin-bottom:2px">' + renderQualityBadge(cardQr) + '</div>';
     html += '<div class="line-card-ev ' + evClass + '">EV: ' + s.ev.toFixed(2) + '</div>';
     html += '<div class="line-card-pop">\u52dd\u7387: ' + (s.pop * 100).toFixed(1) + '%</div>';
     html += '<div class="line-card-pnl">+' + s.maxProfit.toFixed(0) + ' / -' + s.maxLoss.toFixed(0) + '</div>';
@@ -2364,6 +2454,7 @@ function clearLINEPanel() {
   var sumStr = document.getElementById('sum-strategy');
   if (sumMod) { sumMod.textContent = '\u2014'; sumMod.className = 'summary-val blue'; }
   if (sumStr) { sumStr.textContent = '\u2014'; sumStr.className = 'summary-val'; }
+  var sumQ = document.getElementById('sum-quality'); if (sumQ) sumQ.innerHTML = '<span class="quality-badge grade-c">—</span>';
 }
 
 function analyzeLINESignal(index) {
@@ -2482,6 +2573,10 @@ function analyzeAllLINESignals() {
       sumStr.textContent = firstApproved.symbol + ' / ' + (strategyLabelMap[firstApproved.strategy] || firstApproved.strategy);
       sumStr.className = 'summary-val';
     }
+    // Update quality badge for first approved signal
+    var batchQr = calcSignalQuality(firstApproved.ivr, firstApproved.strategy, firstApproved.event_risk, g1State.liquidityOk);
+    var sumQ = document.getElementById('sum-quality');
+    if (sumQ) sumQ.innerHTML = renderQualityBadge(batchQr);
   }
 }
 
@@ -2757,6 +2852,12 @@ function g1UpdateSummaryBar(recs) {
     sumStr.textContent = recs[0].strategy;
     sumStr.className = 'summary-val red';
   }
+  // Update quality badge from Gate 1 state
+  var g1Ivr = g1State.ivr || 0;
+  var g1Strategy = primary ? (primary.code === 'IC' ? 'IRON_CONDOR' : primary.code === 'BPCS' ? 'BULL_PUT_CREDIT_SPREAD' : primary.code === 'BCCS' ? 'BEAR_CALL_CREDIT_SPREAD' : primary.code === 'BCDS' ? 'BULL_CALL_DEBIT_SPREAD' : primary.code === 'BPDS' ? 'BEAR_PUT_DEBIT_SPREAD' : '') : '';
+  var g1Qr = calcSignalQuality(g1Ivr, g1Strategy, g1State.eventRisk, g1State.liquidityOk);
+  var sumQ = document.getElementById('sum-quality');
+  if (sumQ) sumQ.innerHTML = renderQualityBadge(g1Qr);
 }
 
 // === Init ===
