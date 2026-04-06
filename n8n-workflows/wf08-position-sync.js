@@ -57,6 +57,50 @@ const TT_CLIENT_ID     = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
 const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
 const TT_REFRESH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw';
 
+// === Gate 4: Log check failures to Google Sheet ===
+if (action === 'g4-log-failure') {
+  try {
+    const body = inputData.body || {};
+    const student = body.student || 'unknown';
+    const checks = body.checks || [];
+    const signals = body.signals || [];
+    const timestamp = new Date().toISOString();
+
+    const failedItems = checks.filter(c => !c.pass);
+    if (failedItems.length === 0) return [{ json: { logged: false, reason: 'no failures' } }];
+
+    // Write to Google Sheet (gate4-failures tab)
+    const SHEET_ID = '1clv5FZE6Fhf--2002oXlQg9SfVxqojiAL-QLpkdSGS4';
+    const row = [
+      timestamp,
+      student,
+      failedItems.map(f => f.key).join(','),
+      failedItems.map(f => f.label).join(' | '),
+      checks.map(c => (c.pass ? '✅' : '❌') + c.label).join(' | '),
+      signals.map(s => s.symbol + '(' + (s.strategy||'') + ') EV=' + (s.ev||'?')).join(', ') || 'none',
+    ];
+
+    // Use Google Sheets API via n8n credential
+    const gsResp = await this.helpers.httpRequestWithAuthentication.call(this, 'googleSheetsOAuth2Api', {
+      method: 'POST',
+      url: `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/gate4-failures!A:F:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [row] }),
+      returnFullResponse: true,
+      ignoreHttpStatusErrors: true,
+    });
+
+    return [{ json: {
+      logged: true,
+      failedChecks: failedItems.map(f => f.key),
+      student,
+      timestamp,
+    } }];
+  } catch(e) {
+    return [{ json: { logged: false, error: e.message } }];
+  }
+}
+
 // === Gate 3: Account data for position checks ===
 if (action === 'tt-account-data') {
   try {
