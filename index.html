@@ -1187,7 +1187,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 <!-- TOS Parameter Reference -->
 <div style="margin-top:var(--space-4)">
-<div class="g1-section-title" style="font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-3)">📋 TOS 確認項目（逐檔檢查）</div>
+<div class="g1-section-title" style="font-size:var(--text-sm);font-weight:600;margin-bottom:var(--space-3)">📋 篩選標準對照表</div>
+<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:var(--space-2);padding:var(--space-2);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm)"><strong>策略：</strong>第一層用 CBOE 延遲數據自動篩選 OI/Delta/流動性（這些盤中幾乎不變）→ 篩選通過後開啟券商確認即時 Bid/Ask 再下單</div>
 <div style="overflow-x:auto">
 <table class="line-summary-table" style="font-size:12px">
 <thead><tr><th>項目</th><th>收租（Credit Spread / IC）</th><th>進攻（Debit Spread）</th><th>標準</th></tr></thead>
@@ -2919,7 +2920,7 @@ function populateGate2() {
     html += '<div id="g2-check-' + s.symbol + '" style="margin-top:var(--space-2)">';
     // Auto-fetch data row + Bid-Ask display
     html += '<div style="margin-bottom:6px">';
-    html += '<button onclick="autoFetchOptionData(\'' + s.symbol + '\',\'' + s.strategy + '\',\'' + (s.expiry || '') + '\',\'' + (s.orderText || '') + '\')" style="width:100%;padding:6px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer" id="g2-fetch-btn-' + s.symbol + '">⚡ 自動試算（CBOE 即時數據）</button>';
+    html += '<button onclick="autoFetchOptionData(\'' + s.symbol + '\',\'' + s.strategy + '\',\'' + (s.expiry || '') + '\',\'' + (s.orderText || '') + '\')" style="width:100%;padding:6px;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer" id="g2-fetch-btn-' + s.symbol + '">⚡ 自動篩選（OI / Delta / Bid-Ask）</button>';
     html += '</div>';
     // Auto-fill results area
     html += '<div id="g2-auto-data-' + s.symbol + '" style="display:none;font-size:11px;margin-bottom:6px;padding:6px;background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm)"></div>';
@@ -2931,7 +2932,7 @@ function populateGate2() {
     html += '<span style="font-weight:700;min-width:28px">Ask</span>';
     html += '<input type="number" step="0.01" id="g2-ask-' + s.symbol + '" placeholder="0.00" oninput="updateBidAsk(\'' + s.symbol + '\')" style="width:70px;padding:3px 6px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text);font-size:12px;text-align:center">';
     html += '</div>';
-    html += '<div id="g2-spread-' + s.symbol + '" style="min-width:120px;text-align:right;font-weight:700;font-size:12px;color:var(--color-text-muted)">— 點擊自動試算</div>';
+    html += '<div id="g2-spread-' + s.symbol + '" style="min-width:120px;text-align:right;font-weight:700;font-size:12px;color:var(--color-text-muted)">— 點擊自動篩選</div>';
     html += '</div>';
 
     // Per-symbol TOS checklist (OI, Delta, Width — bidask is now interactive above)
@@ -3265,9 +3266,11 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
 
     // Summary
     if (allOk) {
-      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-success-highlight);color:var(--color-success);border-radius:var(--radius-sm);font-weight:600">✅ 全部條件符合 — OI 充足、Bid-Ask 合格</div>';
+      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-success-highlight);color:var(--color-success);border-radius:var(--radius-sm);font-weight:600">✅ 結構篩選通過 — OI 充足、流動性合格</div>';
+      html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px">💡 Bid/Ask 為 CBOE 延遲報價（~15min），下單前請開啟券商確認即時價格。權利金可能有 $0.02-0.10 差距。</div>';
     } else {
-      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-weight:600">⚠️ 部分條件未達標 — 請留意 OI 或 Bid-Ask</div>';
+      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-weight:600">⚠️ 部分條件未達標 — 請留意 OI 或流動性</div>';
+      html += '<div style="margin-top:3px;padding:4px 8px;background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-sm);font-size:10px">⚠️ 此標的流動性或 OI 不足，建議開啟券商仔細確認後再決定是否進場</div>';
     }
 
     if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = html; }
@@ -3292,7 +3295,13 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
       updateGate2Progress();
     }
 
-    if (btn) { btn.textContent = allOk ? '✅ 試算完成' : '⚠️ 試算完成（有警告）'; btn.style.background = allOk ? 'var(--color-success)' : 'var(--color-warning)'; }
+    if (btn) {
+      btn.textContent = allOk ? '✅ 篩選通過 — 開啟券商確認即時報價' : '⚠️ 篩選完成（有警告）';
+      btn.style.background = allOk ? 'var(--color-success)' : 'var(--color-warning)';
+      btn.disabled = false;
+      // After screening passes, clicking the button opens broker option chain
+      btn.onclick = function() { var config = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab']; window.open(config.optionUrl(symbol), '_blank'); };
+    }
 
   } catch(e) {
     if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '❌ CBOE API 錯誤: ' + e.message + '<br>請手動輸入 Bid/Ask'; }
