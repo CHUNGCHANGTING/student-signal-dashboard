@@ -199,6 +199,13 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .auto-display.ivr-low { background: var(--color-warning-highlight); color: var(--color-warning); }
 .auto-display.ivr-ideal { background: var(--color-success-highlight); color: var(--color-success); }
 .auto-display.ivr-high { background: var(--color-error-highlight); color: var(--color-error); }
+.earnings-expand { cursor: pointer; user-select: none; }
+.earnings-expand:hover { opacity: 0.85; }
+.earnings-detail { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; font-size: 11px; color: var(--color-text-muted); }
+.earnings-detail.open { max-height: 300px; overflow-y: auto; }
+.earnings-detail table { width: 100%; border-collapse: collapse; margin-top: var(--space-2); }
+.earnings-detail td { padding: 2px 6px; border-bottom: 1px solid var(--color-border); font-size: 11px; }
+.earnings-detail td:first-child { font-weight: 600; color: var(--color-text); }
 .btn-reset { margin-left: auto; font-size: var(--text-xs); padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-border); color: var(--color-text-muted); }
 .btn-reset:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
 /* Live Dashboard section */
@@ -1005,8 +1012,9 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   </div>
   <div class="g1-status-card" id="g0-card-earnings">
     <div class="sc-title"><span class="sc-emoji">📅</span> 財報日曆</div>
-    <div id="g0-earnings-display" class="auto-display loading">⏳ 載入中...</div>
-    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">Finnhub 財報 API | 自動更新</div>
+    <div id="g0-earnings-display" class="auto-display loading earnings-expand" onclick="toggleEarningsDetail()">⏳ 載入中...</div>
+    <div id="g0-earnings-detail" class="earnings-detail"></div>
+    <div class="sc-hint" style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-1)">Finnhub 財報 API | 點擊展開明細</div>
   </div>
 </div>
 </div>
@@ -1821,7 +1829,7 @@ async function updateEarningsUI() {
     statusEl.innerHTML = '⚠️ ' + earningsSymbols.join(', ');
     // Auto-update display
     var earningsDisp = document.getElementById('g0-earnings-display');
-    if (earningsDisp) { earningsDisp.className = 'auto-display danger'; earningsDisp.innerHTML = '⚠️ ' + earningsSymbols.join(', '); }
+    if (earningsDisp) { earningsDisp.className = 'auto-display danger earnings-expand'; earningsDisp.innerHTML = '⚠️ ' + earningsSymbols.length + ' 檔有財報: ' + earningsSymbols.join(', ') + ' <span style="font-size:10px">▼</span>'; }
   } else {
     statusEl.style.background = 'var(--color-success-highlight)';
     statusEl.style.color = 'var(--color-success)';
@@ -1839,6 +1847,76 @@ async function updateEarningsUI() {
 // 市場狀態全自動化 — 頁面載入時抓取即時數據
 // ═══════════════════════════════════════════════════════════
 var FINNHUB = 'd70bb2hr01qtb4ra5aagd70bb2hr01qtb4ra5ab0';
+
+// === 2026 Key Economic Events Calendar (Hardcoded) ===
+// Sources: BLS CPI schedule, Federal Reserve FOMC dates, BLS NFP dates
+var KEY_ECONOMIC_EVENTS_2026 = [
+  // CPI (Consumer Price Index) — BLS release dates
+  { date: '2026-01-13', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度，3%以下正常，>5%嚴重通膨' },
+  { date: '2026-02-13', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-03-11', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-04-10', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-05-12', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-06-10', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-07-14', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-08-12', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-09-11', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-10-14', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-11-10', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  { date: '2026-12-10', event: 'CPI 消費者物價指數', type: 'CPI', impact: 'high', note: '反映通膨程度' },
+  // FOMC (Federal Open Market Committee) — 2nd day = decision day
+  { date: '2026-01-28', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-03-18', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-04-29', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-06-17', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-07-29', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-09-16', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-10-28', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  { date: '2026-12-09', event: 'FOMC 利率決議', type: 'FOMC', impact: 'high', note: '升息→不利股市 / 降息→刺激經濟' },
+  // NFP (Non-Farm Payrolls)
+  { date: '2026-01-09', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-02-11', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-03-06', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-04-03', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-05-08', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-06-05', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-07-02', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-08-07', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-09-04', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-10-02', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-11-06', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' },
+  { date: '2026-12-04', event: '非農就業數據 NFP', type: 'NFP', impact: 'high', note: '高於預期=經濟強勁' }
+];
+
+// Check for events within N days window (before the event = risk zone for sellers)
+function getUpcomingKeyEvents(lookAheadDays) {
+  lookAheadDays = lookAheadDays || 7;
+  var now = new Date();
+  var today = now.toISOString().slice(0, 10);
+  var futureDate = new Date(now.getTime() + lookAheadDays * 86400000).toISOString().slice(0, 10);
+  var upcoming = [];
+  for (var i = 0; i < KEY_ECONOMIC_EVENTS_2026.length; i++) {
+    var ev = KEY_ECONOMIC_EVENTS_2026[i];
+    if (ev.date >= today && ev.date <= futureDate) {
+      // Calculate days until event
+      var evDate = new Date(ev.date + 'T00:00:00');
+      var diffMs = evDate.getTime() - now.getTime();
+      var daysUntil = Math.ceil(diffMs / 86400000);
+      upcoming.push({
+        date: ev.date,
+        event: ev.event,
+        type: ev.type,
+        impact: ev.impact,
+        note: ev.note,
+        daysUntil: daysUntil
+      });
+    }
+  }
+  return upcoming.sort(function(a, b) { return a.date.localeCompare(b.date); });
+}
+
+// Type badge emoji map
+var eventTypeEmoji = { 'CPI': '📊', 'FOMC': '🏦', 'NFP': '👷' };
 
 async function autoFetchMarketStatus() {
   var cardBias = document.getElementById('g0-card-bias');
@@ -1938,20 +2016,25 @@ async function autoFetchMarketStatus() {
     setCardStatus(cardIvr, '💡 貼上信號後從 IVR 欄位自動帶入', 'yellow');
   }
 
-  // === 3. 事件風險: Finnhub Economic Calendar ===
+  // === 3. 事件風險: Hardcoded 2026 Calendar (CPI/FOMC/NFP) ===
   try {
-    var today = new Date().toISOString().slice(0,10);
-    var future = new Date(Date.now() + 7*86400000).toISOString().slice(0,10);
-    var ecoRes = await fetch('https://finnhub.io/api/v1/calendar/economic?from=' + today + '&to=' + future + '&token=' + FINNHUB).then(function(r){return r.json()});
-    var events = (ecoRes.economicCalendar || []).filter(function(e) {
-      if (e.country !== 'US') return false;
-      var ev = (e.event || '').toUpperCase();
-      return ev.includes('FOMC') || ev.includes('CPI') || ev.includes('NFP') || ev.includes('NONFARM') || ev.includes('FED') || ev.includes('INTEREST RATE') || ev.includes('PPI') || ev.includes('RETAIL SALES') || ev.includes('GDP');
-    });
+    var upcomingEvents = getUpcomingKeyEvents(7);
     var eventDisplay = document.getElementById('g0-event-display');
-    if (events.length > 0) {
-      var eventList = events.slice(0,3).map(function(e) { return e.date.slice(5) + ' ' + e.event.substring(0,20); }).join(', ');
-      if (eventDisplay) { eventDisplay.className = 'auto-display danger'; eventDisplay.innerHTML = '⚠️ ' + eventList; }
+    if (upcomingEvents.length > 0) {
+      var evHtml = '';
+      for (var ei = 0; ei < upcomingEvents.length; ei++) {
+        var ue = upcomingEvents[ei];
+        var emoji = eventTypeEmoji[ue.type] || '⚡';
+        var dateStr = ue.date.slice(5).replace('-', '/');
+        var urgency = ue.daysUntil <= 2 ? ' style="color:var(--color-error);font-weight:700"' : '';
+        evHtml += '<div' + urgency + '>' + emoji + ' ' + dateStr + ' ' + ue.event;
+        if (ue.daysUntil === 0) evHtml += ' <span style="background:var(--color-error);color:#fff;padding:0 4px;border-radius:3px;font-size:10px">今天</span>';
+        else if (ue.daysUntil === 1) evHtml += ' <span style="background:var(--color-error);color:#fff;padding:0 4px;border-radius:3px;font-size:10px">明天</span>';
+        else evHtml += ' <span style="font-size:10px;opacity:0.7">(' + ue.daysUntil + '天後)</span>';
+        evHtml += '</div>';
+      }
+      evHtml += '<div style="font-size:10px;margin-top:4px;color:var(--color-text-muted)">⚠️ 賣方策略避開公布前下單 | 買方策略不受影響（IV上升有利）</div>';
+      if (eventDisplay) { eventDisplay.className = 'auto-display danger'; eventDisplay.style.flexDirection = 'column'; eventDisplay.style.alignItems = 'flex-start'; eventDisplay.style.fontSize = '12px'; eventDisplay.style.fontWeight = '600'; eventDisplay.innerHTML = evHtml; }
       g1State.eventRisk = true;
       cardEvent.className = 'g1-status-card tint-red';
     } else {
@@ -1959,27 +2042,51 @@ async function autoFetchMarketStatus() {
       g1State.eventRisk = false;
       cardEvent.className = 'g1-status-card tint-green';
     }
-    // Auto-set liquidity: default OK unless VIX spike detected
+    // Auto-set liquidity: default OK unless VIX spike
     g1State.liquidityOk = true;
   } catch(e) {
-    setCardStatus(cardEvent, '⚠️ 經濟日曆取得失敗', 'yellow');
+    var eventDisplay = document.getElementById('g0-event-display');
+    if (eventDisplay) { eventDisplay.className = 'auto-display loading'; eventDisplay.textContent = '⚠️ 事件日曆載入失敗'; }
   }
 
   // === 4. 財報日曆: Already handled by fetchEarningsCalendar ===
   await fetchEarningsCalendar();
   var total = Object.keys(earningsCache).length;
   var earningsDisplay = document.getElementById('g0-earnings-display');
+  var earningsDetailEl = document.getElementById('g0-earnings-detail');
   var hintE = cardEarnings ? cardEarnings.querySelector('.sc-hint') : null;
-  if (hintE) hintE.textContent = '本週共 ' + total + ' 家財報 | Finnhub API 自動更新';
+  if (hintE) hintE.textContent = '本週共 ' + total + ' 家財報 | Finnhub API | 點擊展開明細';
   if (earningsDisplay) {
     if (total > 0) {
-      var symbols = Object.keys(earningsCache).slice(0, 5).join(', ');
+      var allSymbols = Object.keys(earningsCache);
+      var shown = allSymbols.slice(0, 5).join(', ');
       var more = total > 5 ? ' +' + (total - 5) + '家' : '';
-      earningsDisplay.className = 'auto-display danger';
-      earningsDisplay.innerHTML = '⚠️ ' + total + ' 家財報 <span style="font-size:10px;font-weight:400">(' + symbols + more + ')</span>';
+      earningsDisplay.className = 'auto-display danger earnings-expand';
+      earningsDisplay.innerHTML = '⚠️ ' + total + ' 家財報 <span style="font-size:10px;font-weight:400">(' + shown + more + ')</span> <span style="font-size:10px">▼ 點擊展開</span>';
+      // Build detail table
+      if (earningsDetailEl) {
+        var detHtml = '<table>';
+        // Group by date
+        var byDate = {};
+        for (var sym in earningsCache) {
+          var ed = earningsCache[sym];
+          var dateKey = ed.date || 'unknown';
+          if (!byDate[dateKey]) byDate[dateKey] = [];
+          byDate[dateKey].push({ symbol: sym, hour: ed.hour || '' });
+        }
+        var sortedDates = Object.keys(byDate).sort();
+        for (var di = 0; di < sortedDates.length; di++) {
+          var dk = sortedDates[di];
+          var syms = byDate[dk].map(function(s) { return s.symbol + (s.hour ? '(' + s.hour + ')' : ''); }).join(', ');
+          detHtml += '<tr><td>' + dk.slice(5) + '</td><td>' + syms + '</td></tr>';
+        }
+        detHtml += '</table>';
+        earningsDetailEl.innerHTML = detHtml;
+      }
     } else {
-      earningsDisplay.className = 'auto-display safe';
+      earningsDisplay.className = 'auto-display safe earnings-expand';
       earningsDisplay.innerHTML = '✅ 本週無財報衝突';
+      if (earningsDetailEl) earningsDetailEl.innerHTML = '';
     }
   }
   // Trigger Gate 1 recommendation update with all auto-filled values
@@ -2155,7 +2262,7 @@ function calcEVSignal(pop, credit_received, debit_paid, max_loss, target_value) 
 function getReasonLabel(reason) {
   var map = {
     'module_unknown': '無法辨識模組（strategy 不在已知清單）',
-    'event_risk': '事件風險（財報 / FOMC 等）',
+    'event_risk': '事件風險 — 賣方策略避開，買方不受影響（IV上升有利）',
     'ivr_too_low': '收租模組 IVR < 27，不符合門檻',
     'ic_ivr_below_30': 'Iron Condor IVR < 30，不符合門檻',
     'dte_out_of_range': 'DTE 不在 14–45 天範圍'
@@ -2603,6 +2710,12 @@ function analyzeAllLINESignals() {
 function fillLINESample() {
   var sample = '\u3010KO\u3011 \u73fe\u50f9:76.72 (IV:14.63%)\n\u8a0a\u865f: \u8da8\u52e2\u7a69\u5b9a (2/3)\n\u7b56\u7565: \ud83d\udcc8 \u770b\u6f32\u9032\u653b\n\u6307\u4ee4: BUY CALL 76.0 / SELL CALL 81.0\nEV: 1.45 | \u52dd\u7387: 61.0%\n\u76c8\u8667: +340.0/-160.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:74.07 | \u58d3\u529b:78.43\n\n\u3010JNJ\u3011 \u73fe\u50f9:156.54 (IV:23.17%)\n\u8a0a\u865f: \u8da8\u52e2\u5f37\u52c1 (3/3)\n\u7b56\u7565: \ud83d\udcc8 \u770b\u6f32\u9032\u653b\n\u6307\u4ee4: BUY CALL 155.0 / SELL CALL 162.5\nEV: 2.18 | \u52dd\u7387: 58.0%\n\u76c8\u8667: +430.0/-320.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:152.30 | \u58d3\u529b:159.80\n\n\u3010CBOE\u3011 \u73fe\u50f9:217.80 (IV:19.45%)\n\u8a0a\u865f: \u8da8\u52e2\u7a69\u5b9a (2/3)\n\u7b56\u7565: \ud83d\udcc9 \u770b\u8dcc\u9032\u653b\n\u6307\u4ee4: BUY PUT 220.0 / SELL PUT 215.0\nEV: 0.87 | \u52dd\u7387: 54.0%\n\u76c8\u8667: +280.0/-220.0\n\ud83d\udcc5 \u5230\u671f: 2026-04-17 (\u526914\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:214.50 | \u58d3\u529b:221.00\n\n\u3010SPY\u3011 \u73fe\u50f9:549.01 (IV:26.88%)\n\u8a0a\u865f: \u8da8\u52e2\u4e2d\u6027 (1/3)\n\u7b56\u7565: \u2696\ufe0f \u4e2d\u6027\u6536\u79df\n\u6307\u4ee4: SELL PUT 540.0 / BUY PUT 535.0\nEV: 1.12 | \u52dd\u7387: 72.0%\n\u76c8\u8667: +180.0/-320.0\n\ud83d\udcc5 \u5230\u671f: 2026-05-01 (\u526928\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:541.20 | \u58d3\u529b:556.80\n\n\u3010QQQ\u3011 \u73fe\u50f9:462.35 (IV:30.12%)\n\u8a0a\u865f: \u8da8\u52e2\u4e2d\u6027 (1/3)\n\u7b56\u7565: \u2696\ufe0f \u4e2d\u6027\u6536\u79df\n\u6307\u4ee4: SELL CALL 475.0 / BUY CALL 480.0\nEV: 0.95 | \u52dd\u7387: 68.0%\n\u76c8\u8667: +160.0/-340.0\n\ud83d\udcc5 \u5230\u671f: 2026-05-01 (\u526928\u5929)\n\ud83d\udee1\ufe0f \u652f\u6490:455.10 | \u58d3\u529b:470.50';
   document.getElementById('line-textarea').value = sample;
+}
+
+// Toggle earnings detail panel
+function toggleEarningsDetail() {
+  var detail = document.getElementById('g0-earnings-detail');
+  if (detail) detail.classList.toggle('open');
 }
 
 // === Gate 1: Pre-Market Signal Dashboard ===
