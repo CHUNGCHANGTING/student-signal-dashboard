@@ -57,6 +57,31 @@ const TT_CLIENT_ID     = 'ec8b4453-d7e5-418e-8170-43e9b3e0b460';
 const TT_CLIENT_SECRET = 'b09387c27e0cd0325cae0a910e43fc5f158ca109';
 const TT_REFRESH_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6InJ0K2p3dCIsImtpZCI6ImxycXg3Wm5RNXJ3cHp6WXRTVjRhTjdMODhET0lWODEtRGpQZTVhVkdrcVUiLCJqa3UiOiJodHRwczovL2ludGVyaW9yLWFwaS5hcjIudGFzdHl0cmFkZS5zeXN0ZW1zL29hdXRoL2p3a3MifQ.eyJpc3MiOiJodHRwczovL2FwaS50YXN0eXRyYWRlLmNvbSIsInN1YiI6IlU1Y2FkZGU1ZS1kOGUzLTQyYmItYTljOC03YThiYjg5NWM2NTkiLCJpYXQiOjE3NzQzNzA3NTIsImF1ZCI6ImVjOGI0NDUzLWQ3ZTUtNDE4ZS04MTcwLTQzZTliM2UwYjQ2MCIsImdyYW50X2lkIjoiRzAyNGY3ZDIwLTk2MDgtNGVmYy1iYzVmLTQ3YzU2MWZlYzVhYSIsInNjb3BlIjoicmVhZCB0cmFkZSBvcGVuaWQifQ.iBKlWkK3DYbHxe3EkBOaU8tQghSq2_MlZpMcBLDgj32wPAew9nwJ-WV397ftK6ilWv_WiOPCuVfN0NNrQDg4Dw';
 
+if (action === 'tt-quote-level') {
+  // Check if account has live or delayed quotes
+  try {
+    const tokenResp = await this.helpers.httpRequest({
+      method: 'POST', url: 'https://api.tastyworks.com/oauth/token',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'chilldove-dashboard/1.0' },
+      body: `grant_type=refresh_token&client_id=${TT_CLIENT_ID}&client_secret=${TT_CLIENT_SECRET}&refresh_token=${encodeURIComponent(TT_REFRESH_TOKEN)}`,
+      returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 10000
+    });
+    const tokenData = typeof tokenResp.body === 'string' ? JSON.parse(tokenResp.body) : tokenResp.body;
+    if (!tokenData.access_token) return [{ json: { level: 'unknown', error: 'token_failed' } }];
+    const quoteResp = await this.helpers.httpRequest({
+      method: 'GET', url: 'https://api.tastyworks.com/api-quote-tokens',
+      headers: { 'Authorization': 'Bearer ' + tokenData.access_token, 'User-Agent': 'chilldove-dashboard/1.0' },
+      returnFullResponse: true, ignoreHttpStatusErrors: true, timeout: 8000
+    });
+    const quoteData = typeof quoteResp.body === 'string' ? JSON.parse(quoteResp.body) : quoteResp.body;
+    const level = quoteData?.data?.level || 'unknown';
+    const url = quoteData?.data?.['dxlink-url'] || '';
+    return [{ json: { level, dxlinkUrl: url, isLive: level === 'live' && url.includes('tasty-live') } }];
+  } catch(e) {
+    return [{ json: { level: 'unknown', error: e.message } }];
+  }
+}
+
 if (action === 'tt-login' || action === 'tt-oauth') {
   // OAuth flow: exchange refresh token for access token (no password needed, no 2FA)
   try {

@@ -3652,11 +3652,44 @@ function fetchWithTimeout(url, opts, timeoutMs) {
   ]);
 }
 
-// tastytrade market-data/by-type requires live quote subscription.
-// This account is professional + delayed → always 403 → skip entirely.
-// When quote level is upgraded to live, change this to true.
+// Check tastytrade quote level: only use real-time if account has live quotes.
+// Result cached in sessionStorage to avoid re-checking every time.
+var _ttQuoteLevelChecked = false;
+var _ttQuoteLevelLive = false;
+
+async function checkTastytradeQuoteLevel() {
+  if (_ttQuoteLevelChecked) return _ttQuoteLevelLive;
+  // Check sessionStorage cache first
+  var cached = sessionStorage.getItem('tt-quote-level');
+  if (cached !== null) {
+    _ttQuoteLevelChecked = true;
+    _ttQuoteLevelLive = (cached === 'live');
+    return _ttQuoteLevelLive;
+  }
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'tt-quote-level' })
+    });
+    var data = await resp.json();
+    var level = data.level || 'unknown';
+    sessionStorage.setItem('tt-quote-level', level);
+    _ttQuoteLevelChecked = true;
+    _ttQuoteLevelLive = data.isLive === true;
+    return _ttQuoteLevelLive;
+  } catch(e) {
+    _ttQuoteLevelChecked = true;
+    _ttQuoteLevelLive = false;
+    sessionStorage.setItem('tt-quote-level', 'error');
+    return false;
+  }
+}
+
 function isTastytradeActive() {
-  return false;
+  // Sync check — uses cached result from checkTastytradeQuoteLevel()
+  if (selectedBroker !== 'tastytrade') return false;
+  if (!localStorage.getItem('broker_tt-session')) return false;
+  return _ttQuoteLevelLive; // Only true if quote level is 'live'
 }
 
 // Build tastytrade OCC option symbol: "KO    260417C00076000"
@@ -3727,14 +3760,29 @@ async function autoFetchAll() {
   var statusSub = document.getElementById('g2-auto-status-sub');
   g2FetchResults = { passed: [], warned: [], failed: [] };
 
+  // Check tastytrade quote level once (cached after first call)
+  if (selectedBroker === 'tastytrade' && localStorage.getItem('broker_tt-session')) {
+    if (statusText) statusText.innerHTML = '⚡ 檢查報價等級...';
+    await checkTastytradeQuoteLevel();
+  }
+
   // Determine data source
   var useTasty = isTastytradeActive();
   g2DataSource = useTasty ? 'tastytrade' : 'cboe';
 
-  if (statusText) statusText.innerHTML = useTasty ? '⚡ 拉取 tastytrade 即時報價...' : '⚡ 拉取 CBOE 篩選數據...';
-  if (statusSub) statusSub.innerHTML = useTasty
-    ? '🟣 tastytrade 即時數據 — Bid/Ask 為券商即時報價'
-    : 'CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）| Bid/Ask 僅供參考，下單前請以券商即時報價為準';
+  // Show data source decision
+  var quoteLevel = sessionStorage.getItem('tt-quote-level') || '';
+  if (useTasty) {
+    if (statusText) statusText.innerHTML = '🟣 拉取 tastytrade 即時報價...';
+    if (statusSub) statusSub.innerHTML = '🟣 tastytrade 即時數據 — Bid/Ask 為券商即時報價';
+  } else {
+    if (statusText) statusText.innerHTML = '⚡ 拉取 CBOE 篩選數據...';
+    if (quoteLevel === 'demo' || quoteLevel === 'delayed') {
+      if (statusSub) statusSub.innerHTML = '🟠 帳戶報價等級: delayed — 使用 CBOE 數據篩選 OI/Delta/流動性（盤中幾乎不變）';
+    } else {
+      if (statusSub) statusSub.innerHTML = 'CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）';
+    }
+  }
 
   var symbols = g2ApprovedSignals.map(function(s) { return s.symbol.replace(/[^A-Z]/g, ''); });
 
