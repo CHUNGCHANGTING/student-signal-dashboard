@@ -14,7 +14,7 @@ if ($input.first().json.halted) {
   try { await this.helpers.httpRequest({ method: 'POST', url: 'https://api.line.me/v2/bot/message/broadcast', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + LINE_TOKEN }, body: JSON.stringify({ messages: [{ type: 'text', text: haltMsg }] }), returnFullResponse: true, ignoreHttpStatusErrors: true }); } catch(e) {}
   try { await this.helpers.httpRequest({ method: 'POST', url: `https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: TG_CHAT, text: haltMsg }) }); } catch(e) {}
   // Also POST to webhook
-  try { await this.helpers.httpRequest({ method: 'POST', url: 'https://chilldove.app.n8n.cloud/webhook/ev-signals-update', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timestamp: new Date().toISOString(), signals: [], summary: { halted: true, reason: d.haltReason, vix: d.vix, version: 'v3.4' }, raw: [] }) }); } catch(e) {}
+  try { await this.helpers.httpRequest({ method: 'POST', url: 'https://chilldove.app.n8n.cloud/webhook/skool-verify', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timestamp: new Date().toISOString(), signals: [], summary: { halted: true, reason: d.haltReason, vix: d.vix, version: 'v3.4' }, raw: [] }) }); } catch(e) {}
   // Even halt messages get Dashboard link
   haltMsg += `\n\n📊 Dashboard:\nhttps://chungchangting.github.io/student-signal-dashboard/`;
   return [{ json: { message: haltMsg, halted: true, version: 'v3.4' } }];
@@ -354,7 +354,7 @@ try {
   trackingResult = `Tracking error: ${e.message}`;
 }
 
-// === POST 信號到 ev-signals webhook（供 Dashboard 即時讀取）===
+// === POST 信號到 skool-verify webhook（供 Dashboard 即時讀取）===
 let webhookResult = 'not sent';
 try {
   const payload = {
@@ -383,7 +383,7 @@ try {
   };
   const webhookResp = await this.helpers.httpRequest({
     method: 'POST',
-    url: 'https://chilldove.app.n8n.cloud/webhook/ev-signals-update',
+    url: 'https://chilldove.app.n8n.cloud/webhook/skool-verify',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });

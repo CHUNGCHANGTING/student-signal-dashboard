@@ -2088,12 +2088,49 @@ function processAutoSignals(data) {
   else if (data && Array.isArray(data.signals)) signals = data.signals;
   else if (data && data.symbol) signals = [data];
 
+  // Map v3.4 strategy names → Dashboard strategy codes
+  var strategyNormalize = {
+    'BULL PUT SPREAD': 'BULL_PUT_CREDIT_SPREAD',
+    'BULL PUT CREDIT SPREAD': 'BULL_PUT_CREDIT_SPREAD',
+    'BEAR CALL SPREAD': 'BEAR_CALL_CREDIT_SPREAD',
+    'BEAR CALL CREDIT SPREAD': 'BEAR_CALL_CREDIT_SPREAD',
+    'BULL CALL SPREAD': 'BULL_CALL_DEBIT_SPREAD',
+    'BULL CALL DEBIT SPREAD': 'BULL_CALL_DEBIT_SPREAD',
+    'BEAR PUT SPREAD': 'BEAR_PUT_DEBIT_SPREAD',
+    'BEAR PUT DEBIT SPREAD': 'BEAR_PUT_DEBIT_SPREAD',
+    'IRON CONDOR': 'IRON_CONDOR',
+    // Already correct formats pass through
+    'IRON_CONDOR': 'IRON_CONDOR',
+    'BULL_PUT_CREDIT_SPREAD': 'BULL_PUT_CREDIT_SPREAD',
+    'BEAR_CALL_CREDIT_SPREAD': 'BEAR_CALL_CREDIT_SPREAD',
+    'BULL_CALL_DEBIT_SPREAD': 'BULL_CALL_DEBIT_SPREAD',
+    'BEAR_PUT_DEBIT_SPREAD': 'BEAR_PUT_DEBIT_SPREAD',
+    // Module short codes → full codes
+    'IC': 'IRON_CONDOR', 'BPCS': 'BULL_PUT_CREDIT_SPREAD',
+    'BCCS': 'BEAR_CALL_CREDIT_SPREAD', 'BCDS': 'BULL_CALL_DEBIT_SPREAD',
+    'BPDS': 'BEAR_PUT_DEBIT_SPREAD'
+  };
+
   signals.forEach(function(sig) {
+    var rawStrat = (sig.strategy || '').toUpperCase();
+    var normStrat = strategyNormalize[rawStrat] || rawStrat;
+    // Parse IVR from iv_environment string if ivr field is missing (e.g. "IVR=45%")
+    var ivrVal = parseFloat(sig.ivr) || 0;
+    if (!ivrVal && sig.iv_environment) {
+      var m = (sig.iv_environment + '').match(/(\d+)/);
+      if (m) ivrVal = parseFloat(m[1]);
+    }
+    // Parse DTE from note field if dte is missing (e.g. "...30DTE...")
+    var dteVal = parseInt(sig.dte) || 0;
+    if (!dteVal && sig.note) {
+      var dm = (sig.note + '').match(/(\d+)DTE/);
+      if (dm) dteVal = parseInt(dm[1]);
+    }
     var payload = {
       symbol: (sig.symbol || '').toUpperCase(),
-      strategy: (sig.strategy || '').toUpperCase(),
-      ivr: parseFloat(sig.ivr) || 0,
-      dte: parseInt(sig.dte) || 0,
+      strategy: normStrat,
+      ivr: ivrVal,
+      dte: dteVal,
       pop: parseFloat(sig.pop) || 0,
       bias: sig.bias || 'neutral',
       credit_received: parseFloat(sig.credit_received) || 0,
@@ -2725,9 +2762,21 @@ function analyzePayload(payload) {
   clearSignalHighlights();
 
   var symbol = (payload.symbol || '').toUpperCase();
-  var strategy = (payload.strategy || '').toUpperCase();
+  var rawS = (payload.strategy || '').toUpperCase();
+  // Normalize strategy name (handle v3.4 format + short codes)
+  var sNorm = {
+    'BULL PUT SPREAD':'BULL_PUT_CREDIT_SPREAD','BULL PUT CREDIT SPREAD':'BULL_PUT_CREDIT_SPREAD',
+    'BEAR CALL SPREAD':'BEAR_CALL_CREDIT_SPREAD','BEAR CALL CREDIT SPREAD':'BEAR_CALL_CREDIT_SPREAD',
+    'BULL CALL SPREAD':'BULL_CALL_DEBIT_SPREAD','BULL CALL DEBIT SPREAD':'BULL_CALL_DEBIT_SPREAD',
+    'BEAR PUT SPREAD':'BEAR_PUT_DEBIT_SPREAD','BEAR PUT DEBIT SPREAD':'BEAR_PUT_DEBIT_SPREAD',
+    'IRON CONDOR':'IRON_CONDOR','IC':'IRON_CONDOR','BPCS':'BULL_PUT_CREDIT_SPREAD',
+    'BCCS':'BEAR_CALL_CREDIT_SPREAD','BCDS':'BULL_CALL_DEBIT_SPREAD','BPDS':'BEAR_PUT_DEBIT_SPREAD'
+  };
+  var strategy = sNorm[rawS] || rawS;
   var ivr = parseFloat(payload.ivr) || 0;
+  if (!ivr && payload.iv_environment) { var _m = (payload.iv_environment+'').match(/(\d+)/); if (_m) ivr = parseFloat(_m[1]); }
   var dte = parseInt(payload.dte) || 0;
+  if (!dte && payload.note) { var _dm = (payload.note+'').match(/(\d+)DTE/); if (_dm) dte = parseInt(_dm[1]); }
   var event_risk = payload.event_risk;
   var pop = parseFloat(payload.pop) || 0;
   var credit_received = parseFloat(payload.credit_received) || 0;
