@@ -354,9 +354,17 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .module-card.sp-highlight { box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md); border-color: var(--color-primary); }
 .strategy-row.sp-highlight { background: var(--color-primary-highlight); border-color: var(--color-primary); }
 .regime-card.sp-highlight { box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md); border-color: var(--color-primary); }
+/* Mobile hamburger */
+.menu-toggle { display:none;width:36px;height:36px;border-radius:var(--radius-md);align-items:center;justify-content:center;color:var(--color-text-muted);border:1px solid var(--color-border);flex-shrink:0;cursor:pointer; }
+.menu-toggle:hover { background:var(--color-surface-dynamic);color:var(--color-text); }
+.sidebar-backdrop { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:199;backdrop-filter:blur(2px); }
 @media (max-width: 768px) {
   .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
-  .sidebar { display: none; }
+  .menu-toggle { display:flex; }
+  .sidebar { display:none;position:fixed;top:0;left:0;bottom:0;width:280px;z-index:200;height:100dvh;box-shadow:4px 0 24px rgba(0,0,0,0.3);padding-top:var(--space-6); }
+  .sidebar.open { display:block;animation:slideIn .25s ease; }
+  .sidebar-backdrop.open { display:block; }
+  @keyframes slideIn { from { transform:translateX(-100%); } to { transform:translateX(0); } }
   .main, .live-section { padding: var(--space-6) var(--space-4); }
   .module-grid { grid-template-columns: 1fr; }
   .regime-grid { grid-template-columns: 1fr 1fr; }
@@ -899,7 +907,10 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="app">
 <!-- Topbar -->
 <header class="topbar">
-  <a class="logo" href="#">
+  <button class="menu-toggle" id="menu-toggle" onclick="toggleMobileSidebar()" aria-label="選單">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <a class="logo" href="#" onclick="if(window.innerWidth<=768){event.preventDefault();toggleMobileSidebar();}">
     <div class="logo-mark"><svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="24" height="24" rx="6" fill="var(--color-primary)" opacity="0.15"/><path d="M7 14 L12 9 L16 13 L21 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 21 L12 18 L16 20 L21 16" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="21" cy="7" r="2" fill="var(--color-primary)"/><circle cx="21" cy="16" r="2" fill="var(--color-gold)"/></svg></div>
     <div><div class="logo-text">Options Strategy Engine</div><div class="logo-sub">決策流程 SOP v1.3</div></div>
   </a>
@@ -916,8 +927,9 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     </button>
   </div>
 </header>
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 <!-- Sidebar -->
-<nav class="sidebar">
+<nav class="sidebar" id="sidebar">
   <div class="sidebar-section">決策流程</div>
   <button class="nav-item active" onclick="showSection('gate0',this)"><span class="nav-dot gate"></span>第1關　盤前訊號</button>
   <!-- Gate 1 merged into Gate 0 -->
@@ -1605,7 +1617,19 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 })();
 
 // === Navigation ===
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'gate4') loadGate4();   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
+// Mobile sidebar toggle
+function toggleMobileSidebar() {
+  var sb = document.getElementById('sidebar');
+  var bd = document.getElementById('sidebar-backdrop');
+  var isOpen = sb.classList.contains('open');
+  if (isOpen) { closeMobileSidebar(); } else { sb.classList.add('open'); bd.classList.add('open'); }
+}
+function closeMobileSidebar() {
+  var sb = document.getElementById('sidebar');
+  var bd = document.getElementById('sidebar-backdrop');
+  sb.classList.remove('open'); bd.classList.remove('open');
+}
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'gate4') loadGate4();   if (id === 'admin-panel') loadStudents();   closeMobileSidebar();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
