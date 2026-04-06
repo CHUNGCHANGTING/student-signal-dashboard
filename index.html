@@ -1691,23 +1691,63 @@ function startAutoRefresh() {
 
 // === Webhook/Demo/Parse ===
 function loadWebhook() {
-  const url = document.getElementById('webhook-url').value;
   const statusEl = document.getElementById('load-status');
   const dotEl = document.getElementById('live-dot');
   const timeEl = document.getElementById('live-time');
-  if (statusEl) statusEl.textContent = '載入中...';
-  fetch(url).then(r => r.json()).then(data => {
+  if (statusEl) statusEl.textContent = '載入中... 拉取 tastytrade 即時持倉';
+
+  // Use tt-account-data for real positions
+  fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'tt-account-data' })
+  }).then(r => r.json()).then(ttData => {
+    var positions = (ttData.positions || []).map(function(p) {
+      return {
+        symbol: p.symbol,
+        strategy: p.type === 'Equity Option' ? (p.optionType === 'C' ? 'CALL' : 'PUT') : (p.type || 'Equity'),
+        expiration: p.expirationDate || '-',
+        quantity: p.quantity,
+        pop: '-',
+        credit_received: 0,
+        debit_paid: parseFloat(p.averageOpenPrice) || 0,
+        max_loss: 0,
+        status: 'active',
+        strikePrice: p.strikePrice,
+        direction: p.direction
+      };
+    });
+    var bal = ttData.balances || {};
+    var risk = {
+      buying_power: '$' + (bal.optionBuyingPower || 0).toFixed(2),
+      net_liq: '$' + (bal.netLiq || 0).toFixed(2),
+      portfolio_delta: 'N/A'
+    };
+    var data = { positions: positions, signals: g2ApprovedSignals || [], risk: risk };
     dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
+    renderPositions(data.positions);
+    renderSignals(data.signals);
+    renderRisk(data.risk);
+    renderOrders(data.positions);
     updateStats(data);
     if (dotEl) dotEl.classList.add('online');
     if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
-    if (statusEl) { statusEl.textContent = '✅ 載入成功 (' + new Date().toLocaleTimeString() + ')'; statusEl.className = 'load-status ok'; }
+    if (statusEl) { statusEl.textContent = '✅ tastytrade 即時持倉已載入 (' + positions.length + ' 筆, ' + new Date().toLocaleTimeString() + ')'; statusEl.className = 'load-status ok'; }
   }).catch(e => {
-    if (statusEl) { statusEl.textContent = '❌ 載入失敗: ' + e.message; statusEl.className = 'load-status err'; }
+    // Fallback to webhook URL
+    var url = document.getElementById('webhook-url').value;
+    fetch(url).then(r => r.json()).then(data => {
+      dashboardData = data;
+      renderPositions(data.positions || []);
+      renderSignals(data.signals || []);
+      renderRisk(data.risk || {});
+      renderOrders(data.positions || []);
+      updateStats(data);
+      if (dotEl) dotEl.classList.add('online');
+      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+      if (statusEl) { statusEl.textContent = '✅ Webhook 載入成功 (' + new Date().toLocaleTimeString() + ')'; statusEl.className = 'load-status ok'; }
+    }).catch(e2 => {
+      if (statusEl) { statusEl.textContent = '❌ 載入失敗: ' + e.message; statusEl.className = 'load-status err'; }
+    });
   });
 }
 
