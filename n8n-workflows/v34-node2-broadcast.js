@@ -133,7 +133,11 @@ ranked.forEach((sym, idx) => {
     } else {
       msg += `➡️ ${sLabel} ${s.shortStrike}/${s.longStrike}\n`;
     }
-    msg += `   ${action}$${amount} | EV $${parseFloat(s.ev).toFixed(2)} | Kelly ${s.kelly}\n`;
+    // EV range: show worst~best based on Bid/Ask slippage
+    const evStr = s.evRange
+      ? `EV $${s.evRange.evWorst}~$${s.evRange.evBest} (中$${parseFloat(s.ev).toFixed(2)})`
+      : `EV $${parseFloat(s.ev).toFixed(2)}`;
+    msg += `   ${action}$${amount} | ${evStr} | Kelly ${s.kelly}\n`;
     msg += `   ${s.dte}DTE | ${wr} | Δ${s.shortDelta || '?'}\n`;
 
     // Stop loss / take profit
@@ -231,7 +235,9 @@ ranked.forEach(sym => {
       symbol: sym.ticker,
       strategy: s.strategy,
       decision: parseFloat(s.ev) > 0 ? 'GO' : 'SKIP',
-      note: `EV=$${parseFloat(s.ev).toFixed(2)} Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`,
+      note: s.evRange
+        ? `EV=$${s.evRange.evWorst}~$${s.evRange.evBest}(中${parseFloat(s.ev).toFixed(2)}) Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`
+        : `EV=$${parseFloat(s.ev).toFixed(2)} Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`,
       module: moduleMap[s.strategy] || s.strategy,
       bias: sym.direction || 'neutral',
       iv_environment: `IVR=${(parseFloat(sym.ivr)*100).toFixed(0)}%`,

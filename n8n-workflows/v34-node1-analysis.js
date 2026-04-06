@@ -309,6 +309,41 @@ function midPrice(opt) {
   return ((parseFloat(opt.bid) || 0) + (parseFloat(opt.ask) || 0)) / 2;
 }
 
+// EV range: best/worst case based on Bid-Ask slippage
+function calcEVRange(shortOpt, longOpt, winRate, width, isCredit) {
+  const sBid = parseFloat(shortOpt.bid) || 0;
+  const sAsk = parseFloat(shortOpt.ask) || 0;
+  const lBid = parseFloat(longOpt.bid) || 0;
+  const lAsk = parseFloat(longOpt.ask) || 0;
+  if (isCredit) {
+    // Credit spread: sell short, buy long
+    const creditBest  = sAsk - lBid;  // best fill: sell at ask, buy at bid (unlikely but possible with limit)
+    const creditMid   = midPrice(shortOpt) - midPrice(longOpt);
+    const creditWorst = sBid - lAsk;  // worst fill: sell at bid, buy at ask
+    const mlBest  = width - creditBest;
+    const mlMid   = width - creditMid;
+    const mlWorst = width - creditWorst;
+    return {
+      evBest:  +(creditBest * winRate - mlBest * (1 - winRate)).toFixed(2),
+      evMid:   +(creditMid * winRate - mlMid * (1 - winRate)).toFixed(2),
+      evWorst: +(Math.max(creditWorst, 0) * winRate - (width - Math.max(creditWorst, 0)) * (1 - winRate)).toFixed(2)
+    };
+  } else {
+    // Debit spread: buy long, sell short
+    const debitBest  = lBid - sAsk;  // best: buy at bid (unlikely), sell at ask
+    const debitMid   = midPrice(longOpt) - midPrice(shortOpt);
+    const debitWorst = lAsk - sBid;  // worst: buy at ask, sell at bid
+    const gainBest  = width - debitBest;
+    const gainMid   = width - debitMid;
+    const gainWorst = width - debitWorst;
+    return {
+      evBest:  +(winRate * gainBest - (1 - winRate) * debitBest).toFixed(2),
+      evMid:   +(winRate * gainMid - (1 - winRate) * debitMid).toFixed(2),
+      evWorst: +(winRate * gainWorst - (1 - winRate) * Math.max(debitWorst, 0)).toFixed(2)
+    };
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // 7.  KELLY CRITERION
 // ─────────────────────────────────────────────────────────────
@@ -435,6 +470,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           credit: +credit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortPut, longPut, winRate, width, true),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +maxLoss.toFixed(4),
@@ -515,6 +551,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           credit: +credit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortCall, longCall, winRate, width, true),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +maxLoss.toFixed(4),
@@ -580,6 +617,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           debit: +debit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortCall, longCall, winRate, width, false),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +debit.toFixed(4),
@@ -644,6 +682,7 @@ function buildSpreads(optsByExpType, underlyingPrice, direction, ivr, ivPercenti
           dte,
           debit: +debit.toFixed(4),
           ev: +ev.toFixed(4),
+          evRange: calcEVRange(shortPut, longPut, winRate, longPut._strike - shortPut._strike, false),
           kelly: +k.toFixed(4),
           winRate: +winRate.toFixed(4),
           margin: +debit.toFixed(4),

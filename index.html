@@ -1168,12 +1168,15 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="gate-header"><div class="gate-num g2">2</div><div><div class="gate-title">TOS 試算</div><div class="gate-subtitle">在券商平台上逐檔確認 OI、Bid-Ask、Delta、Width</div></div></div>
 
 <!-- Broker Auto-Display (reads from saved setting) -->
-<div id="g2-broker-bar" style="margin-bottom:var(--space-3);padding:var(--space-2) var(--space-3);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;font-size:12px">
+<div id="g2-broker-bar" style="margin-bottom:var(--space-3);padding:var(--space-3);background:var(--color-success-highlight);border:1px solid var(--color-success);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;font-size:12px">
   <div style="display:flex;align-items:center;gap:var(--space-2)">
-    <span id="g2-broker-icon" style="font-size:18px">🟦</span>
-    <span>你的券商：<strong id="g2-broker-name">Schwab / TOS</strong></span>
+    <span id="g2-broker-icon" style="font-size:20px">🟦</span>
+    <div>
+      <div style="font-weight:700;color:var(--color-success)">✅ 已綁定券商：<span id="g2-broker-name">Schwab / TOS</span></div>
+      <div style="font-size:10px;color:var(--color-text-muted)">篩選通過的標的會自動顯示「開啟券商」按鈕，點擊即可查看即時報價</div>
+    </div>
   </div>
-  <button onclick="showBrokerSetup()" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:2px 8px;font-size:10px;color:var(--color-text-muted);cursor:pointer">變更券商</button>
+  <button onclick="showBrokerSetup()" style="background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:4px 10px;font-size:10px;color:var(--color-text-muted);cursor:pointer;white-space:nowrap">變更</button>
 </div>
 
 <!-- Approved symbols will be injected here -->
@@ -1181,8 +1184,11 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="info-block note"><p>請先在第1關完成批次判斷，通過的標的會自動帶入此處。</p></div>
 </div>
 <div id="g2-fetch-all-bar" style="display:none;margin-bottom:var(--space-3)">
-  <button onclick="autoFetchAll()" style="width:100%;padding:var(--space-3);background:linear-gradient(135deg,var(--color-primary),#2ecc71);color:#fff;border:none;border-radius:var(--radius-md);font-size:var(--text-sm);font-weight:700;cursor:pointer">⚡ 全部自動試算（CBOE 即時 Bid/Ask/OI/Delta）</button>
-  <p style="font-size:10px;color:var(--color-text-muted);text-align:center;margin-top:4px">使用 CBOE 延遲報價（約 15 分鐘延遲），不需券商 API</p>
+  <div id="g2-auto-status" style="padding:var(--space-3);border-radius:var(--radius-md);text-align:center">
+    <div id="g2-auto-status-text" style="font-size:13px;font-weight:700;color:var(--color-primary)">⚡ 自動篩選中...</div>
+    <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px">CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）| Bid/Ask 僅供參考，下單前請以券商即時報價為準</div>
+  </div>
+  <button onclick="autoFetchAll()" style="width:100%;padding:var(--space-2);background:var(--color-surface);color:var(--color-text-muted);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:11px;cursor:pointer;margin-top:var(--space-2)">🔄 重新篩選</button>
 </div>
 
 <!-- TOS Parameter Reference -->
@@ -2378,6 +2384,26 @@ function calcEVSignal(pop, credit_received, debit_paid, max_loss, target_value) 
   return ev;
 }
 
+// EV range estimate: assume ±$0.03~0.05 slippage on each leg
+function calcEVRange(ev, pop, credit_received, debit_paid, max_loss) {
+  var slippage = 0.04; // typical $0.04 per leg, $0.08 total spread impact
+  var isCredit = credit_received > debit_paid;
+  if (isCredit) {
+    var bestCredit = credit_received + slippage;
+    var worstCredit = Math.max(credit_received - slippage, 0);
+    var mlBest = (max_loss > 0 ? max_loss : credit_received * 100 / 100) - slippage * 100;
+    var mlWorst = (max_loss > 0 ? max_loss : credit_received * 100 / 100) + slippage * 100;
+    var evBest = pop * bestCredit * 100 - (1 - pop) * Math.max(mlBest, 0);
+    var evWorst = pop * worstCredit * 100 - (1 - pop) * mlWorst;
+  } else {
+    var bestDebit = Math.max(debit_paid - slippage, 0);
+    var worstDebit = debit_paid + slippage;
+    var evBest = pop * ((max_loss > 0 ? max_loss : debit_paid * 100) + slippage * 100) - (1 - pop) * bestDebit * 100;
+    var evWorst = pop * ((max_loss > 0 ? max_loss : debit_paid * 100) - slippage * 100) - (1 - pop) * worstDebit * 100;
+  }
+  return { evBest: +evBest.toFixed(2), evMid: +ev.toFixed(2), evWorst: +evWorst.toFixed(2) };
+}
+
 function getReasonLabel(reason) {
   var map = {
     'module_unknown': '無法辨識模組（strategy 不在已知清單）',
@@ -2487,7 +2513,8 @@ function analyzePayload(payload) {
   html += '<tr><td>IVR</td><td><span class="' + ivrClass + '">' + ivr + '</span></td></tr>';
   html += '<tr><td>DTE</td><td><span class="' + dteClass + '">' + dte + ' 天</span></td></tr>';
   html += '<tr><td>POP</td><td><span class="' + popClass + '">' + (pop * 100).toFixed(1) + '%</span></td></tr>';
-  html += '<tr><td>EV</td><td><span class="' + evClass + '">$' + ev.toFixed(2) + '</span></td></tr>';
+  var evR = calcEVRange(ev, pop, credit_received, debit_paid, max_loss_raw);
+  html += '<tr><td>EV 參考範圍</td><td><span class="' + evClass + '">$' + evR.evWorst.toFixed(2) + ' ~ $' + evR.evBest.toFixed(2) + '</span> <span style="font-size:10px;color:var(--color-text-muted)">(中值 $' + ev.toFixed(2) + ' | 滑價±$0.04/leg)</span></td></tr>';
   html += '<tr><td>event_risk</td><td>' + (event_risk === true || event_risk === 'true' ? '<span class="val-stop">⚠ true</span>' : '<span class="val">false</span>') + '</td></tr>';
   var oiResult = estimateOILiquidity(symbol);
   html += '<tr><td>OI 流動性</td><td>' + oiResult.html + (oiResult.tier >= 4 ? ' <span style="font-size:10px;color:var(--color-text-muted)">（小型股需至 TOS 確認 OI > 500）</span>' : '') + '</td></tr>';
@@ -3311,11 +3338,19 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
 
 // Fetch all approved symbols at once
 async function autoFetchAll() {
+  var statusText = document.getElementById('g2-auto-status-text');
+  if (statusText) statusText.innerHTML = '⚡ 自動篩選中... (0/' + g2ApprovedSignals.length + ')';
   for (var i = 0; i < g2ApprovedSignals.length; i++) {
     var s = g2ApprovedSignals[i];
+    if (statusText) statusText.innerHTML = '⚡ 篩選中 ' + s.symbol + '... (' + (i+1) + '/' + g2ApprovedSignals.length + ')';
     await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '');
-    // Small delay between requests
     await new Promise(function(r) { setTimeout(r, 500); });
+  }
+  // Update status to complete
+  if (statusText) {
+    var brokerConfig = BROKER_CONFIG[selectedBroker] || BROKER_CONFIG['schwab'];
+    statusText.innerHTML = '✅ 篩選完成 — 已綁定 ' + brokerConfig.icon + ' ' + brokerConfig.name + '，點擊各標的綠色按鈕開啟券商確認即時報價';
+    statusText.style.color = 'var(--color-success)';
   }
 }
 
