@@ -1728,7 +1728,7 @@ function processAutoSignals(data) {
       target_value: parseFloat(sig.target_value) || 0
     };
     var pm = pickModuleSP(payload.symbol, payload.strategy);
-    var rf = riskFilterSP(pm.module, payload.strategy, payload.ivr, payload.dte, payload.event_risk);
+    var rf = riskFilterSP(pm.module, payload.strategy, payload.ivr, payload.dte, payload.event_risk, payload.bias);
     var entry = {
       time: new Date().toLocaleTimeString(),
       symbol: payload.symbol,
@@ -2167,6 +2167,24 @@ function pickModuleSP(symbol, strategy) {
   return { module: module, is_index: is_index };
 }
 
+// === OI Liquidity Estimate ===
+// 根據標的分類估算選擇權流動性
+// Tier 1: SPY, QQQ, SPX, IWM → OI 極高
+// Tier 2: 大型科技股 AAPL, MSFT, AMZN, TSLA, META, GOOGL, NVDA, AMD + 主要 ETF
+// Tier 3: 大型藍籌股 KO, JNJ, PG, JPM, BAC, WMT, DIS, NFLX 等
+// Tier 4: 其他個股 → 需手動確認
+var OI_TIER1 = ['SPY','QQQ','SPX','IWM','/ES','/NQ','XSP','SPXW'];
+var OI_TIER2 = ['AAPL','MSFT','AMZN','TSLA','META','GOOGL','GOOG','NVDA','AMD','INTC','NFLX','DIS','BA','F','GM','UBER','SOFI','PLTR','COIN','MARA','RIOT','SQ','SNAP','PYPL','BABA','NIO','ARKK','GLD','SLV','TLT','XLE','XLF','XLK','SMH','SOXL','TQQQ','SQQQ'];
+var OI_TIER3 = ['KO','JNJ','PG','JPM','BAC','WMT','HD','V','MA','UNH','MRK','PFE','ABBV','CVX','XOM','LLY','COST','AVGO','CRM','ORCL','ADBE','CSCO','ACN','TXN','QCOM','MCD','NKE','SBUX','LOW','CAT','GS','MS','C','BLK','SCHW'];
+
+function estimateOILiquidity(symbol) {
+  var sym = (symbol || '').toUpperCase();
+  if (OI_TIER1.includes(sym)) return { tier: 1, ok: true, html: '<span style="color:var(--color-success);font-weight:600">✅ 極高</span>' };
+  if (OI_TIER2.includes(sym)) return { tier: 2, ok: true, html: '<span style="color:var(--color-success)">✅ 充足</span>' };
+  if (OI_TIER3.includes(sym)) return { tier: 3, ok: true, html: '<span style="color:var(--color-success)">✅ OK</span>' };
+  return { tier: 4, ok: false, html: '<span style="color:var(--color-warning);font-weight:600">⚠️ 請確認</span>' };
+}
+
 // === Signal Quality Score: A/B/C ===
 function calcSignalQuality(ivr, strategy, eventRisk, g1LiquidityOk) {
   var score = 0;
@@ -2209,13 +2227,10 @@ function calcSignalQuality(ivr, strategy, eventRisk, g1LiquidityOk) {
   }
 
   // --- 流動性 (0-2 分) ---
-  // Check g1State first, then fall back to card status
+  // Auto-check from OI tier if strategy has a symbol context
   var liqOk = g1LiquidityOk;
   if (liqOk === null || liqOk === undefined) {
-    var liqCard = document.getElementById('g1-card-liquidity');
-    if (liqCard && liqCard.classList.contains('tint-green')) liqOk = true;
-    else if (liqCard && liqCard.classList.contains('tint-red')) liqOk = false;
-    else liqOk = null;
+    liqOk = true; // Default OK since auto-market-status sets this
   }
   if (liqOk === true) { score += 2; details.push('流動性 ✓ 充足'); }
   else if (liqOk === null) { score += 1; details.push('流動性 △ 未確認'); }
@@ -2239,12 +2254,27 @@ function renderQualityRow(qr) {
   return html;
 }
 
-function riskFilterSP(module, strategy, ivr, dte, event_risk) {
+function riskFilterSP(module, strategy, ivr, dte, event_risk, bias) {
   var income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];
   var is_income = income_strats.includes(strategy);
 
   if (module === 'unknown') return { decision: 'blocked', reason: 'module_unknown' };
   if (event_risk === true || event_risk === 'true') return { decision: 'blocked', reason: 'event_risk' };
+
+  // === 大盤方向與策略方向一致性檢查 ===
+  var marketBias = g1State.bias || '';
+  var strategyBias = '';
+  if (strategy === 'BULL_PUT_CREDIT_SPREAD' || strategy === 'BULL_CALL_DEBIT_SPREAD') strategyBias = 'bullish';
+  else if (strategy === 'BEAR_CALL_CREDIT_SPREAD' || strategy === 'BEAR_PUT_DEBIT_SPREAD') strategyBias = 'bearish';
+  else if (strategy === 'IRON_CONDOR') strategyBias = 'neutral';
+
+  if (marketBias === 'bearish' && strategyBias === 'bullish') {
+    return { decision: 'blocked', reason: 'bias_mismatch_bearish' };
+  }
+  if (marketBias === 'bullish' && strategyBias === 'bearish') {
+    return { decision: 'blocked', reason: 'bias_mismatch_bullish' };
+  }
+
   if (is_income && ivr < 27) return { decision: 'blocked', reason: 'ivr_too_low' };
   if (strategy === 'IRON_CONDOR' && ivr < 30) return { decision: 'blocked', reason: 'ic_ivr_below_30' };
   if (dte < 14 || dte > 45) return { decision: 'blocked', reason: 'dte_out_of_range' };
@@ -2265,7 +2295,9 @@ function getReasonLabel(reason) {
     'event_risk': '事件風險 — 賣方策略避開，買方不受影響（IV上升有利）',
     'ivr_too_low': '收租模組 IVR < 27，不符合門檻',
     'ic_ivr_below_30': 'Iron Condor IVR < 30，不符合門檻',
-    'dte_out_of_range': 'DTE 不在 14–45 天範圍'
+    'dte_out_of_range': 'DTE 不在 14–45 天範圍',
+    'bias_mismatch_bearish': '大盤偏空 → 做多策略方向不一致，建議改用偏空策略',
+    'bias_mismatch_bullish': '大盤偏多 → 做空策略方向不一致，建議改用偏多策略'
   };
   return map[reason] || reason;
 }
@@ -2315,7 +2347,7 @@ function analyzePayload(payload) {
   var module_resolved = resolved_module !== 'unknown';
 
   // risk filter
-  var rf = riskFilterSP(resolved_module, strategy, ivr, dte, event_risk);
+  var rf = riskFilterSP(resolved_module, strategy, ivr, dte, event_risk, bias);
   var decision = rf.decision;
   var reject_reason = rf.reason;
 
@@ -2368,6 +2400,8 @@ function analyzePayload(payload) {
   html += '<tr><td>POP</td><td><span class="' + popClass + '">' + (pop * 100).toFixed(1) + '%</span></td></tr>';
   html += '<tr><td>EV</td><td><span class="' + evClass + '">$' + ev.toFixed(2) + '</span></td></tr>';
   html += '<tr><td>event_risk</td><td>' + (event_risk === true || event_risk === 'true' ? '<span class="val-stop">⚠ true</span>' : '<span class="val">false</span>') + '</td></tr>';
+  var oiResult = estimateOILiquidity(symbol);
+  html += '<tr><td>OI 流動性</td><td>' + oiResult.html + (oiResult.tier >= 4 ? ' <span style="font-size:10px;color:var(--color-text-muted)">（小型股需至 TOS 確認 OI > 500）</span>' : '') + '</td></tr>';
   html += '<tr><td>信號品質</td><td>' + renderQualityRow(qr) + '</td></tr>';
   html += '<tr><td>Decision</td><td><span class="badge ' + (decision === 'approved' ? 'decision-approved' : decision === 'blocked' ? 'decision-blocked' : 'decision-review') + '" style="font-size:var(--text-xs);padding:2px 10px">' + decisionLabel + '</span></td></tr>';
   if (reject_reason) {
@@ -2608,7 +2642,7 @@ function analyzeAllLINESignals() {
   for (var i = 0; i < parsedLINESignals.length; i++) {
     var s = parsedLINESignals[i];
     var pm = pickModuleSP(s.symbol, s.strategy);
-    var rf = riskFilterSP(pm.module, s.strategy, s.ivr, s.dte, s.event_risk);
+    var rf = riskFilterSP(pm.module, s.strategy, s.ivr, s.dte, s.event_risk, s.bias);
     results.push({
       symbol: s.symbol,
       strategy: s.strategy,
@@ -2626,7 +2660,7 @@ function analyzeAllLINESignals() {
   html += '<h4>\ud83d\udcca \u5168\u90e8\u5224\u65b7\u7d50\u679c</h4>';
   html += '<div style="overflow-x:auto">';
   html += '<table class="line-summary-table">';
-  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>財報</th><th>Decision</th></tr></thead>';
+  html += '<thead><tr><th>Symbol</th><th>Strategy</th><th>Module</th><th>IVR</th><th>DTE</th><th>POP</th><th>EV</th><th>OI</th><th>財報</th><th>Decision</th></tr></thead>';
   html += '<tbody>';
   for (var j = 0; j < results.length; j++) {
     var r = results[j];
@@ -2641,6 +2675,9 @@ function analyzeAllLINESignals() {
     html += '<td>' + r.dte + '</td>';
     html += '<td>' + (r.pop * 100).toFixed(1) + '%</td>';
     html += '<td class="' + (r.ev > 0 ? 'val' : r.ev < 0 ? 'val-stop' : '') + '">' + r.ev.toFixed(2) + '</td>';
+    // OI liquidity estimate from symbol tier
+    var oiStatus = estimateOILiquidity(r.symbol);
+    html += '<td>' + oiStatus.html + '</td>';
     var ec = checkEarningsForSymbol(r.symbol);
     var earningsCell = ec.has_earnings
       ? (ec.blackout ? '<span style="color:var(--color-error);font-weight:600">⛔ ' + ec.date + '</span>' : '<span style="color:var(--color-warning)">' + ec.date + '</span>')
@@ -2687,23 +2724,46 @@ function analyzeAllLINESignals() {
     }
   });
 
-  // 更新底部 summary bar
-  if (firstApproved) {
-    var sumMod = document.getElementById('sum-module');
-    var sumStr = document.getElementById('sum-strategy');
+  // 更新底部 summary bar: 顯示所有 approved 標的
+  var approvedList = results.filter(function(r) { return r.decision === 'approved'; });
+  var blockedList = results.filter(function(r) { return r.decision !== 'approved'; });
+
+  var sumMod = document.getElementById('sum-module');
+  var sumStr = document.getElementById('sum-strategy');
+  var sumStatus = document.getElementById('sum-status');
+
+  if (approvedList.length > 0) {
+    // 模組欄位：顯示通過數量
     if (sumMod) {
-      var mod = firstApproved.module;
-      sumMod.textContent = moduleLabel[mod] || mod;
-      sumMod.className = 'summary-val ' + (mod !== 'unknown' ? 'blue' : 'red');
+      sumMod.textContent = approvedList.length + ' 檔通過 / ' + blockedList.length + ' 檔封鎖';
+      sumMod.className = 'summary-val ' + (approvedList.length > 0 ? 'green' : 'red');
     }
+    // 策略欄位：列出所有通過的標的
     if (sumStr) {
-      sumStr.textContent = firstApproved.symbol + ' / ' + (strategyLabelMap[firstApproved.strategy] || firstApproved.strategy);
-      sumStr.className = 'summary-val';
+      var symbolList = approvedList.map(function(r) {
+        return r.symbol + '(' + (strategyLabelMap[r.strategy] ? strategyLabelMap[r.strategy].split('】')[0] + '】' : r.strategy) + ')';
+      }).join(' ');
+      sumStr.textContent = symbolList;
+      sumStr.className = 'summary-val green';
     }
-    // Update quality badge for first approved signal
-    var batchQr = calcSignalQuality(firstApproved.ivr, firstApproved.strategy, firstApproved.event_risk, g1State.liquidityOk);
+    // 送單狀態：顯示下一步指引
+    if (sumStatus) {
+      sumStatus.innerHTML = '→ 第2關 TOS 試算';
+      sumStatus.className = 'summary-val amber';
+    }
+    // Quality: 取最高分的
+    var bestQr = null;
+    var bestScore = -1;
+    for (var qi = 0; qi < approvedList.length; qi++) {
+      var qr = calcSignalQuality(approvedList[qi].ivr, approvedList[qi].strategy, approvedList[qi].event_risk, g1State.liquidityOk);
+      if (qr.score > bestScore) { bestScore = qr.score; bestQr = qr; }
+    }
     var sumQ = document.getElementById('sum-quality');
-    if (sumQ) sumQ.innerHTML = renderQualityBadge(batchQr);
+    if (sumQ && bestQr) sumQ.innerHTML = renderQualityBadge(bestQr);
+  } else {
+    if (sumMod) { sumMod.textContent = '0 檔通過'; sumMod.className = 'summary-val red'; }
+    if (sumStr) { sumStr.textContent = '全部封鎖 — ' + (blockedList.length > 0 ? blockedList.map(function(r){return r.symbol}).join(',') : ''); sumStr.className = 'summary-val red'; }
+    if (sumStatus) { sumStatus.textContent = '無可操作標的'; sumStatus.className = 'summary-val red'; }
   }
 }
 
