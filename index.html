@@ -792,18 +792,69 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 <!-- Broker Setup Overlay (shown once on first login) -->
 <div id="broker-setup-overlay" style="display:none">
-  <div class="broker-setup-card">
-    <h2>🏦 環境設定</h2>
-    <p class="sub">選擇你常用的券商，系統會自動記住並在所有頁面套用</p>
-    <div class="broker-setup-grid">
-      <div class="broker-setup-option" data-broker="schwab" onclick="pickSetupBroker(this)"><div class="icon">🟦</div><div class="name">Schwab / TOS</div></div>
-      <div class="broker-setup-option" data-broker="tastytrade" onclick="pickSetupBroker(this)"><div class="icon">🟣</div><div class="name">tastytrade</div></div>
-      <div class="broker-setup-option" data-broker="ibkr" onclick="pickSetupBroker(this)"><div class="icon">🔴</div><div class="name">IBKR</div></div>
-      <div class="broker-setup-option" data-broker="firstrade" onclick="pickSetupBroker(this)"><div class="icon">🟢</div><div class="name">Firstrade</div></div>
-      <div class="broker-setup-option" data-broker="webull" onclick="pickSetupBroker(this)"><div class="icon">🟠</div><div class="name">Webull</div></div>
-      <div class="broker-setup-option" data-broker="futu" onclick="pickSetupBroker(this)"><div class="icon">🟡</div><div class="name">Futu / moomoo</div></div>
+  <div class="broker-setup-card" style="max-width:540px;max-height:90vh;overflow-y:auto">
+    <!-- Step 1: Choose Broker -->
+    <div id="setup-step-1">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="background:var(--color-primary);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">1</span>
+        <h2 style="margin:0">🏦 選擇券商</h2>
+      </div>
+      <p class="sub">選擇你常用的券商，系統會自動記住並在所有頁面套用</p>
+      <div class="broker-setup-grid">
+        <div class="broker-setup-option" data-broker="schwab" onclick="pickSetupBroker(this)"><div class="icon">🟦</div><div class="name">Schwab / TOS</div></div>
+        <div class="broker-setup-option" data-broker="tastytrade" onclick="pickSetupBroker(this)"><div class="icon">🟣</div><div class="name">tastytrade</div></div>
+        <div class="broker-setup-option" data-broker="ibkr" onclick="pickSetupBroker(this)"><div class="icon">🔴</div><div class="name">IBKR</div></div>
+        <div class="broker-setup-option" data-broker="firstrade" onclick="pickSetupBroker(this)"><div class="icon">🟢</div><div class="name">Firstrade</div></div>
+        <div class="broker-setup-option" data-broker="webull" onclick="pickSetupBroker(this)"><div class="icon">🟠</div><div class="name">Webull</div></div>
+        <div class="broker-setup-option" data-broker="futu" onclick="pickSetupBroker(this)"><div class="icon">🟡</div><div class="name">Futu / moomoo</div></div>
+      </div>
+      <button class="broker-setup-confirm" id="broker-setup-confirm" disabled onclick="goSetupStep2()">下一步 → API 綁定</button>
     </div>
-    <button class="broker-setup-confirm" id="broker-setup-confirm" disabled onclick="confirmSetupBroker()">✅ 確認選擇</button>
+
+    <!-- Step 2: API Key Binding -->
+    <div id="setup-step-2" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="background:var(--color-primary);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">2</span>
+        <h2 style="margin:0">🔑 API 綁定（選填）</h2>
+      </div>
+      <p class="sub">綁定 API 可啟用自動下單功能。不綁定也可正常使用篩選 + 手動下單。</p>
+      <div id="setup-api-fields" style="margin-bottom:var(--space-3)"></div>
+      <div id="setup-api-guide" style="font-size:11px;color:var(--color-text-muted);padding:var(--space-2);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm);margin-bottom:var(--space-3)"></div>
+      <div style="display:flex;gap:var(--space-2)">
+        <button onclick="goSetupStep1()" style="flex:1;padding:var(--space-2);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);color:var(--color-text-muted);cursor:pointer;font-size:12px">← 上一步</button>
+        <button onclick="testBrokerConnection()" id="setup-test-btn" style="flex:2;padding:var(--space-2);background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);cursor:pointer;font-size:12px;font-weight:600">🔌 測試連線</button>
+        <button onclick="goSetupStep3()" style="flex:1;padding:var(--space-2);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);color:var(--color-text-muted);cursor:pointer;font-size:12px">跳過 →</button>
+      </div>
+      <div id="setup-test-result" style="margin-top:var(--space-2);font-size:12px;display:none"></div>
+    </div>
+
+    <!-- Step 3: Risk Disclaimer -->
+    <div id="setup-step-3" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="background:var(--color-primary);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">3</span>
+        <h2 style="margin:0">⚠️ 風險須知</h2>
+      </div>
+      <div style="font-size:12px;line-height:1.8;padding:var(--space-3);background:var(--color-error-highlight);border-radius:var(--radius-md);margin-bottom:var(--space-3)">
+        <div style="font-weight:700;color:var(--color-error);margin-bottom:var(--space-2)">選擇權交易風險警示</div>
+        <div>• 選擇權交易具有高度風險，可能損失全部投入資金</div>
+        <div>• 過去績效不代表未來結果</div>
+        <div>• 系統信號僅供參考，不構成投資建議</div>
+        <div>• 請勿投入無法承受損失的資金</div>
+        <div>• 建議單筆部位不超過帳戶總值 5%</div>
+        <div>• 每筆交易必須設定停損點</div>
+      </div>
+      <div style="margin-bottom:var(--space-3)">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px">
+          <input type="checkbox" id="setup-risk-agree" onchange="document.getElementById('setup-final-btn').disabled = !this.checked" style="margin-top:2px;accent-color:var(--color-primary)">
+          <span>我已閱讀並理解以上風險警示，且使用自己可承受損失的資金進行交易</span>
+        </label>
+      </div>
+      <div style="display:flex;gap:var(--space-2)">
+        <button onclick="goSetupStep2()" style="flex:1;padding:var(--space-2);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);color:var(--color-text-muted);cursor:pointer;font-size:12px">← 上一步</button>
+        <button class="broker-setup-confirm" id="setup-final-btn" disabled onclick="confirmSetupBroker()">✅ 完成設定，開始使用</button>
+      </div>
+    </div>
+
     <p style="text-align:center;font-size:10px;color:var(--color-text-faint);margin-top:var(--space-2)">之後可在側邊欄隨時更改</p>
   </div>
 </div>
@@ -2412,7 +2463,8 @@ function getReasonLabel(reason) {
     'ic_ivr_below_30': 'Iron Condor IVR < 30，不符合門檻',
     'dte_out_of_range': 'DTE 不在 14–45 天範圍',
     'bias_mismatch_bearish': '大盤偏空 → 做多策略方向不一致，建議改用偏空策略',
-    'bias_mismatch_bullish': '大盤偏多 → 做空策略方向不一致，建議改用偏多策略'
+    'bias_mismatch_bullish': '大盤偏多 → 做空策略方向不一致，建議改用偏多策略',
+    'liquidity_cboe': '🚫 CBOE 即時數據: 流動性不足 (OI<500 或 Bid-Ask過寬)，難以合理價格成交'
   };
   return map[reason] || reason;
 }
@@ -2752,13 +2804,50 @@ function analyzeLINESignal(index) {
   analyzePayload(payload);
 }
 
-function analyzeAllLINESignals() {
+async function analyzeAllLINESignals() {
   if (!parsedLINESignals.length) return;
+
+  // Pre-fetch CBOE data for all symbols (batch) to check OI/liquidity
+  var uniqueSymbols = [...new Set(parsedLINESignals.map(function(s) { return s.symbol.replace(/[^A-Z]/g, ''); }))];
+  var cboeCache = {};
+  try {
+    var cboeResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + uniqueSymbols.join(','));
+    var cboeData = await cboeResp.json();
+    if (cboeData.batch && cboeData.results) {
+      cboeCache = cboeData.results;
+    } else if (cboeData.symbol) {
+      cboeCache[cboeData.symbol] = { options: cboeData.options || [] };
+    }
+  } catch(e) { /* CBOE pre-check failed, continue without it */ }
+
   var results = [];
   for (var i = 0; i < parsedLINESignals.length; i++) {
     var s = parsedLINESignals[i];
     var pm = pickModuleSP(s.symbol, s.strategy);
     var rf = riskFilterSP(pm.module, s.strategy, s.ivr, s.dte, s.event_risk, s.bias);
+
+    // CBOE OI/liquidity pre-check
+    var cboeOpts = (cboeCache[s.symbol] && cboeCache[s.symbol].options) || [];
+    var oiWarning = '';
+    if (cboeOpts.length > 0 && s.orderText && rf.decision === 'approved') {
+      var strikes = (s.orderText || '').match(/[\d.]+/g) || [];
+      if (strikes.length >= 1) {
+        var expPart = (s.expiry || '').replace(/-/g, '').slice(2);
+        var optType = s.strategy.includes('CALL') ? 'C' : 'P';
+        var strikeKey = s.symbol + expPart + optType + Math.round(parseFloat(strikes[0]) * 1000).toString().padStart(8, '0');
+        var match = cboeOpts.filter(function(o) { return o.option === strikeKey; });
+        if (match.length > 0) {
+          var oi = parseInt(match[0].open_interest) || 0;
+          var bid = parseFloat(match[0].bid) || 0;
+          var ask = parseFloat(match[0].ask) || 0;
+          var spread = ask > 0 ? ask - bid : 999;
+          if (oi < 500 || spread > 0.15 || bid <= 0) {
+            oiWarning = 'OI=' + oi + ' Spread=$' + spread.toFixed(2) + (bid <= 0 ? ' (bid=0)' : '');
+            rf = { decision: 'blocked', reason: 'liquidity_cboe' };
+          }
+        }
+      }
+    }
     results.push({
       symbol: s.symbol,
       strategy: s.strategy,
@@ -3042,10 +3131,152 @@ function checkBrokerSetup() {
   }
 }
 
+var setupSelectedBroker = '';
+
 function pickSetupBroker(el) {
   document.querySelectorAll('.broker-setup-option').forEach(function(o) { o.classList.remove('selected'); });
   el.classList.add('selected');
+  setupSelectedBroker = el.getAttribute('data-broker');
   document.getElementById('broker-setup-confirm').disabled = false;
+}
+
+function goSetupStep1() {
+  document.getElementById('setup-step-1').style.display = 'block';
+  document.getElementById('setup-step-2').style.display = 'none';
+  document.getElementById('setup-step-3').style.display = 'none';
+}
+
+function goSetupStep2() {
+  if (!setupSelectedBroker) return;
+  document.getElementById('setup-step-1').style.display = 'none';
+  document.getElementById('setup-step-2').style.display = 'block';
+  document.getElementById('setup-step-3').style.display = 'none';
+  renderApiFields(setupSelectedBroker);
+}
+
+function goSetupStep3() {
+  document.getElementById('setup-step-1').style.display = 'none';
+  document.getElementById('setup-step-2').style.display = 'none';
+  document.getElementById('setup-step-3').style.display = 'block';
+}
+
+// Per-broker API field config
+var BROKER_API_FIELDS = {
+  schwab: {
+    fields: [
+      { id: 'schwab-app-key', label: 'App Key', placeholder: '從 Schwab Developer Portal 取得', type: 'text' },
+      { id: 'schwab-secret', label: 'App Secret', placeholder: 'OAuth App Secret', type: 'password' },
+      { id: 'schwab-account', label: 'Account Number', placeholder: '帳戶號碼', type: 'text' }
+    ],
+    guide: '📖 <a href="https://developer.schwab.com" target="_blank" style="color:var(--color-primary)">Schwab Developer Portal</a> → Create App → 複製 App Key 和 Secret<br>OAuth 授權流程詳見 <a href="https://github.com/CHUNGCHANGTING/student-signal-dashboard/blob/main/BROKER-SETUP.md#schwab" target="_blank" style="color:var(--color-primary)">BROKER-SETUP.md</a>'
+  },
+  tastytrade: {
+    fields: [
+      { id: 'tt-username', label: '帳號', placeholder: 'tastytrade 登入帳號', type: 'text' },
+      { id: 'tt-password', label: '密碼', placeholder: 'tastytrade 密碼', type: 'password' },
+      { id: 'tt-account', label: 'Account Number', placeholder: '例: 5WZ90854', type: 'text' }
+    ],
+    guide: '📖 使用你的 tastytrade 登入帳密 + 帳戶號碼。帳戶號在 tastytrade → My Account → Account Number'
+  },
+  ibkr: {
+    fields: [
+      { id: 'ibkr-token', label: 'OAuth Token', placeholder: 'IBKR Live/Paper OAuth Token', type: 'password' },
+      { id: 'ibkr-account', label: 'Account ID', placeholder: '例: U1234567', type: 'text' }
+    ],
+    guide: '📖 IBKR Client Portal → Settings → API → 產生 OAuth Token<br>詳見 <a href="https://github.com/CHUNGCHANGTING/student-signal-dashboard/blob/main/BROKER-SETUP.md#ibkr" target="_blank" style="color:var(--color-primary)">BROKER-SETUP.md</a>'
+  },
+  firstrade: {
+    fields: [
+      { id: 'ft-username', label: '帳號', placeholder: 'Firstrade 登入帳號', type: 'text' },
+      { id: 'ft-pin', label: 'PIN', placeholder: '交易 PIN 碼', type: 'password' }
+    ],
+    guide: '📖 Firstrade 目前不提供公開 API。欄位僅供未來擴充使用。<br>目前請使用手動下單模式。'
+  },
+  webull: {
+    fields: [
+      { id: 'wb-did', label: 'Device ID', placeholder: 'Webull Device ID', type: 'text' },
+      { id: 'wb-token', label: 'Access Token', placeholder: 'Webull Access Token', type: 'password' }
+    ],
+    guide: '📖 Webull API 需要 Device ID + Access Token。<br>可從 Webull Desktop 的網路請求中擷取。'
+  },
+  futu: {
+    fields: [
+      { id: 'futu-appid', label: 'App ID', placeholder: 'moomoo OpenAPI App ID', type: 'text' },
+      { id: 'futu-key', label: 'App Key', placeholder: 'moomoo OpenAPI App Key', type: 'password' }
+    ],
+    guide: '📖 <a href="https://openapi.moomoo.com" target="_blank" style="color:var(--color-primary)">moomoo OpenAPI</a> → 申請開通 → 取得 App ID 和 Key'
+  }
+};
+
+function renderApiFields(broker) {
+  var config = BROKER_API_FIELDS[broker];
+  if (!config) return;
+  var container = document.getElementById('setup-api-fields');
+  var guide = document.getElementById('setup-api-guide');
+  var html = '';
+  for (var i = 0; i < config.fields.length; i++) {
+    var f = config.fields[i];
+    // Load saved value from localStorage
+    var saved = localStorage.getItem('broker_' + f.id) || '';
+    html += '<div style="margin-bottom:8px">';
+    html += '<label style="font-size:11px;font-weight:600;display:block;margin-bottom:2px">' + f.label + '</label>';
+    html += '<input type="' + f.type + '" id="' + f.id + '" value="' + saved + '" placeholder="' + f.placeholder + '" style="width:100%;padding:8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text);font-size:12px">';
+    html += '</div>';
+  }
+  container.innerHTML = html;
+  guide.innerHTML = config.guide;
+}
+
+async function testBrokerConnection() {
+  var btn = document.getElementById('setup-test-btn');
+  var result = document.getElementById('setup-test-result');
+  btn.textContent = '⏳ 測試中...';
+  btn.disabled = true;
+  result.style.display = 'block';
+
+  // Save fields to localStorage
+  var config = BROKER_API_FIELDS[setupSelectedBroker];
+  if (config) {
+    for (var i = 0; i < config.fields.length; i++) {
+      var f = config.fields[i];
+      var val = document.getElementById(f.id);
+      if (val) localStorage.setItem('broker_' + f.id, val.value);
+    }
+  }
+
+  // Test connection via n8n webhook
+  try {
+    if (setupSelectedBroker === 'tastytrade') {
+      var username = document.getElementById('tt-username')?.value || '';
+      var password = document.getElementById('tt-password')?.value || '';
+      if (!username || !password) {
+        result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 請填入帳號密碼後再測試</span>';
+        btn.textContent = '🔌 測試連線'; btn.disabled = false;
+        return;
+      }
+      var resp = await fetch('https://api.tastyworks.com/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: username, password: password })
+      });
+      if (resp.ok) {
+        var data = await resp.json();
+        result.innerHTML = '<span style="color:var(--color-success)">✅ 連線成功！帳戶: ' + (data.data?.user?.email || username) + '</span>';
+        // Save session token
+        if (data.data?.['session-token']) {
+          localStorage.setItem('broker_tt-session', data.data['session-token']);
+        }
+      } else {
+        result.innerHTML = '<span style="color:var(--color-error)">❌ 登入失敗（請確認帳號密碼）</span>';
+      }
+    } else {
+      // For other brokers, just save fields and show success
+      result.innerHTML = '<span style="color:var(--color-success)">✅ 設定已儲存。' + (BROKER_CONFIG[setupSelectedBroker]?.name || '') + ' 目前使用手動下單模式。</span>';
+    }
+  } catch(e) {
+    result.innerHTML = '<span style="color:var(--color-error)">❌ 連線失敗: ' + e.message + '</span>';
+  }
+  btn.textContent = '🔌 測試連線'; btn.disabled = false;
 }
 
 function confirmSetupBroker() {
