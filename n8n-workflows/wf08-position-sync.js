@@ -3,31 +3,53 @@ const inputData = $input.first().json;
 const action = (inputData.body?.action || inputData.query?.action || '').toLowerCase();
 
 if (action === 'cboe-proxy' || action === 'cboe') {
-  const symbol = (inputData.body?.symbol || inputData.query?.symbol || '').toUpperCase().replace(/[^A-Z]/g, '');
-  if (!symbol) {
-    return [{ json: { error: 'Missing symbol', options: [] } }];
+  // Batch support: ?symbols=KO,JNJ,CBOE or single ?symbol=KO
+  const body = inputData.body || {};
+  const query = inputData.query || {};
+  const singleSym = (body.symbol || query.symbol || '').toUpperCase().replace(/[^A-Z,]/g, '');
+  const multiSym = (body.symbols || query.symbols || '').toUpperCase().replace(/[^A-Z,]/g, '');
+  const symbolList = (multiSym || singleSym).split(',').filter(s => s.length > 0);
+
+  if (symbolList.length === 0) {
+    return [{ json: { error: 'Missing symbol(s)', results: {} } }];
   }
-  try {
-    const cboeResp = await this.helpers.httpRequest({
-      method: 'GET',
-      url: `https://cdn.cboe.com/api/global/delayed_quotes/options/${symbol}.json`,
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
-      returnFullResponse: true,
-      ignoreHttpStatusErrors: true,
-      timeout: 15000
-    });
-    if (cboeResp.statusCode !== 200) {
-      return [{ json: { error: 'CBOE ' + cboeResp.statusCode, symbol, options: [] } }];
+
+  // Fetch all symbols in parallel
+  const results = {};
+  await Promise.all(symbolList.map(async (sym) => {
+    try {
+      const cboeResp = await this.helpers.httpRequest({
+        method: 'GET',
+        url: `https://cdn.cboe.com/api/global/delayed_quotes/options/${sym}.json`,
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+        returnFullResponse: true,
+        ignoreHttpStatusErrors: true,
+        timeout: 15000
+      });
+      if (cboeResp.statusCode !== 200) {
+        results[sym] = { error: 'CBOE ' + cboeResp.statusCode, options: [] };
+        return;
+      }
+      const cboeData = typeof cboeResp.body === 'string' ? JSON.parse(cboeResp.body) : cboeResp.body;
+      results[sym] = {
+        count: (cboeData?.data?.options || []).length,
+        options: (cboeData?.data?.options || []).map(o => ({
+          option: o.option, bid: o.bid, ask: o.ask, delta: o.delta,
+          open_interest: o.open_interest, volume: o.volume, iv: o.iv
+        }))
+      };
+    } catch(e) {
+      results[sym] = { error: e.message, options: [] };
     }
-    const cboeData = typeof cboeResp.body === 'string' ? JSON.parse(cboeResp.body) : cboeResp.body;
-    const options = (cboeData?.data?.options || []).map(o => ({
-      option: o.option, bid: o.bid, ask: o.ask, delta: o.delta,
-      open_interest: o.open_interest, volume: o.volume, iv: o.iv
-    }));
-    return [{ json: { symbol, count: options.length, options } }];
-  } catch(e) {
-    return [{ json: { error: e.message, symbol, options: [] } }];
+  }));
+
+  // Single symbol backward compat
+  if (symbolList.length === 1) {
+    const sym = symbolList[0];
+    const r = results[sym];
+    return [{ json: { symbol: sym, count: r.count || 0, options: r.options || [], error: r.error } }];
   }
+  return [{ json: { batch: true, symbols: symbolList, results } }];
 }
 
 // === Original WF-08 Logic Below ===

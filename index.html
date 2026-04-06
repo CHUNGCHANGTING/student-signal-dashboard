@@ -2957,7 +2957,7 @@ function populateGate2() {
     html += '<span style="font-weight:700;min-width:28px">Ask</span>';
     html += '<input type="number" step="0.01" id="g2-ask-' + s.symbol + '" placeholder="0.00" oninput="updateBidAsk(\'' + s.symbol + '\')" style="width:70px;padding:3px 6px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text);font-size:12px;text-align:center">';
     html += '</div>';
-    html += '<div id="g2-spread-' + s.symbol + '" style="min-width:120px;text-align:right;font-weight:700;font-size:12px;color:var(--color-text-muted)">— 點擊自動篩選</div>';
+    html += '<div id="g2-spread-' + s.symbol + '" style="min-width:120px;text-align:right;font-weight:700;font-size:12px;color:var(--color-text-muted)"></div>';
     html += '</div>';
 
     // Per-symbol TOS checklist (OI, Delta, Width — bidask is now interactive above)
@@ -3002,8 +3002,7 @@ function populateGate2() {
     html += '<div style="display:flex;gap:var(--space-2);flex-wrap:wrap">';
 
     // 1. Schwab Web option chain link
-    var brokerLink = getBrokerOptionLink(s.symbol, selectedBroker);
-    html += '<a href="' + brokerLink.url + '" target="_blank" rel="noopener" class="g2-broker-link" data-symbol="' + s.symbol + '" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer">' + brokerLink.icon + ' ' + brokerLink.label + '</a>';
+    // Broker link removed — now integrated into the auto-fetch result badge
 
     // 2. Copy TOS symbol to clipboard
     if (tosSymbol) {
@@ -3185,11 +3184,15 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
 
   try {
     var cboeRoot = symbol.replace(/[^A-Z]/g, '');
-    // Use n8n proxy to bypass CORS (CBOE blocks direct browser requests)
-    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbol=' + cboeRoot);
-    var data = await resp.json();
-    // Proxy returns { symbol, count, options } directly
-    var opts = (data && data.options) || [];
+    // Use batch cache if available, otherwise single fetch
+    var opts = [];
+    if (g2BatchCache[cboeRoot] && g2BatchCache[cboeRoot].options) {
+      opts = g2BatchCache[cboeRoot].options;
+    } else {
+      var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbol=' + cboeRoot);
+      var data = await resp.json();
+      opts = (data && data.options) || [];
+    }
 
     if (opts.length === 0) {
       if (dataEl) { dataEl.style.display = 'block'; dataEl.innerHTML = '⚠️ CBOE 無數據，請手動輸入'; }
@@ -3347,16 +3350,34 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText) {
 
 // Fetch all approved symbols at once
 var g2FetchResults = { passed: [], warned: [], failed: [] };
+var g2BatchCache = {}; // Cache batch CBOE data
 
 async function autoFetchAll() {
   var statusText = document.getElementById('g2-auto-status-text');
   g2FetchResults = { passed: [], warned: [], failed: [] };
-  if (statusText) statusText.innerHTML = '⚡ 自動篩選中... (0/' + g2ApprovedSignals.length + ')';
+  if (statusText) statusText.innerHTML = '⚡ 一次拉取所有標的數據...';
+
+  // Batch fetch all symbols in one request
+  var symbols = g2ApprovedSignals.map(function(s) { return s.symbol.replace(/[^A-Z]/g, ''); });
+  try {
+    var batchResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + symbols.join(','));
+    var batchData = await batchResp.json();
+    if (batchData.batch && batchData.results) {
+      g2BatchCache = batchData.results;
+    } else if (batchData.symbol) {
+      // Single symbol response
+      g2BatchCache[batchData.symbol] = { count: batchData.count, options: batchData.options };
+    }
+  } catch(e) {
+    if (statusText) { statusText.innerHTML = '❌ 數據拉取失敗: ' + e.message; statusText.style.color = 'var(--color-error)'; }
+    return;
+  }
+
+  // Process each symbol using cached data
   for (var i = 0; i < g2ApprovedSignals.length; i++) {
     var s = g2ApprovedSignals[i];
     if (statusText) statusText.innerHTML = '⚡ 篩選中 ' + s.symbol + '... (' + (i+1) + '/' + g2ApprovedSignals.length + ')';
     await autoFetchOptionData(s.symbol, s.strategy, s.expiry || '', s.orderText || '');
-    await new Promise(function(r) { setTimeout(r, 300); });
   }
   // Summary
   if (statusText) {
