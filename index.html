@@ -2088,6 +2088,14 @@ function processAutoSignals(data) {
   else if (data && Array.isArray(data.signals)) signals = data.signals;
   else if (data && data.symbol) signals = [data];
 
+  // Build raw lookup by ticker for enriching signals with spread details
+  var rawLookup = {};
+  var rawArr = (data && data.raw) || [];
+  for (var ri = 0; ri < rawArr.length; ri++) {
+    var r = rawArr[ri];
+    if (r.ticker) rawLookup[r.ticker.toUpperCase()] = r;
+  }
+
   // Map v3.4 strategy names → Dashboard strategy codes
   var strategyNormalize = {
     'BULL PUT SPREAD': 'BULL_PUT_CREDIT_SPREAD',
@@ -2159,10 +2167,48 @@ function processAutoSignals(data) {
   // === Update Gate 2 approved signals + summary bar ===
   var approvedFromAuto = signalHistory.filter(function(e) { return e.decision === 'approved'; });
   if (approvedFromAuto.length > 0) {
-    // Build g2-compatible signal objects
+    // Build g2-compatible signal objects, enriched with raw spread data
     g2ApprovedSignals = approvedFromAuto.map(function(e) {
       var p = e.payload;
       var ev = calcEVSignal(p.pop / 100, p.credit_received, p.debit_paid, p.max_loss, p.target_value);
+      var rawData = rawLookup[p.symbol] || {};
+      var spreads = rawData.spreads || [];
+      // Find best matching spread for this strategy
+      var bestSpread = null;
+      for (var si = 0; si < spreads.length; si++) {
+        var sp = spreads[si];
+        var spNorm = (sp.strategy || '').toUpperCase();
+        if (spNorm.indexOf('BULL CALL') >= 0 && p.strategy === 'BULL_CALL_DEBIT_SPREAD') { bestSpread = sp; break; }
+        if (spNorm.indexOf('BEAR PUT') >= 0 && p.strategy === 'BEAR_PUT_DEBIT_SPREAD') { bestSpread = sp; break; }
+        if (spNorm.indexOf('BULL PUT') >= 0 && p.strategy === 'BULL_PUT_CREDIT_SPREAD') { bestSpread = sp; break; }
+        if (spNorm.indexOf('BEAR CALL') >= 0 && p.strategy === 'BEAR_CALL_CREDIT_SPREAD') { bestSpread = sp; break; }
+        if (spNorm.indexOf('IRON CONDOR') >= 0 && p.strategy === 'IRON_CONDOR') { bestSpread = sp; break; }
+      }
+      // Build orderText + expiry from spread data
+      var orderText = '';
+      var expiry = '';
+      if (bestSpread) {
+        var isCall = p.strategy.indexOf('CALL') >= 0;
+        var optType = isCall ? 'CALL' : 'PUT';
+        if (p.strategy === 'BULL_CALL_DEBIT_SPREAD') {
+          orderText = 'BUY CALL ' + bestSpread.longStrike + ' / SELL CALL ' + bestSpread.shortStrike;
+        } else if (p.strategy === 'BEAR_PUT_DEBIT_SPREAD') {
+          orderText = 'BUY PUT ' + bestSpread.longStrike + ' / SELL PUT ' + bestSpread.shortStrike;
+        } else if (p.strategy === 'BULL_PUT_CREDIT_SPREAD') {
+          orderText = 'SELL PUT ' + bestSpread.shortStrike + ' / BUY PUT ' + bestSpread.longStrike;
+        } else if (p.strategy === 'BEAR_CALL_CREDIT_SPREAD') {
+          orderText = 'SELL CALL ' + bestSpread.shortStrike + ' / BUY CALL ' + bestSpread.longStrike;
+        }
+        // Calculate expiry date from DTE
+        var dte = parseInt(bestSpread.dte) || p.dte || 30;
+        var expDate = new Date(Date.now() + dte * 86400000);
+        // Round to nearest Friday (options expire on Friday)
+        var dayOfWeek = expDate.getDay();
+        var daysToFri = (5 - dayOfWeek + 7) % 7;
+        if (daysToFri === 0 && dayOfWeek !== 5) daysToFri = 7;
+        expDate.setDate(expDate.getDate() + (dayOfWeek === 5 ? 0 : daysToFri));
+        expiry = expDate.toISOString().slice(0, 10);
+      }
       return {
         symbol: p.symbol, strategy: p.strategy,
         ivr: p.ivr, dte: p.dte, pop: p.pop / 100,
@@ -2172,7 +2218,9 @@ function processAutoSignals(data) {
         max_loss: p.max_loss,
         target_value: p.target_value,
         ev: ev / 100,
-        decision: 'approved'
+        decision: 'approved',
+        orderText: orderText,
+        expiry: expiry
       };
     });
     // Update summary bar
