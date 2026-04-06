@@ -1338,42 +1338,24 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 </div><!-- #g3-content -->
 </section>
 <section class="gate" id="gate4" style="display:none">
-<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">最終核查清單與送單確認詞</div></div></div>
-<div class="checklist" id="gate4-checklist">
-  <div class="check-item" onclick="toggleCheck(this)">
+<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">系統自動檢查 + 手動確認送單</div></div></div>
+
+<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:var(--space-3)">🔒 以下項目由系統自動判定，學生無法手動勾選</div>
+<div id="g4-auto-checks" style="margin-bottom:var(--space-4)"></div>
+
+<div style="border-top:2px dashed var(--color-border);margin:var(--space-4) 0;padding-top:var(--space-3)">
+  <div style="font-size:10px;color:var(--color-text-muted);margin-bottom:var(--space-2)">✋ 以下為手動確認（系統通過後才可勾選）</div>
+  <div class="check-item g4-manual" onclick="toggleG4Manual(this)" style="opacity:0.4;pointer-events:none" data-key="stoploss">
     <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">策略分流已完成</div><div class="check-detail">Module 已鎖定（收租 or 進攻）</div></div>
+    <div class="check-content"><div class="check-label">我已計算好停損價格</div><div class="check-detail">收租: credit×1.3 / 進攻: debit×0.7 / IC: credit×2.0。下單後立即設定 STPLMT 止損單</div></div>
   </div>
-  <div class="check-item" onclick="toggleCheck(this)">
+  <div class="check-item g4-manual" onclick="toggleG4Manual(this)" style="opacity:0.4;pointer-events:none" data-key="confirm">
     <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">盤前訊號確認</div><div class="check-detail">IVR / Regime / 事件風險已排除</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">TOS 試算完成</div><div class="check-detail">Delta / DTE / Credit / Width 符合標準</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">BP 使用率 ≤ 50%</div><div class="check-detail">單筆 BP ≤ 5%，總部位 BP ≤ 50%</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">相關性 ≤ 3 個標的</div><div class="check-detail">不重複押注同方向</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">停損點已設定</div><div class="check-detail">收租: 2×Credit / 進攻: 50% Debit</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">EV 為正</div><div class="check-detail">期望值 > 0，Kelly > 0%</div></div>
-  </div>
-  <div class="check-item" onclick="toggleCheck(this)">
-    <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">送單確認詞唸出</div><div class="check-detail">「我已完成所有確認，這筆符合系統規則」</div></div>
+    <div class="check-content"><div class="check-label">送單確認詞</div><div class="check-detail">「我已完成所有確認，這筆符合系統規則」</div></div>
   </div>
 </div>
-<div class="progress-label" style="margin-top:var(--space-4)"><span>確認進度</span><span id="gate4-progress-text">0 / 8</span></div>
+
+<div class="progress-label" style="margin-top:var(--space-4)"><span>確認進度</span><span id="gate4-progress-text">0 / 0</span></div>
 <div class="progress-bar"><div class="progress-fill" id="gate4-progress-fill"></div></div>
 <div class="confirm-box">
   <div class="confirm-title">🔒 送單確認詞</div>
@@ -1383,7 +1365,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可跳過 IVR 閾值</div>
     <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可在財報 / FOMC 前進場</div>
     <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可超出 BP 上限</div>
-    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可用收租邏輯做進攻部位</div>
+    <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>停損是紀律</div>
   </div>
 </div>
 </section>
@@ -1507,7 +1489,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 })();
 
 // === Navigation ===
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'gate4') loadGate4();   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
@@ -4262,6 +4244,116 @@ function goToGate4() {
   showSection('gate4', gate4Nav);
   window.scrollTo(0, 0);
 }
+
+// === GATE 4: Auto-check system ===
+function loadGate4() {
+  var container = document.getElementById('g4-auto-checks');
+  if (!container) return;
+
+  // Collect auto-check results from previous gates
+  var checks = [
+    { key: 'module', label: '策略分流已完成', detail: '', pass: false },
+    { key: 'signal', label: '盤前訊號確認', detail: '', pass: false },
+    { key: 'tos',    label: 'TOS 試算完成', detail: '', pass: false },
+    { key: 'bp',     label: 'BP 使用率安全', detail: '', pass: false },
+    { key: 'corr',   label: '相關性檢查', detail: '', pass: false },
+    { key: 'ev',     label: 'EV 為正', detail: '', pass: false },
+  ];
+
+  // 1. Module check: has approved signals with a strategy
+  var approvedSigs = (g2ApprovedSignals || []).filter(function(s) { return s.strategy; });
+  checks[0].pass = approvedSigs.length > 0;
+  checks[0].detail = approvedSigs.length > 0
+    ? approvedSigs.map(function(s) { return s.symbol + ' (' + (s.strategyLabel || s.strategy) + ')'; }).join(', ')
+    : '未完成第1關篩選';
+
+  // 2. Signal check: IVR/regime/event risk passed in gate 1
+  var hasApproved = approvedSigs.some(function(s) { return s.decision === 'approved'; });
+  checks[1].pass = hasApproved;
+  checks[1].detail = hasApproved ? 'IVR / Regime / 事件風險已排除' : '無通過第1關的信號';
+
+  // 3. TOS check: gate 2 fetch results
+  var g2Passed = (g2FetchResults && g2FetchResults.passed) ? g2FetchResults.passed.length : 0;
+  checks[2].pass = g2Passed > 0;
+  checks[2].detail = g2Passed > 0 ? g2Passed + ' 檔通過 OI/Delta/流動性篩選' : '第2關篩選未通過或未執行';
+
+  // 4. BP check: from gate 3
+  checks[3].pass = g3Passed ? g3Passed[2] : false;
+  var bpPct = (g3Data && g3Data.balances && g3Data.balances.netLiq > 0)
+    ? (g3Data.balances.maintenanceRequirement / g3Data.balances.netLiq * 100).toFixed(1) + '%'
+    : '未檢查';
+  checks[3].detail = checks[3].pass ? 'BP 使用率 ' + bpPct : 'BP 使用率 ' + bpPct + ' — 超過安全線';
+
+  // 5. Correlation check: from gate 3
+  checks[4].pass = g3Passed ? g3Passed[1] : false;
+  checks[4].detail = checks[4].pass ? '無重複標的，持倉數量安全' : '有重複標的或持倉過多';
+
+  // 6. EV check: from approved signals
+  var hasPositiveEV = approvedSigs.some(function(s) { return parseFloat(s.ev || 0) > 0; });
+  checks[5].pass = hasPositiveEV;
+  checks[5].detail = hasPositiveEV
+    ? approvedSigs.filter(function(s) { return parseFloat(s.ev||0) > 0; }).map(function(s) { return s.symbol + ' EV=' + parseFloat(s.ev||0).toFixed(2); }).join(', ')
+    : '無正 EV 信號';
+
+  // Render auto-checks
+  var html = '';
+  var autoPassCount = 0;
+  checks.forEach(function(c) {
+    var icon = c.pass ? '✅' : '❌';
+    var bg = c.pass ? 'var(--color-success-highlight)' : 'var(--color-error-highlight)';
+    var color = c.pass ? 'var(--color-success)' : 'var(--color-error)';
+    if (c.pass) autoPassCount++;
+    html += '<div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);background:' + bg + ';border-radius:var(--radius-md);margin-bottom:var(--space-2)">';
+    html += '<span style="font-size:16px">' + icon + '</span>';
+    html += '<div><div style="font-weight:600;color:' + color + '">' + c.label + '</div>';
+    html += '<div style="font-size:10px;color:var(--color-text-muted)">' + c.detail + '</div></div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+
+  // Enable manual checks only if all auto-checks pass
+  var allAutoPass = autoPassCount === checks.length;
+  var manualItems = document.querySelectorAll('.g4-manual');
+  manualItems.forEach(function(el) {
+    el.style.opacity = allAutoPass ? '1' : '0.4';
+    el.style.pointerEvents = allAutoPass ? 'auto' : 'none';
+  });
+
+  // Update progress
+  updateGate4Progress();
+}
+
+function toggleG4Manual(el) {
+  el.classList.toggle('checked');
+  var box = el.querySelector('.check-box');
+  var icon = el.querySelector('.check-icon');
+  if (el.classList.contains('checked')) {
+    box.style.background = 'var(--color-success)'; box.style.borderColor = 'var(--color-success)';
+    if (icon) icon.style.display = 'block';
+  } else {
+    box.style.background = ''; box.style.borderColor = '';
+    if (icon) icon.style.display = 'none';
+  }
+  updateGate4Progress();
+}
+
+function updateGate4Progress() {
+  // Count: auto checks (from DOM) + manual checks
+  var autoChecks = document.querySelectorAll('#g4-auto-checks > div');
+  var autoPass = 0;
+  autoChecks.forEach(function(el) { if (el.innerHTML.includes('✅')) autoPass++; });
+  var manualChecked = document.querySelectorAll('.g4-manual.checked').length;
+  var manualTotal = document.querySelectorAll('.g4-manual').length;
+  var total = autoChecks.length + manualTotal;
+  var done = autoPass + manualChecked;
+  var pText = document.getElementById('gate4-progress-text');
+  var pFill = document.getElementById('gate4-progress-fill');
+  if (pText) pText.textContent = done + ' / ' + total;
+  if (pFill) pFill.style.width = (total > 0 ? done / total * 100 : 0) + '%';
+}
+
+// Hook gate4 into showSection
+var _origShowSection = null;
 
 // Toggle earnings detail panel
 function toggleEarningsDetail() {
