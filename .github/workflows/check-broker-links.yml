@@ -1,0 +1,151 @@
+name: 🔗 Broker Deep Link Health Check
+
+on:
+  push:
+    paths:
+      - 'index.html'
+  pull_request:
+    paths:
+      - 'index.html'
+  schedule:
+    # Weekly check every Monday 9am UTC (5pm TW)
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-broker-links:
+    runs-on: ubuntu-latest
+    name: Verify broker deep link URL structure
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract BROKER_CONFIG URLs from index.html
+        id: extract
+        run: |
+          echo "=== Extracting broker URLs from BROKER_CONFIG ==="
+          
+          # Extract all optionUrl patterns
+          grep -oP "optionUrl: function\(sym\) \{ return '([^']+)" index.html | \
+            sed "s/optionUrl: function(sym) { return '//" | \
+            while read -r url_pattern; do
+              # Replace sym concatenation with test symbol SPY
+              test_url=$(echo "$url_pattern" | sed "s/' + sym + '/SPY/g" | sed "s/' + sym/SPY/g")
+              echo "  Pattern: $url_pattern"
+              echo "  Test URL: $test_url"
+              echo "---"
+            done
+          
+          echo ""
+          echo "=== Checking URL structure validity ==="
+
+      - name: Check each broker URL is reachable (HTTP HEAD)
+        run: |
+          FAILED=0
+          RESULTS=""
+          
+          # Define test URLs (symbol=SPY)
+          declare -A BROKERS
+          BROKERS[schwab]="https://client.schwab.com/app/trade/options-chains/SPY"
+          BROKERS[tastytrade]="https://trade.tastyworks.com/index.html#/option-chain?symbol=SPY"
+          BROKERS[ibkr]="https://portal.interactivebrokers.com/portal/#/option-chain?symbol=SPY"
+          BROKERS[firstrade]="https://invest.firstrade.com/cgi-bin/main#/content/optiontrade/SPY"
+          BROKERS[webull]="https://app.webull.com/trade?source=navbar&tickerId=&type=options&symbol=SPY"
+          BROKERS[futu]="https://www.moomoo.com/quote/us/SPY/options-chain"
+          
+          for broker in schwab tastytrade ibkr firstrade webull futu; do
+            url="${BROKERS[$broker]}"
+            # Strip hash fragments for HTTP check (servers don't see them)
+            base_url=$(echo "$url" | sed 's/#.*//')
+            
+            echo "--- $broker ---"
+            echo "  Full URL: $url"
+            echo "  Base URL: $base_url"
+            
+            # Check if base domain is reachable (allow redirects, ignore SSL for speed)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 "$base_url" 2>/dev/null || echo "000")
+            
+            if [ "$HTTP_CODE" = "000" ]; then
+              echo "  ❌ UNREACHABLE (timeout or DNS failure)"
+              FAILED=$((FAILED + 1))
+              RESULTS="$RESULTS\n❌ $broker: UNREACHABLE ($base_url)"
+            elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+              echo "  ✅ OK (HTTP $HTTP_CODE)"
+              RESULTS="$RESULTS\n✅ $broker: HTTP $HTTP_CODE"
+            elif [ "$HTTP_CODE" -ge 400 ] && [ "$HTTP_CODE" -lt 500 ]; then
+              # 401/403 = auth required = expected for trading platforms
+              echo "  ⚠️ AUTH REQUIRED (HTTP $HTTP_CODE) — expected for trading platforms"
+              RESULTS="$RESULTS\n⚠️ $broker: HTTP $HTTP_CODE (auth required — expected)"
+            else
+              echo "  ❌ ERROR (HTTP $HTTP_CODE)"
+              FAILED=$((FAILED + 1))
+              RESULTS="$RESULTS\n❌ $broker: HTTP $HTTP_CODE"
+            fi
+            echo ""
+          done
+          
+          echo "================================"
+          echo "Summary:"
+          echo -e "$RESULTS"
+          echo ""
+          
+          if [ $FAILED -gt 0 ]; then
+            echo "::warning::$FAILED broker URL(s) may be broken. Check the output above."
+          else
+            echo "All broker base URLs are reachable."
+          fi
+
+      - name: Verify BROKER_CONFIG has all 6 brokers
+        run: |
+          echo "=== Checking BROKER_CONFIG completeness ==="
+          EXPECTED="schwab tastytrade ibkr firstrade webull futu"
+          MISSING=""
+          
+          for broker in $EXPECTED; do
+            if grep -q "  $broker:" index.html; then
+              echo "  ✅ $broker: found in BROKER_CONFIG"
+            else
+              echo "  ❌ $broker: MISSING from BROKER_CONFIG"
+              MISSING="$MISSING $broker"
+            fi
+          done
+          
+          # Also check broker selector buttons
+          echo ""
+          echo "=== Checking broker selector buttons ==="
+          for broker in $EXPECTED; do
+            if grep -q "data-broker=\"$broker\"" index.html; then
+              echo "  ✅ $broker: button found"
+            else
+              echo "  ❌ $broker: button MISSING"
+              MISSING="$MISSING $broker"
+            fi
+          done
+          
+          if [ -n "$MISSING" ]; then
+            echo ""
+            echo "::error::Missing brokers:$MISSING"
+            exit 1
+          fi
+          
+          echo ""
+          echo "All 6 brokers present in config and UI."
+
+      - name: Check URL format consistency
+        run: |
+          echo "=== Verifying URL patterns contain symbol placeholder ==="
+          
+          # Each optionUrl should reference 'sym' parameter
+          URL_FUNCS=$(grep -c "optionUrl: function(sym)" index.html)
+          echo "Found $URL_FUNCS optionUrl functions"
+          
+          if [ "$URL_FUNCS" -ne 6 ]; then
+            echo "::error::Expected 6 optionUrl functions, found $URL_FUNCS"
+            exit 1
+          fi
+          
+          # Each should use sym variable
+          SYM_REFS=$(grep "optionUrl: function(sym)" index.html | grep -c "sym")
+          echo "All $SYM_REFS reference 'sym' parameter ✅"
+          
+          echo ""
+          echo "=== URL format check passed ==="

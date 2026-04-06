@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>券商 Deep Link 測試回報</title>
+<style>
+:root { --bg: #1a1a1a; --surface: #242424; --border: #333; --text: #e8e6e3; --muted: #797876; --primary: #4ecdc4; --success: #34c759; --error: #ff453a; --warning: #ffd60a; --radius: 10px; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 700px; margin: 0 auto; }
+h1 { font-size: 22px; margin-bottom: 6px; }
+.subtitle { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.field input, .field select, .field textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 14px; }
+.field textarea { min-height: 60px; resize: vertical; }
+.radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.radio-group label { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 400; }
+.radio-group input[type=radio] { accent-color: var(--primary); }
+.broker-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.broker-card { padding: 10px; border: 2px solid var(--border); border-radius: var(--radius); text-align: center; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+.broker-card.selected { border-color: var(--primary); background: rgba(78,205,196,0.1); }
+.broker-card:hover { border-color: var(--primary); }
+.test-url { background: var(--surface); padding: 10px; border-radius: var(--radius); font-family: monospace; font-size: 11px; word-break: break-all; color: var(--primary); margin: 8px 0; }
+.results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.result-item { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); }
+.result-item label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: block; }
+.btn { padding: 12px 24px; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 16px; }
+.btn-primary { background: var(--primary); color: #1a1a1a; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-test { background: var(--surface); color: var(--primary); border: 2px solid var(--primary); margin-top: 8px; }
+.status { padding: 12px; border-radius: var(--radius); margin-top: 12px; font-size: 14px; text-align: center; display: none; }
+.status.success { display: block; background: rgba(52,199,89,0.1); color: var(--success); }
+.status.error { display: block; background: rgba(255,69,58,0.1); color: var(--error); }
+.divider { border-top: 1px solid var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<h1>🔗 券商 Deep Link 測試回報</h1>
+<p class="subtitle">幫助我們確認每家券商的 Option Chain 連結是否正常運作。測試結果會自動回報到 GitHub Issue #1。</p>
+
+<div class="field">
+  <label>你的名字（或暱稱）</label>
+  <input type="text" id="f-name" placeholder="例：小明">
+</div>
+
+<div class="field">
+  <label>選擇要測試的券商</label>
+  <div class="broker-cards" id="broker-cards">
+    <div class="broker-card" data-broker="schwab" onclick="selectTestBroker(this)">🟦 Schwab</div>
+    <div class="broker-card" data-broker="tastytrade" onclick="selectTestBroker(this)">🟣 tastytrade</div>
+    <div class="broker-card" data-broker="ibkr" onclick="selectTestBroker(this)">🔴 IBKR</div>
+    <div class="broker-card" data-broker="firstrade" onclick="selectTestBroker(this)">🟢 Firstrade</div>
+    <div class="broker-card" data-broker="webull" onclick="selectTestBroker(this)">🟠 Webull</div>
+    <div class="broker-card" data-broker="futu" onclick="selectTestBroker(this)">🟡 moomoo</div>
+  </div>
+</div>
+
+<div class="field">
+  <label>測試裝置 / 平台</label>
+  <div class="radio-group">
+    <label><input type="radio" name="device" value="Desktop Chrome"> 🖥️ Desktop Chrome</label>
+    <label><input type="radio" name="device" value="Desktop Safari"> 🖥️ Desktop Safari</label>
+    <label><input type="radio" name="device" value="iOS Safari"> 📱 iOS Safari</label>
+    <label><input type="radio" name="device" value="iOS App"> 📱 iOS App</label>
+    <label><input type="radio" name="device" value="Android Chrome"> 📱 Android Chrome</label>
+    <label><input type="radio" name="device" value="Android App"> 📱 Android App</label>
+  </div>
+</div>
+
+<div class="field">
+  <label>測試 Symbol</label>
+  <input type="text" id="f-symbol" value="SPY" placeholder="SPY">
+</div>
+
+<div id="test-section" style="display:none">
+  <div class="divider"></div>
+  <p style="font-weight:600;margin-bottom:8px">👇 點擊下方按鈕測試 Deep Link</p>
+  <div class="test-url" id="test-url"></div>
+  <button class="btn btn-test" id="btn-open-link" onclick="openTestLink()">🔗 開啟測試連結</button>
+
+  <div class="divider"></div>
+  <p style="font-weight:600;margin-bottom:12px">測試結果（請勾選）</p>
+
+  <div class="results-grid">
+    <div class="result-item">
+      <label>URL 能打開？</label>
+      <div class="radio-group"><label><input type="radio" name="r-open" value="✅ 是"> ✅ 是</label><label><input type="radio" name="r-open" value="❌ 否"> ❌ 否</label></div>
+    </div>
+    <div class="result-item">
+      <label>跳到 Option Chain？</label>
+      <div class="radio-group"><label><input type="radio" name="r-chain" value="✅ 是"> ✅ 是</label><label><input type="radio" name="r-chain" value="❌ 否"> ❌ 否</label></div>
+    </div>
+    <div class="result-item">
+      <label>帶入正確 Symbol？</label>
+      <div class="radio-group"><label><input type="radio" name="r-symbol" value="✅ 是"> ✅ 是</label><label><input type="radio" name="r-symbol" value="❌ 否"> ❌ 否</label></div>
+    </div>
+    <div class="result-item">
+      <label>需要重新登入？</label>
+      <div class="radio-group"><label><input type="radio" name="r-login" value="是"> 是</label><label><input type="radio" name="r-login" value="否"> 否</label></div>
+    </div>
+    <div class="result-item">
+      <label>被導到首頁或 404？</label>
+      <div class="radio-group"><label><input type="radio" name="r-redirect" value="是"> 是</label><label><input type="radio" name="r-redirect" value="否"> 否</label></div>
+    </div>
+  </div>
+
+  <div class="field" style="margin-top:12px">
+    <label>實際最終 URL（如果跟測試 URL 不同）</label>
+    <input type="text" id="f-actual-url" placeholder="貼上瀏覽器網址列的最終 URL">
+  </div>
+  <div class="field">
+    <label>備註</label>
+    <textarea id="f-notes" placeholder="任何觀察，例如：被重導到登入頁、App 攔截了連結、頁面空白等"></textarea>
+  </div>
+
+  <button class="btn btn-primary" onclick="submitReport()">📤 提交測試回報</button>
+  <div class="status" id="status-msg"></div>
+</div>
+
+<script>
+var BROKERS = {
+  schwab: { url: function(s) { return 'https://client.schwab.com/app/trade/options-chains/' + s; } },
+  tastytrade: { url: function(s) { return 'https://trade.tastyworks.com/index.html#/option-chain?symbol=' + s; } },
+  ibkr: { url: function(s) { return 'https://portal.interactivebrokers.com/portal/#/option-chain?symbol=' + s; } },
+  firstrade: { url: function(s) { return 'https://invest.firstrade.com/cgi-bin/main#/content/optiontrade/' + s; } },
+  webull: { url: function(s) { return 'https://app.webull.com/trade?source=navbar&tickerId=&type=options&symbol=' + s; } },
+  futu: { url: function(s) { return 'https://www.moomoo.com/quote/us/' + s + '/options-chain'; } }
+};
+
+var selectedBroker = '';
+// Google Sheet Apps Script Web App URL for form submission
+var SHEET_ID = '1QrREqk0MMhZnCRweFqEG70eExn9AQhM1Ip3zk5EkVtc';
+
+function selectTestBroker(el) {
+  document.querySelectorAll('.broker-card').forEach(function(c) { c.classList.remove('selected'); });
+  el.classList.add('selected');
+  selectedBroker = el.getAttribute('data-broker');
+  var sym = document.getElementById('f-symbol').value || 'SPY';
+  var url = BROKERS[selectedBroker].url(sym);
+  document.getElementById('test-url').textContent = url;
+  document.getElementById('test-section').style.display = 'block';
+}
+
+function openTestLink() {
+  var sym = document.getElementById('f-symbol').value || 'SPY';
+  if (!selectedBroker) return;
+  var url = BROKERS[selectedBroker].url(sym);
+  window.open(url, '_blank');
+}
+
+function submitReport() {
+  var name = document.getElementById('f-name').value || '匿名';
+  var device = document.querySelector('input[name="device"]:checked');
+  var sym = document.getElementById('f-symbol').value || 'SPY';
+  var rOpen = document.querySelector('input[name="r-open"]:checked');
+  var rChain = document.querySelector('input[name="r-chain"]:checked');
+  var rSymbol = document.querySelector('input[name="r-symbol"]:checked');
+  var rLogin = document.querySelector('input[name="r-login"]:checked');
+  var rRedirect = document.querySelector('input[name="r-redirect"]:checked');
+  var actualUrl = document.getElementById('f-actual-url').value;
+  var notes = document.getElementById('f-notes').value;
+  var statusEl = document.getElementById('status-msg');
+
+  if (!selectedBroker || !device) {
+    statusEl.className = 'status error';
+    statusEl.textContent = '❌ 請選擇券商和測試裝置';
+    return;
+  }
+
+  // Build row data
+  var row = [
+    new Date().toISOString(),
+    name,
+    selectedBroker,
+    device.value,
+    sym,
+    rOpen ? rOpen.value : '',
+    rChain ? rChain.value : '',
+    rSymbol ? rSymbol.value : '',
+    rLogin ? rLogin.value : '',
+    rRedirect ? rRedirect.value : '',
+    actualUrl,
+    '',
+    notes
+  ];
+
+  // Submit via Google Sheets API proxy (or show copyable data)
+  statusEl.className = 'status success';
+  statusEl.innerHTML = '✅ 感謝回報！請將以下資料貼到 <a href="https://github.com/CHUNGCHANGTING/student-signal-dashboard/issues/1" target="_blank" style="color:var(--primary)">GitHub Issue #1</a> 的留言區：<br><br>' +
+    '<code style="font-size:11px;background:var(--surface);padding:8px;display:block;border-radius:6px;word-break:break-all;margin-top:6px">' +
+    '| ' + selectedBroker + ' | ' + (device ? device.value : '') + ' | ' +
+    (rOpen ? rOpen.value : '?') + ' | ' +
+    (rChain ? rChain.value : '?') + ' | ' +
+    (rSymbol ? rSymbol.value : '?') + ' | ' +
+    (rLogin ? rLogin.value : '?') + ' | ' +
+    (rRedirect ? rRedirect.value : '?') + ' | ' +
+    (actualUrl || '—') + ' | ' +
+    (notes || '—') + ' |</code>';
+
+  // Also try to copy to clipboard
+  var clipText = '| ' + selectedBroker + ' | ' + (device ? device.value : '') + ' | ' +
+    (rOpen ? rOpen.value : '?') + ' | ' + (rChain ? rChain.value : '?') + ' | ' +
+    (rSymbol ? rSymbol.value : '?') + ' | ' + (rLogin ? rLogin.value : '?') + ' | ' +
+    (rRedirect ? rRedirect.value : '?') + ' | ' + (actualUrl || '—') + ' | ' + (notes || '—') + ' |';
+  navigator.clipboard.writeText(clipText).catch(function(){});
+}
+</script>
+</body>
+</html>
