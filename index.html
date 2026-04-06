@@ -793,7 +793,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 <!-- Broker Setup Overlay (shown once on first login) -->
 <div id="broker-setup-overlay" style="display:none">
-  <div class="broker-setup-card" style="max-width:540px;max-height:90vh;overflow-y:auto">
+  <div class="broker-setup-card" style="max-width:540px;max-height:90vh;overflow-y:auto;position:relative">
+    <button onclick="document.getElementById('broker-setup-overlay').style.display='none'" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--color-text-muted);font-size:20px;transition:all 0.2s;z-index:1" onmouseover="this.style.background='rgba(128,128,128,0.15)';this.style.color='var(--color-text)'" onmouseout="this.style.background='none';this.style.color='var(--color-text-muted)'">✕</button>
     <!-- Step 1: Choose Broker -->
     <div id="setup-step-1">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
