@@ -772,8 +772,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- Sidebar -->
 <nav class="sidebar">
   <div class="sidebar-section">決策流程</div>
-  <button class="nav-item active" onclick="showSection('gate0',this)"><span class="nav-dot gate"></span>第0關　策略分流</button>
-  <button class="nav-item" onclick="showSection('gate1',this)"><span class="nav-dot gate"></span>第1關　盤前訊號</button>
+  <button class="nav-item active" onclick="showSection('gate0',this)"><span class="nav-dot gate"></span>第1關　盤前訊號</button>
+  <!-- Gate 1 merged into Gate 0 -->
   <button class="nav-item" onclick="showSection('gate2',this)"><span class="nav-dot gate"></span>第2關　TOS 試算</button>
   <button class="nav-item" onclick="showSection('gate3',this)"><span class="nav-dot gate"></span>第3關　部位確認</button>
   <button class="nav-item" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
@@ -797,11 +797,52 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="main-wrapper">
 <!-- GATE 0: 策略分流 -->
 <section class="gate" id="gate0">
-<div class="gate-header"><div class="gate-num g0">0</div><div><div class="gate-title">策略分流</div><div class="gate-subtitle">先選戰術，再用對應規則 — 不先決定這件事，後面所有條件都會互相打架</div></div></div>
+<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號</div><div class="gate-subtitle">設定市場狀態、貼上信號、系統自動判斷 — 一頁完成所有盤前準備</div></div></div>
 <!-- Signal Input Dual-Mode Panel -->
 <div class="sp-panel" id="sp-panel">
   <button class="sp-toggle" id="sp-toggle" onclick="toggleSignalPanel()">
-    <span>📋 訊號輸入與自動判斷</span>
+
+<!-- 今日市場狀態 (from Gate 1) -->
+<div class="g1-section-title"><span class="g1-st-icon">A</span> 今日市場狀態</div>
+<div class="g1-status-grid">
+  <div class="g1-status-card" id="g1-card-bias">
+    <div class="sc-title"><span class="sc-emoji">🧭</span> 大盤方向</div>
+    <div class="sc-input">
+      <select id="g1-bias" onchange="g1Update()">
+        <option value="">— 請選擇 —</option>
+        <option value="bullish">📈 偏多 (Bullish)</option>
+        <option value="bearish">📉 偏空 (Bearish)</option>
+        <option value="neutral">➡️ 中性 (Neutral)</option>
+      </select>
+    </div>
+    <div class="sc-hint">SPX/QQQ 技術面方向</div>
+  </div>
+  <div class="g1-status-card" id="g1-card-ivr">
+    <div class="sc-title"><span class="sc-emoji">📊</span> IVR 區間</div>
+    <div class="sc-input">
+      <input type="number" id="g1-ivr" min="0" max="100" placeholder="輸入 IVR %" oninput="g1Update()">
+    </div>
+    <div class="sc-hint">27以下=進攻為主 | 27-45=收租理想 | 45+=高波</div>
+  </div>
+  <div class="g1-status-card" id="g1-card-event">
+    <div class="sc-title"><span class="sc-emoji">⚡</span> 事件風險</div>
+    <div class="g1-toggle-group" id="g1-event-toggle">
+      <button class="g1-toggle-btn" data-val="false" onclick="g1SetToggle('event','false',this)">無</button>
+      <button class="g1-toggle-btn" data-val="true" onclick="g1SetToggle('event','true',this)">有</button>
+    </div>
+    <div class="sc-hint">FOMC / CPI / 財報週</div>
+  </div>
+  <div class="g1-status-card" id="g1-card-liquidity">
+    <div class="sc-title"><span class="sc-emoji">💧</span> 流動性</div>
+    <div class="g1-toggle-group" id="g1-liq-toggle">
+      <button class="g1-toggle-btn" data-val="true" onclick="g1SetToggle('liquidity','true',this)">充足</button>
+      <button class="g1-toggle-btn" data-val="false" onclick="g1SetToggle('liquidity','false',this)">不足</button>
+    </div>
+    <div class="sc-hint">OI > 500, Spread < $0.10</div>
+  </div>
+</div>
+
+    <span>B 訊號輸入與自動判斷</span>
     <span class="sp-arrow">▼</span>
   </button>
   <div class="sp-body" id="sp-body">
@@ -969,7 +1010,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div class="info-block note"><p><strong>n8n 對應：</strong>Code node 第一步 <code>pickModule()</code> 根據 <code>strategy</code> + <code>is_index</code> 自動分流：IRON_CONDOR → IC_INDEX / IC_EQUITY、BULL_PUT_CREDIT_SPREAD → BPCS_INDEX / BPCS_EQUITY、BEAR_CALL_CREDIT_SPREAD → BCCS_INDEX / BCCS_EQUITY。若 <code>resolved_module === 'unknown'</code>，<code>module_resolved</code> 為 false，整筆會在 IF node 被濾掉。</p></div>
 </section>
 <!-- GATE 1-4 簡化版 -->
-<section class="gate" id="gate1" style="display:none">
+<!-- Gate 1 merged into Gate 0 -->
+<section class="gate" id="gate1" style="display:none !important">
 <div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號總覽</div><div class="gate-subtitle">設定今日市場狀態，系統自動推薦適合的策略 — 學生看這頁就知道今天該做什麼</div></div></div>
 
 <!-- Section A: 今日市場狀態 -->
@@ -2135,6 +2177,56 @@ function analyzeAllLINESignals() {
   }
   html += '</tbody></table></div></div>';
   container.innerHTML = html;
+
+  // === 策略卡片亮燈 ===
+  clearSignalHighlights();
+  var income_strats = ['IRON_CONDOR','BULL_PUT_CREDIT_SPREAD','BEAR_CALL_CREDIT_SPREAD','CREDIT_VERTICAL'];
+  var debit_strats = ['BULL_CALL_DEBIT_SPREAD','BEAR_PUT_DEBIT_SPREAD'];
+  var stratMap = {'IRON_CONDOR':'IC','BULL_PUT_CREDIT_SPREAD':'BPCS','BEAR_CALL_CREDIT_SPREAD':'BCCS','BULL_CALL_DEBIT_SPREAD':'BCDS','BEAR_PUT_DEBIT_SPREAD':'BPDS','CREDIT_VERTICAL':'CV'};
+  var hasIncome = false, hasOffense = false;
+  var approvedStrategies = new Set();
+  var firstApproved = null;
+
+  for (var k = 0; k < results.length; k++) {
+    var r2 = results[k];
+    if (r2.decision === 'approved') {
+      if (!firstApproved) firstApproved = r2;
+      if (income_strats.includes(r2.strategy)) hasIncome = true;
+      if (debit_strats.includes(r2.strategy)) hasOffense = true;
+      if (stratMap[r2.strategy]) approvedStrategies.add(stratMap[r2.strategy]);
+    }
+  }
+
+  // 高亮模組卡片
+  var moduleCards = document.querySelectorAll('#module-grid .module-card');
+  moduleCards.forEach(function(card) {
+    if (hasIncome && card.classList.contains('income')) card.classList.add('sp-highlight');
+    if (hasOffense && card.classList.contains('offense')) card.classList.add('sp-highlight');
+  });
+
+  // 高亮對應的策略行
+  var stratRows = document.querySelectorAll('#module-grid .strategy-row');
+  stratRows.forEach(function(row) {
+    var tag = row.querySelector('.strategy-tag');
+    if (tag && approvedStrategies.has(tag.textContent.trim())) {
+      row.classList.add('sp-highlight');
+    }
+  });
+
+  // 更新底部 summary bar
+  if (firstApproved) {
+    var sumMod = document.getElementById('sum-module');
+    var sumStr = document.getElementById('sum-strategy');
+    if (sumMod) {
+      var mod = firstApproved.module;
+      sumMod.textContent = mod;
+      sumMod.className = 'summary-val ' + (mod !== 'unknown' ? 'blue' : 'red');
+    }
+    if (sumStr) {
+      sumStr.textContent = firstApproved.symbol + ' / ' + firstApproved.strategy;
+      sumStr.className = 'summary-val';
+    }
+  }
 }
 
 function fillLINESample() {
