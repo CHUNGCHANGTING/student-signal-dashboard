@@ -56,7 +56,7 @@ const ranked = results
   .slice(0, 5);
 
 if (ranked.length === 0) {
-  const noMsg = `📢 正EV履約價推播 v3.0 — ${dateStr} ${timeStr}\n━━━━━━━━━━━━━━\n\n⚠️ 今日無符合正EV條件的履約價\n篩選: Delta選價 + Greeks + IVR + 流動性\n\n少做多看，靜候佳機 🧘`;
+  const noMsg = `📢 正EV履約價推播 v3.4 — ${dateStr} ${timeStr}\n━━━━━━━━━━━━━━\n\n今日無符合條件的推薦\n篩選: Delta選價 + Greeks + IVR + 流動性\n\n🛡️ 沒有好的機會時，不做就是最好的策略 🧘\n少做多看，靜候佳機`;
   // Push to LINE
   try {
     await this.helpers.httpRequest({
@@ -157,7 +157,11 @@ msg += `v3.4 篩選:\n`;
 msg += `📊 Greeks + Delta選價 + IVR\n`;
 msg += `🧠 RSI/MA20/Skew方向判斷\n`;
 msg += `🛡️ BidAsk<10% + OI>500\n`;
-msg += `⚠️ CBOE即時數據，下單前請確認`;
+msg += `\n🛡️ 風險提醒:\n`;
+msg += `• 每筆交易已鎖定最大虧損，不會超過設定範圍\n`;
+msg += `• 信號為輔助決策工具，下單決定權在你手上\n`;
+msg += `• 單筆建議不超過帳戶 5%，先求穩再求多\n`;
+msg += `• 停損是紀律，不是建議`;
 
 // Split if too long (LINE limit 5000 chars)
 const msgParts = [];
