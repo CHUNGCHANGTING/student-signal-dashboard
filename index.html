@@ -3254,34 +3254,27 @@ async function testBrokerConnection() {
         btn.textContent = '🔌 測試連線'; btn.disabled = false;
         return;
       }
-      var resp = await fetch('https://api.tastyworks.com/sessions', {
+      // Use n8n proxy for tastytrade login (browser can't set User-Agent header)
+      var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'chilldove-dashboard/1.0' },
-        body: JSON.stringify({ login: username, password: password, 'remember-me': true })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'tt-login', login: username, password: password })
       });
       var data = await resp.json();
-      if (resp.ok && data.data) {
+      if (data.data && data.data['session-token']) {
         result.innerHTML = '<span style="color:var(--color-success)">✅ 連線成功！帳戶: ' + (data.data?.user?.email || username) + '</span>';
-        if (data.data?.['session-token']) {
-          localStorage.setItem('broker_tt-session', data.data['session-token']);
-        }
-        if (data.data?.['remember-token']) {
+        localStorage.setItem('broker_tt-session', data.data['session-token']);
+        if (data.data['remember-token']) {
           localStorage.setItem('broker_tt-remember', data.data['remember-token']);
         }
       } else {
         var errMsg = (data.error?.message || data.error?.code || '請確認帳號密碼');
-        // Check for OTP requirement
-        var otpHeader = resp.headers.get('X-Tastyworks-OTP');
-        if (otpHeader === 'required') {
+        if (data.otpRequired) {
           result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 需要雙重驗證 (2FA)。請先在 tastytrade App 完成登入，或暫時關閉 2FA 後重試</span>';
         } else if (errMsg.includes('locked')) {
           result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 帳號已被暫時鎖定（太多次失敗嘗試）。請等 15 分鐘後重試。</span>';
         } else if (errMsg.toLowerCase().includes('device') || errMsg.toLowerCase().includes('challenge')) {
-          result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 新裝置驗證：這台裝置還沒在 tastytrade 上認證過。</span>' +
-            '<br><span style="font-size:11px;color:var(--color-text-muted)">' +
-            '① 開新分頁前往 <a href="https://trade.tastyworks.com" target="_blank" style="color:var(--color-primary)">trade.tastyworks.com</a> 登入<br>' +
-            '② 完成 tastytrade 的 email/簡訊驗證碼<br>' +
-            '③ 登入成功後，回這裡再按「測試連線」</span>';
+          result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 新裝置驗證：請先在 tastytrade 官網登入一次後再試。</span>';
         } else {
           result.innerHTML = '<span style="color:var(--color-error)">❌ 登入失敗: ' + errMsg + '</span>';
         }

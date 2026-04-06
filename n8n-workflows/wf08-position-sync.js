@@ -52,6 +52,37 @@ if (action === 'cboe-proxy' || action === 'cboe') {
   return [{ json: { batch: true, symbols: symbolList, results } }];
 }
 
+// === tastytrade Login Proxy (bypass browser User-Agent restriction) ===
+if (action === 'tt-login') {
+  const body = inputData.body || {};
+  const login = body.login || '';
+  const password = body.password || '';
+  if (!login || !password) {
+    return [{ json: { error: { code: 'missing_fields', message: 'Missing login or password' } } }];
+  }
+  try {
+    const resp = await this.helpers.httpRequest({
+      method: 'POST',
+      url: 'https://api.tastyworks.com/sessions',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'chilldove-dashboard/1.0',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ login, password, 'remember-me': true }),
+      returnFullResponse: true,
+      ignoreHttpStatusErrors: true,
+      timeout: 15000
+    });
+    const data = typeof resp.body === 'string' ? JSON.parse(resp.body) : resp.body;
+    // Forward the OTP header if present
+    const otpHeader = resp.headers?.['x-tastyworks-otp'] || '';
+    return [{ json: { statusCode: resp.statusCode, data: data?.data || null, error: data?.error || null, otpRequired: otpHeader === 'required' } }];
+  } catch(e) {
+    return [{ json: { error: { code: 'proxy_error', message: e.message } } }];
+  }
+}
+
 // === Original WF-08 Logic Below ===
 // ============================================================
 // WF-08【持倉同步】Position Sync — Fetch from tastytrade → Serve to Dashboard
