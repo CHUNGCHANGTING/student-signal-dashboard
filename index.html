@@ -1073,6 +1073,13 @@ a, button, [role=button] { transition: color var(--transition), background var(-
           <button class="btn-primary" onclick="connectAutoReceive()">連線</button>
         </div>
         <p class="sp-auto-desc">當 WF-02 收到 TradingView Alert 或手動觸發後，判斷結果會自動顯示在下方。</p>
+        <div id="sp-staging-toggle" class="admin-only" style="display:none;margin-bottom:var(--space-2);padding:var(--space-2);background:var(--color-warning-highlight);border:1px solid var(--color-warning);border-radius:var(--radius-md);font-size:11px">
+          <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer">
+            <input type="checkbox" id="sp-staging-mode" onchange="toggleStagingMode()">
+            <span>🧪 Staging 模式（測試用，不影響學生端）</span>
+            <span id="sp-staging-badge" style="display:none;background:var(--color-warning);color:#fff;padding:1px 6px;border-radius:var(--radius-sm);font-weight:700;font-size:10px">STAGING</span>
+          </label>
+        </div>
         <div class="sp-auto-actions">
           <label class="sp-toggle-switch">
             <input type="checkbox" id="sp-auto-refresh-toggle" onchange="toggleAutoRefreshSignal()">
@@ -2031,6 +2038,33 @@ function clearSignal() {
   var sumQ = document.getElementById('sum-quality'); if (sumQ) sumQ.innerHTML = '<span class="quality-badge grade-c">—</span>';
 }
 
+// === Staging Mode ===
+var isStagingMode = false;
+function toggleStagingMode() {
+  var cb = document.getElementById('sp-staging-mode');
+  isStagingMode = cb ? cb.checked : false;
+  var badge = document.getElementById('sp-staging-badge');
+  if (badge) badge.style.display = isStagingMode ? 'inline' : 'none';
+  var statusText = document.getElementById('sp-auto-status-text');
+  if (isStagingMode) {
+    statusText.textContent = '\ud83e\uddea Staging \u6a21\u5f0f — \u9ede\u9023\u7dda\u62c9\u53d6\u6e2c\u8a66\u4fe1\u865f';
+  } else {
+    statusText.textContent = '\u2705 \u5df2\u5207\u56de\u6b63\u5f0f\u6a21\u5f0f';
+  }
+}
+// Show staging toggle for admin
+(function() {
+  setTimeout(function() {
+    var isAdmin = document.querySelector('.badge-admin') !== null;
+    var el = document.getElementById('sp-staging-toggle');
+    if (isAdmin && el) el.style.display = 'block';
+  }, 2000);
+})();
+
+function getSignalAction() {
+  return isStagingMode ? 'get_staging' : 'get_signals';
+}
+
 // === Auto-Receive ===
 function connectAutoReceive() {
   var url = document.getElementById('sp-auto-url').value.trim();
@@ -2039,7 +2073,9 @@ function connectAutoReceive() {
   var statusText = document.getElementById('sp-auto-status-text');
   statusText.textContent = '\u9023\u7dda\u4e2d...';
   dotEl.className = 'status-dot waiting';
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get_signals' }) }).then(function(r) { return r.json(); }).then(function(raw) {
+  var action = getSignalAction();
+  var envLabel = isStagingMode ? '\ud83e\uddea staging' : '';
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) }).then(function(r) { return r.json(); }).then(function(raw) {
     var data = Array.isArray(raw) ? raw[0] : raw;
     autoReceiveConnected = true;
     dotEl.className = 'status-dot connected';
@@ -2057,7 +2093,8 @@ function manualPollSignal() {
   if (!url) return;
   var statusText = document.getElementById('sp-auto-status-text');
   statusText.textContent = '\ud83d\udd04 \u5237\u65b0\u4e2d...';
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get_signals' }) }).then(function(r) { return r.json(); }).then(function(raw) {
+  var action = getSignalAction();
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) }).then(function(r) { return r.json(); }).then(function(raw) {
     var data = Array.isArray(raw) ? raw[0] : raw;
     var dotEl = document.getElementById('sp-auto-dot');
     dotEl.className = 'status-dot connected';
