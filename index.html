@@ -7,6 +7,7 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
+<!-- build:v3.5.1-20260406-1618 -->
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700&display=swap" rel="stylesheet">
 <style>
 :root, [data-theme="light"] {
@@ -3739,28 +3740,35 @@ async function autoFetchAll() {
 
   var symbols = g2ApprovedSignals.map(function(s) { return s.symbol.replace(/[^A-Z]/g, ''); });
 
-  // Always fetch CBOE for OI/Delta/structure data
+  // ── Step 1: CBOE batch fetch (OI/Delta/structure) ──
+  var cboeOk = false;
+  if (statusText) statusText.innerHTML = '⚡ 拉取 CBOE 結構數據...';
   try {
     var batchResp = await fetchWithTimeout('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=cboe-proxy&symbols=' + symbols.join(','), 12000);
     var batchData = await batchResp.json();
     if (batchData.batch && batchData.results) {
       g2BatchCache = batchData.results;
+      cboeOk = Object.keys(batchData.results).length > 0;
     } else if (batchData.symbol) {
       g2BatchCache[batchData.symbol] = { count: batchData.count, options: batchData.options };
+      cboeOk = true;
     }
   } catch(e) {
-    if (statusText && !useTasty) {
-      statusText.innerHTML = '⚠️ 數據拉取逾時，改用逐檔查詢...';
-      statusText.style.color = 'var(--color-warning)';
-    }
     g2BatchCache = {};
   }
 
-  // Pre-fetch ALL tastytrade quotes in one batch (instead of per-symbol)
+  if (!cboeOk) {
+    if (statusText) { statusText.innerHTML = '❌ CBOE 數據拉取失敗 — 請稍後重試或檢查網路連線'; statusText.style.color = 'var(--color-error)'; }
+    if (statusSub) statusSub.innerHTML = '❗ CBOE proxy (n8n) 無回應或逾時。如持續失敗請聯絡老師。';
+    return; // Stop — can't filter without CBOE data
+  }
+  if (statusText) statusText.innerHTML = '✅ CBOE 數據已取得 (' + symbols.length + ' 檔)';
+
+  // ── Step 2: tastytrade real-time quotes (optional overlay) ──
   var g2TastyQuoteCache = {};
   if (useTasty) {
     try {
-      if (statusText) statusText.innerHTML = '🟣 批次拉取即時報價...';
+      if (statusText) statusText.innerHTML = '🟣 拉取即時報價...';
       var allTastySymbols = [];
       for (var k = 0; k < g2ApprovedSignals.length; k++) {
         var sig = g2ApprovedSignals[k];
@@ -3773,18 +3781,17 @@ async function autoFetchAll() {
           allTastySymbols.push(buildTastyOptionSymbol(root, expiry, optType, parseFloat(strikes[1])));
         }
       }
-      // Deduplicate
       allTastySymbols = allTastySymbols.filter(function(s, i, a) { return s && a.indexOf(s) === i; });
       if (allTastySymbols.length > 0) {
         g2TastyQuoteCache = await fetchTastytradeQuotes(allTastySymbols);
         if (statusText) statusText.innerHTML = '🟣 即時報價已取得 (' + Object.keys(g2TastyQuoteCache).length + ' 檔)';
       }
     } catch(tastyBatchErr) {
-      console.log('Batch tastytrade fetch failed:', tastyBatchErr.message);
-      useTasty = false; // Don't retry per-symbol, use CBOE fallback
+      console.log('tastytrade market-data failed:', tastyBatchErr.message);
+      useTasty = false;
       g2DataSource = 'cboe';
-      if (statusText) statusText.innerHTML = '⚡ tastytrade 不可用，改用 CBOE 篩選...';
-      if (statusSub) statusSub.innerHTML = 'CBOE 延遲數據篩選 OI/Delta/流動性（盤中幾乎不變）';
+      if (statusText) { statusText.innerHTML = '⚠️ tastytrade 即時報價不可用 (403)，改用 CBOE 篩選'; statusText.style.color = 'var(--color-warning)'; }
+      if (statusSub) statusSub.innerHTML = '💡 原因：帳戶 quote level 為 delayed。CBOE 數據已足夠篩選 OI/Delta/流動性。';
     }
   }
 
@@ -3812,7 +3819,7 @@ async function autoFetchAll() {
     }
     if (statusSub) statusSub.innerHTML = useTasty
       ? '🟣 數據來源：tastytrade 即時報價'
-      : '數據來源：CBOE 延遲 — 下單前請以券商即時報價為準';
+      : '🟠 數據來源：CBOE 延遲 | OI/Delta 盤中幾乎不變，Bid/Ask 下單前請開啟券商確認';
   }
 }
 
