@@ -2155,6 +2155,55 @@ function processAutoSignals(data) {
   });
 
   renderSignalHistory();
+
+  // === Update Gate 2 approved signals + summary bar ===
+  var approvedFromAuto = signalHistory.filter(function(e) { return e.decision === 'approved'; });
+  if (approvedFromAuto.length > 0) {
+    // Build g2-compatible signal objects
+    g2ApprovedSignals = approvedFromAuto.map(function(e) {
+      var p = e.payload;
+      var ev = calcEVSignal(p.pop / 100, p.credit_received, p.debit_paid, p.max_loss, p.target_value);
+      return {
+        symbol: p.symbol, strategy: p.strategy,
+        ivr: p.ivr, dte: p.dte, pop: p.pop / 100,
+        bias: p.bias, event_risk: p.event_risk,
+        credit_received: p.credit_received,
+        debit_paid: p.debit_paid,
+        max_loss: p.max_loss,
+        target_value: p.target_value,
+        ev: ev / 100,
+        decision: 'approved'
+      };
+    });
+    // Update summary bar
+    var sumMod = document.getElementById('sum-module');
+    var sumStr = document.getElementById('sum-strategy');
+    var sumStatus = document.getElementById('sum-status');
+    var blockedCount = signalHistory.filter(function(e) { return e.decision !== 'approved'; }).length;
+    if (sumMod) { sumMod.textContent = approvedFromAuto.length + ' \u6a94\u901a\u904e / ' + blockedCount + ' \u6a94\u5c01\u9396'; sumMod.className = 'summary-val green'; }
+    if (sumStr) {
+      var _slm = typeof strategyLabelMap !== 'undefined' ? strategyLabelMap : {};
+      var symList = approvedFromAuto.map(function(e) {
+        var sl = _slm[e.payload.strategy];
+        return e.symbol + '(' + (sl ? sl.split('\u3011')[0] + '\u3011' : e.payload.strategy) + ')';
+      }).join(' ');
+      sumStr.textContent = symList; sumStr.className = 'summary-val green';
+    }
+    if (sumStatus) {
+      sumStatus.innerHTML = '<button onclick="goToGate2()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">\u2192 \u7b2c2\u95dc TOS \u8a66\u7b97</button>';
+      sumStatus.className = 'summary-val';
+    }
+    // Update quality badge
+    var bestQr = null; var bestScore = -1;
+    for (var qi = 0; qi < g2ApprovedSignals.length; qi++) {
+      var _g1s = typeof g1State !== 'undefined' && g1State ? g1State : { liquidityOk: true };
+      var qr = calcSignalQuality(g2ApprovedSignals[qi].ivr, g2ApprovedSignals[qi].strategy, g2ApprovedSignals[qi].event_risk, _g1s.liquidityOk);
+      if (qr.score > bestScore) { bestScore = qr.score; bestQr = qr; }
+    }
+    var sumQ = document.getElementById('sum-quality');
+    if (sumQ && bestQr) sumQ.innerHTML = renderQualityBadge(bestQr);
+  }
+
   // Auto-analyze the latest signal
   if (signalHistory.length > 0) {
     analyzePayload(signalHistory[0].payload);
