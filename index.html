@@ -2682,7 +2682,17 @@ function analyzeAllLINESignals() {
       pop: s.pop,
       ev: s.ev,
       decision: rf.decision,
-      reason: rf.reason
+      reason: rf.reason,
+      // TOS fields
+      expiry: s.expiry || '',
+      price: s.price || 0,
+      orderText: s.orderText || '',
+      support: s.support || 0,
+      resistance: s.resistance || 0,
+      maxProfit: s.maxProfit || 0,
+      maxLoss: s.maxLoss || 0,
+      event_risk: s.event_risk || false,
+      bias: s.bias || ''
     });
   }
   var container = document.getElementById('line-summary-table');
@@ -2863,10 +2873,71 @@ function populateGate2() {
       html += '</div>';
     }
     html += '</div>';
+
+    // === TOS Direct Link Section ===
+    html += '<div style="margin-top:var(--space-2);padding-top:var(--space-2);border-top:1px solid var(--color-border)">';
+
+    // Order detail line
+    if (s.orderText) {
+      html += '<div style="font-size:11px;font-weight:600;color:var(--color-text);margin-bottom:4px">📝 ' + s.orderText + '</div>';
+    }
+    if (s.expiry) {
+      html += '<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:6px">📅 到期: ' + s.expiry + ' (' + s.dte + '天) | 💰 盈虧: +' + (s.maxProfit||0).toFixed(0) + '/-' + (s.maxLoss||0).toFixed(0) + '</div>';
+    }
+
+    // Parse strike prices from orderText
+    var strikes = (s.orderText || '').match(/\d+(\.\d+)?/g) || [];
+    var strikeInfo = strikes.length >= 2 ? strikes[0] + '/' + strikes[1] : (strikes[0] || '?');
+
+    // Build TOS option symbol: e.g., .KO260417C76
+    var tosSymbol = '';
+    if (s.expiry && strikes.length >= 1) {
+      var expParts = s.expiry.replace(/-/g, '').slice(2); // 260417
+      var optType = (s.strategy.includes('CALL') || s.strategy.includes('BULL_CALL')) ? 'C' : 'P';
+      // For spreads, use the short leg strike (first strike in order usually)
+      tosSymbol = '.' + s.symbol + expParts + optType + strikes[0];
+    }
+
+    // Buttons row
+    html += '<div style="display:flex;gap:var(--space-2);flex-wrap:wrap">';
+
+    // 1. Schwab Web option chain link
+    html += '<a href="https://client.schwab.com/app/trade/options-chains/' + s.symbol + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:11px;font-weight:600;text-decoration:none;cursor:pointer">📊 Schwab 選擇權</a>';
+
+    // 2. Copy TOS symbol to clipboard
+    if (tosSymbol) {
+      html += '<button onclick="copyToClipboard(\'' + tosSymbol + '\',this)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-surface-alt,#333);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:11px;font-weight:600;cursor:pointer">📋 複製 TOS 代碼</button>';
+    }
+
+    // 3. Quick info chip: strikes + expiry
+    html += '<span style="display:inline-flex;align-items:center;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px;font-weight:600">⚡ ' + strikeInfo + ' | ' + (s.expiry || '').slice(5) + '</span>';
+
+    html += '</div>';
+    html += '</div>';
     html += '</div>';
   }
   html += '</div>';
   container.innerHTML = html;
+}
+
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text).then(function() {
+    var orig = btn.innerHTML;
+    btn.innerHTML = '✅ 已複製!';
+    btn.style.background = 'var(--color-success)';
+    btn.style.color = '#fff';
+    setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 1500);
+  }).catch(function() {
+    // Fallback
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.innerHTML = '✅ 已複製!';
+    setTimeout(function() { btn.innerHTML = '📋 複製 TOS 代碼'; }, 1500);
+  });
 }
 
 function toggleG2Check(el) {
