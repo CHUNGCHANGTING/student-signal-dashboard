@@ -3273,6 +3273,12 @@ async function testBrokerConnection() {
           result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 需要雙重驗證 (2FA)。請先在 tastytrade App 完成登入，或暫時關閉 2FA 後重試</span>';
         } else if (errMsg.includes('locked')) {
           result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 帳號已被暫時鎖定（太多次失敗嘗試）。請等 15 分鐘後重試。</span>';
+        } else if (errMsg.toLowerCase().includes('device') || errMsg.toLowerCase().includes('challenge')) {
+          result.innerHTML = '<span style="color:var(--color-warning)">⚠️ 新裝置驗證：這台裝置還沒在 tastytrade 上認證過。</span>' +
+            '<br><span style="font-size:11px;color:var(--color-text-muted)">' +
+            '① 開新分頁前往 <a href="https://trade.tastyworks.com" target="_blank" style="color:var(--color-primary)">trade.tastyworks.com</a> 登入<br>' +
+            '② 完成 tastytrade 的 email/簡訊驗證碼<br>' +
+            '③ 登入成功後，回這裡再按「測試連線」</span>';
         } else {
           result.innerHTML = '<span style="color:var(--color-error)">❌ 登入失敗: ' + errMsg + '</span>';
         }
