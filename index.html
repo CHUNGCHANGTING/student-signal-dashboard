@@ -5424,17 +5424,19 @@ async function updateStudentRole(userId, newRole) {
   }
 }
 
-function syncSkool() {
+async function syncSkool() {
   const btn = document.getElementById('btn-sync-skool');
   btn.textContent = '同步中…';
   btn.disabled = true;
-  // Simulated — in production this would trigger n8n webhook
-  setTimeout(() => {
-    btn.textContent = '同步 Skool 會員';
-    btn.disabled = false;
+  try {
+    // 重新讀取 Supabase profiles 刷新學生列表
+    await loadStudents();
     document.getElementById('sync-last-time').textContent = '上次同步：' + new Date().toLocaleString('zh-TW');
-    alert('Skool 同步功能需配合 n8n Workflow 使用');
-  }, 1500);
+  } catch(e) {
+    console.error('Sync error:', e);
+  }
+  btn.textContent = '同步 Skool 會員';
+  btn.disabled = false;
 }
 
 // === Initialize Auth ===
