@@ -3831,17 +3831,34 @@ async function startMFAEnroll() {
       return;
     }
     mfaEnrollFactorId = data.id;
-    var qrHtml = '<div style="background:#fff;padding:12px;border-radius:8px;display:inline-block;margin-bottom:8px">';
-    qrHtml += '<img src="' + data.totp.qr_code + '" alt="TOTP QR Code" style="width:200px;height:200px;display:block;image-rendering:pixelated">';
-    qrHtml += '</div>';
+    // Use DOM API to avoid quote conflicts in SVG data URI
+    container.innerHTML = '';
+    var qrWrap = document.createElement('div');
+    qrWrap.style.cssText = 'background:#fff;padding:16px;border-radius:8px;display:inline-block;margin-bottom:8px';
+    var qrImg = document.createElement('img');
+    qrImg.src = data.totp.qr_code;
+    qrImg.alt = 'TOTP QR Code';
+    qrImg.style.cssText = 'width:200px;height:200px;display:block;image-rendering:pixelated';
+    qrWrap.appendChild(qrImg);
+    container.appendChild(qrWrap);
     // 金鑰手動輸入
     var secret = data.totp.secret || '';
     if (secret) {
-      qrHtml += '<div style="margin-top:8px;font-size:11px;color:var(--color-text-muted)">\u7121\u6cd5\u6383\u63cf\uff1f\u8acb\u624b\u52d5\u8f38\u5165\u91d1\u9470\uff1a</div>';
-      qrHtml += '<div onclick="navigator.clipboard.writeText(\'' + secret + '\').then(function(){this.title=\'\u5df2\u8907\u88fd\'})" style="margin-top:4px;padding:8px 12px;background:var(--color-surface-alt,#f5f5f5);border:1px dashed var(--color-border);border-radius:var(--radius-sm);font-family:monospace;font-size:13px;letter-spacing:2px;word-break:break-all;cursor:pointer;user-select:all;color:var(--color-text)" title="\u9ede\u64ca\u8907\u88fd">' + secret + '</div>';
-      qrHtml += '<div style="font-size:10px;color:var(--color-text-faint);margin-top:2px">\u9ede\u64ca\u91d1\u9470\u53ef\u8907\u88fd</div>';
+      var keyLabel = document.createElement('div');
+      keyLabel.style.cssText = 'margin-top:10px;font-size:11px;color:var(--color-text-muted)';
+      keyLabel.textContent = '\u7121\u6cd5\u6383\u63cf\uff1f\u8acb\u624b\u52d5\u8f38\u5165\u91d1\u9470\uff1a';
+      container.appendChild(keyLabel);
+      var keyBox = document.createElement('div');
+      keyBox.style.cssText = 'margin-top:4px;padding:8px 12px;background:var(--color-surface-alt,#f5f5f5);border:1px dashed var(--color-border);border-radius:var(--radius-sm);font-family:monospace;font-size:14px;letter-spacing:3px;word-break:break-all;cursor:pointer;user-select:all;color:var(--color-text);text-align:center';
+      keyBox.textContent = secret;
+      keyBox.title = '\u9ede\u64ca\u8907\u88fd';
+      keyBox.onclick = function() { navigator.clipboard.writeText(secret); keyBox.title = '\u5df2\u8907\u88fd'; };
+      container.appendChild(keyBox);
+      var keyHint = document.createElement('div');
+      keyHint.style.cssText = 'font-size:10px;color:var(--color-text-faint);margin-top:2px';
+      keyHint.textContent = '\u9ede\u64ca\u91d1\u9470\u53ef\u8907\u88fd';
+      container.appendChild(keyHint);
     }
-    container.innerHTML = qrHtml;
     var codeInput = document.getElementById('mfa-verify-code');
     codeInput.focus();
   } catch(e) {
