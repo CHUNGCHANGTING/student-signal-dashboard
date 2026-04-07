@@ -2983,8 +2983,8 @@ function analyzePayload(payload) {
   var oiResult = estimateOILiquidity(symbol);
   html += '<tr><td>OI 流動性</td><td>' + oiResult.html + (oiResult.tier >= 4 ? ' <span style="font-size:10px;color:var(--color-text-muted)">（小型股需至 TOS 確認 OI > 500）</span>' : '') + '</td></tr>';
   html += '<tr><td>信號品質</td><td>' + renderQualityRow(qr) + '</td></tr>';
-  html += '<tr><td colspan="2" style="font-size:9px;color:var(--color-text-faint);padding:2px 0;border:none">※ 以上為教學用條件篩選結果，非投資建議</td></tr>
-<tr><td>Decision</td><td><span class="badge ' + (decision === 'approved' ? 'decision-approved' : decision === 'blocked' ? 'decision-blocked' : 'decision-review') + '" style="font-size:var(--text-xs);padding:2px 10px">' + decisionLabel + '</span></td></tr>';
+  html += '<tr><td colspan="2" style="font-size:9px;color:var(--color-text-faint);padding:2px 0;border:none">※ 以上為教學用條件篩選結果，非投資建議</td></tr>';
+  html += '<tr><td>Decision</td><td><span class="badge ' + (decision === 'approved' ? 'decision-approved' : decision === 'blocked' ? 'decision-blocked' : 'decision-review') + '" style="font-size:var(--text-xs);padding:2px 10px">' + decisionLabel + '</span></td></tr>';
   if (reject_reason) {
     html += '<tr><td>Reject Reason</td><td><span class="val-stop">' + reject_reason + '</span><div style="font-size:11px;color:var(--color-text-muted);margin-top:2px">' + getReasonLabel(reject_reason) + '</div></td></tr>';
   }
