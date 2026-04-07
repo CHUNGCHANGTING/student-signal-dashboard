@@ -3288,7 +3288,7 @@ async function analyzeAllLINESignals() {
           var bid = parseFloat(match[0].bid) || 0;
           var ask = parseFloat(match[0].ask) || 0;
           var spread = ask > 0 ? ask - bid : 999;
-          var _isOff = (r2.strategy === 'BULL_CALL_DEBIT_SPREAD' || r2.strategy === 'BEAR_PUT_DEBIT_SPREAD');
+          var _isOff = (s.strategy === 'BULL_CALL_DEBIT_SPREAD' || s.strategy === 'BEAR_PUT_DEBIT_SPREAD');
           var _oiMin = _isOff ? 100 : 500;
           var _mid = (bid + ask) / 2;
           var _spPct = _mid > 0 ? spread / _mid : 1;
