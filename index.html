@@ -2231,11 +2231,16 @@ function processAutoSignals(data) {
       var m = (sig.iv_environment + '').match(/(\d+)/);
       if (m) ivrVal = parseFloat(m[1]);
     }
-    // Parse DTE from note field if dte is missing (e.g. "...30DTE...")
+    // Parse DTE: sig.dte → note → raw spreads fallback
     var dteVal = parseInt(sig.dte) || 0;
     if (!dteVal && sig.note) {
       var dm = (sig.note + '').match(/(\d+)DTE/);
       if (dm) dteVal = parseInt(dm[1]);
+    }
+    if (!dteVal) {
+      var _raw = rawLookup[(sig.symbol || '').toUpperCase()] || {};
+      var _sp = (_raw.spreads || [])[0];
+      if (_sp && _sp.dte) dteVal = parseInt(_sp.dte) || 0;
     }
     var payload = {
       symbol: (sig.symbol || '').toUpperCase(),
