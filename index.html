@@ -3940,9 +3940,37 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetch
     // Use pre-fetched tastytrade quotes (batch fetched in autoFetchAll, no per-symbol retry)
     var tastyQuotes = preFetchedTastyQuotes || {};
 
+    // === Find best matching expiry: if exact date has no data, search ±3 days ===
+    var bestExpiry = expiry;
+    if (opts.length > 0 && legs.length > 0 && expiry) {
+      var testKey = buildCboeSymbol(cboeRoot, expiry, legs[0].type, legs[0].strike);
+      var testMatch = opts.filter(function(o) { return o.option === testKey; });
+      var testOI = testMatch.length > 0 ? (parseInt(testMatch[0].open_interest) || 0) : 0;
+      if (testOI === 0) {
+        // Search nearby dates for the same strike with highest OI
+        var baseDate = new Date(expiry + 'T00:00:00');
+        var candidates = [];
+        for (var dayOff = -3; dayOff <= 3; dayOff++) {
+          var tryDate = new Date(baseDate.getTime() + dayOff * 86400000);
+          var tryExp = tryDate.toISOString().slice(0, 10);
+          var tryKey = buildCboeSymbol(cboeRoot, tryExp, legs[0].type, legs[0].strike);
+          var tryMatch = opts.filter(function(o) { return o.option === tryKey; });
+          if (tryMatch.length > 0) {
+            var tryOI = parseInt(tryMatch[0].open_interest) || 0;
+            candidates.push({ exp: tryExp, oi: tryOI });
+          }
+        }
+        if (candidates.length > 0) {
+          candidates.sort(function(a, b) { return b.oi - a.oi; });
+          bestExpiry = candidates[0].exp;
+        }
+      }
+    }
+
     // Look up each leg
     var srcTag = useTasty ? '🟣 即時' : 'CBOE';
-    var html = '<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:4px">數據來源：' + srcTag + '</div>';
+    var expiryNote = bestExpiry !== expiry ? ' (已自動對齊到 ' + bestExpiry + ')' : '';
+    var html = '<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:4px">數據來源：' + srcTag + expiryNote + '</div>';
     html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
     html += '<tr style="border-bottom:1px solid var(--color-border);font-weight:600"><td>Leg</td><td>Strike</td><td>Bid</td><td>Ask</td><td>Delta</td><td>OI</td><td>Vol</td><td>狀態</td></tr>';
 
@@ -3951,8 +3979,8 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetch
 
     for (var i = 0; i < legs.length; i++) {
       var leg = legs[i];
-      var cboeKey = buildCboeSymbol(cboeRoot, expiry, leg.type, leg.strike);
-      var tastyKey = buildTastyOptionSymbol(cboeRoot, expiry, leg.type, leg.strike);
+      var cboeKey = buildCboeSymbol(cboeRoot, bestExpiry, leg.type, leg.strike);
+      var tastyKey = buildTastyOptionSymbol(cboeRoot, bestExpiry, leg.type, leg.strike);
 
       // Try tastytrade real-time quote first
       var tastyQ = tastyQuotes[tastyKey] || null;
