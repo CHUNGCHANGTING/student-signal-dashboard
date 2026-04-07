@@ -6,7 +6,7 @@ if ($input.first().json.skipped) {
 // 盤勢全面暫停
 if ($input.first().json.halted) {
   const d = $input.first().json;
-  const haltMsg = `🚨 正EV推播 — 全面暫停\n━━━━━━━━━━━━━━\n\n${d.haltReason}\n\n盤勢狀態: ${d.marketRegime}\nVIX: ${d.vix?.toFixed(1) || 'N/A'}\nSPY方向: ${d.spyDirection || 'N/A'} (score=${d.spyDirScore || 0})\n\n⚠️ 極端恐慌環境，建議觀望不操作`;
+  const haltMsg = `🚨 正EV推播 — 全面暫停\n━━━━━━━━━━━━━━\n\n${d.haltReason}\n\n盤勢狀態: ${d.marketRegime}\nVIX: ${d.vix?.toFixed(1) || 'N/A'}\nSPY方向: ${d.spyDirection || 'N/A'} (score=${d.spyDirScore || 0})\n\n⚠️ 極端恐慌環境，參考觀望`;
   // Push halt notification to LINE + TG
   const LINE_TOKEN = '<LINE_CHANNEL_TOKEN>';
   const TG_TOKEN = '<TG_BOT_TOKEN>';
@@ -56,7 +56,7 @@ const ranked = results
   .slice(0, 5);
 
 if (ranked.length === 0) {
-  const noMsg = `📢 正EV履約價推播 v3.4 — ${dateStr} ${timeStr}\n━━━━━━━━━━━━━━\n\n今日無符合條件的推薦\n篩選: Delta選價 + Greeks + IVR + 流動性\n\n🛡️ 沒有好的機會時，不做就是最好的策略 🧘\n少做多看，靜候佳機`;
+  const noMsg = `📢 正EV履約價推播 v3.4 — ${dateStr} ${timeStr}\n━━━━━━━━━━━━━━\n\n今日無符合篩選條件的標的\n篩選: Delta選價 + Greeks + IVR + 流動性\n\n🛡️ 教學提醒：沒有符合條件時，觀望也是一種策略 🧘\n少做多看，靜候佳機`;
   // Push to LINE
   try {
     await this.helpers.httpRequest({
@@ -84,7 +84,7 @@ const vix = data.vix;
 const spyDir = data.spyDirection;
 const regimeMap = { normal: '🟢正常', caution: '🟡高波動警戒', bearOnly: '🔴只推Bear', halt: '🚨全面暫停' };
 
-let msg = `🎯 正EV精選推薦 ${dateStr} ${timeStr}\n`;
+let msg = `🎯 正EV篩選結果 ${dateStr} ${timeStr}\n`;
 msg += `━━━━━━━━━━━━━━\n`;
 msg += `盤勢: ${regimeMap[regime] || regime}`;
 if (vix) msg += ` | VIX:${vix.toFixed(1)}`;
@@ -169,8 +169,8 @@ msg += `🛡️ BidAsk<10% + OI>500\n`;
 msg += `💱 Bid/Ask: ${srcLabel}\n`;
 msg += `\n🛡️ 風險提醒:\n`;
 msg += `• 每筆交易已鎖定最大虧損，不會超過設定範圍\n`;
-msg += `• 信號為輔助決策工具，下單決定權在你手上\n`;
-msg += `• 單筆建議不超過帳戶 5%，先求穩再求多\n`;
+msg += `• 篩選結果僅供學習參考，不構成投資建議\n`;
+msg += `• 教學參考：單筆風控在帳戶 5% 以內\n`;
 msg += `• 停損是紀律`;
 
 // Split if too long (LINE limit 5000 chars)

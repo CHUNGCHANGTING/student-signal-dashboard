@@ -29,9 +29,9 @@ const symbols = [
   { ticker: 'AMAT', name: 'Applied Materials', sector: 'semi' },
   { ticker: 'TSM',  name: 'TSM',    sector: 'semi' },
 ];
-const MAX_PER_SECTOR = 2;      // 同產業最多推薦 2 檔
-const MAX_TOTAL_SIGNALS = 5;   // 每次最多推薦 5 檔標的
-const EARNINGS_BLACKOUT_DAYS = 2; // 財報前 N 天不推薦
+const MAX_PER_SECTOR = 2;      // 同產業最多篩選 2 檔
+const MAX_TOTAL_SIGNALS = 5;   // 每次最多篩選 5 檔標的
+const EARNINGS_BLACKOUT_DAYS = 2; // 財報前 N 天不納入
 const FINNHUB_KEY = 'd70bb2hr01qtb4ra5aagd70bb2hr01qtb4ra5ab0';
 
 // ── DTE per strategy (aligned with Notion rules) ──
@@ -1115,7 +1115,7 @@ if (vixValue !== null && vixValue >= 35) {
   marketRegimeReasons.push(`VIX=${vixValue.toFixed(1)} ≥ 25 + SPY偏空(${spyDirScore}) → 只推 Bear 策略`);
 } else if (vixValue !== null && vixValue >= 25) {
   marketRegime = 'caution';
-  marketRegimeReasons.push(`VIX=${vixValue.toFixed(1)} ≥ 25 → 高波動警戒，謹慎推薦`);
+  marketRegimeReasons.push(`VIX=${vixValue.toFixed(1)} ≥ 25 → 高波動警戒，謹慎篩選`);
 } else if (spyDirScore <= -3) {
   marketRegime = 'bearOnly';
   marketRegimeReasons.push(`SPY強烈偏空(score=${spyDirScore}) → 只推 Bear 策略`);
@@ -1404,7 +1404,7 @@ results.sort((a, b) => {
   return bScore - aScore;
 });
 
-// 同產業限制 + 最大推薦數
+// 同產業限制 + 最大篩選數
 const finalResults = [];
 const sectorUsed = {};
 for (const r of results) {
@@ -1422,14 +1422,14 @@ for (const r of results) {
   finalResults.push(r);
 }
 
-// 最大推薦數限制
+// 最大篩選數限制
 const withSpreads = finalResults.filter(r => r.positiveEVSpreads?.length > 0);
 if (withSpreads.length > MAX_TOTAL_SIGNALS) {
   log(`Capping from ${withSpreads.length} to ${MAX_TOTAL_SIGNALS} symbols`);
   const topTickers = new Set(withSpreads.slice(0, MAX_TOTAL_SIGNALS).map(r => r.ticker));
   for (const r of finalResults) {
     if (r.positiveEVSpreads?.length > 0 && !topTickers.has(r.ticker)) {
-      r.skippedReason = `超過最大推薦數 ${MAX_TOTAL_SIGNALS}`;
+      r.skippedReason = `超過最大篩選數 ${MAX_TOTAL_SIGNALS}`;
       r.positiveEVSpreads = [];
     }
   }

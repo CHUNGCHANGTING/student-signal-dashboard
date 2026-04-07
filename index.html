@@ -812,7 +812,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
       <p>不是 Skool 會員？可以直接訂閱使用 Options Strategy Engine</p>
       <div class="stripe-features">
         <span>即時訊號推播</span>
-        <span>策略推薦引擎</span>
+        <span>策略篩選引擎</span>
         <span>AI 風控判斷</span>
         <span>學生持倉 Dashboard</span>
       </div>
@@ -861,7 +861,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
         <span style="background:var(--color-primary);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">2</span>
         <h2 style="margin:0">🔑 API 綁定（選填）</h2>
       </div>
-      <p class="sub">綁定 API 可啟用自動下單功能。不綁定也可正常使用篩選 + 手動下單。</p>
+      <p class="sub">綁定 API 可查看即時報價。此為學習工具，不提供自動下單功能。</p>
       <div id="setup-api-fields" style="margin-bottom:var(--space-3)"></div>
       <div id="setup-api-guide" style="font-size:11px;color:var(--color-text-muted);padding:var(--space-2);background:var(--color-surface-alt,rgba(128,128,128,0.05));border-radius:var(--radius-sm);margin-bottom:var(--space-3)"></div>
       <div style="display:flex;gap:var(--space-2)">
@@ -882,7 +882,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
         <div style="font-weight:700;color:var(--color-text);margin-bottom:var(--space-2)">🛡️ 交易前的重要觀念</div>
         <div>• 選擇權是有結構的風險控制工具 — 我們的系統會幫你在每筆交易前鎖定最大虧損</div>
         <div>• 每筆交易都有明確的最大虧損金額，不會超過你設定的範圍</div>
-        <div>• 系統信號是輔助決策工具，最終下單決定權始終在你手上</div>
+        <div>• 系統篩選結果僅供學習參考，不構成任何投資建議，所有交易決策由使用者自行負責</div>
         <div>• 建議用「學習資金」開始 — 單筆不超過帳戶 5%，先求穩再求多</div>
         <div>• 每筆交易都必須設定停損點 — 停損是紀律</div>
         <div>• 過去績效不代表未來結果，保持學習心態持續進步</div>
@@ -936,7 +936,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <!-- Gate 1 merged into Gate 0 -->
   <button class="nav-item student-only" onclick="showSection('gate2',this)"><span class="nav-dot gate"></span>第2關　TOS 試算</button>
   <button class="nav-item student-only" onclick="showSection('gate3',this)"><span class="nav-dot gate"></span>第3關　部位確認</button>
-  <button class="nav-item student-only" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　人工確認送單</button>
+  <button class="nav-item student-only" onclick="showSection('gate4',this)"><span class="nav-dot gate"></span>第4關　最終確認</button>
   <div class="sidebar-divider student-only"></div>
   <div class="sidebar-section student-only">即時系統</div>
   <button class="nav-item student-only" onclick="showSection('live-dashboard',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
@@ -1174,7 +1174,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- GATE 1-4 簡化版 -->
 <!-- Gate 1 merged into Gate 0 -->
 <section class="gate" id="gate1" style="display:none !important">
-<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號總覽</div><div class="gate-subtitle">設定今日市場狀態，系統自動推薦適合的策略 — 學生看這頁就知道今天該做什麼</div></div></div>
+<div class="gate-header"><div class="gate-num g1">1</div><div><div class="gate-title">盤前訊號總覽</div><div class="gate-subtitle">設定今日市場狀態，系統根據條件篩選對應策略 — 根據市場狀態篩選符合條件的策略類型</div></div></div>
 
 <!-- Section A: 今日市場狀態 -->
 <div class="g1-section-title"><span class="g1-st-icon">A</span> 今日市場狀態</div>
@@ -1226,10 +1226,10 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   </div>
 </div>
 
-<!-- Section B: 策略推薦引擎 -->
-<div class="g1-section-title"><span class="g1-st-icon">B</span> 策略推薦引擎</div>
+<!-- Section B: 策略篩選引擎 -->
+<div class="g1-section-title"><span class="g1-st-icon">B</span> 策略篩選引擎</div>
 <div id="g1-rec-container">
-  <div class="g1-prompt"><span class="g1-prompt-icon">👆</span>請先設定今日市場狀態，系統會自動推薦適合的策略</div>
+  <div class="g1-prompt"><span class="g1-prompt-icon">👆</span>請先設定今日市場狀態，系統會根據條件篩選對應策略</div>
 </div>
 
 <!-- Section C: 條件核對清單 -->
@@ -1321,7 +1321,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="g2-symbol-checklists" style="margin-top:var(--space-4)"></div>
 
 <div style="margin-top:var(--space-4);text-align:center">
-  <button class="btn-primary" onclick="completeGate2()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-sm)">✅ TOS 確認完成 → 進入第3關</button>
+  <button class="btn-primary" onclick="completeGate2()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-sm)">✅ TOS 練習完成 → 進入第3關</button>
 </div>
 </section>
 <section class="gate" id="gate3" style="display:none">
@@ -1386,13 +1386,13 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <!-- Summary -->
 <div id="g3-summary" style="padding:var(--space-4);border-radius:var(--radius-md);text-align:center;margin-bottom:var(--space-4)"></div>
 <div style="text-align:center">
-  <button class="btn-primary" onclick="completeGate3()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-sm)">✅ 部位確認完成 → 進入第4關</button>
+  <button class="btn-primary" onclick="completeGate3()" style="padding:var(--space-3) var(--space-6);font-size:var(--text-sm)">✅ 風險檢查完成 → 進入第4關</button>
 </div>
 
 </div><!-- #g3-content -->
 </section>
 <section class="gate" id="gate4" style="display:none">
-<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">人工確認送單</div><div class="gate-subtitle">系統自動檢查 + 手動確認送單</div></div></div>
+<div class="gate-header"><div class="gate-num g4">4</div><div><div class="gate-title">最終確認</div><div class="gate-subtitle">系統自動檢查 + 最終確認</div></div></div>
 
 <div style="font-size:10px;color:var(--color-text-muted);margin-bottom:var(--space-3)">🔒 以下項目由系統自動判定，學生無法手動勾選</div>
 <div id="g4-auto-checks" style="margin-bottom:var(--space-4)"></div>
@@ -1404,19 +1404,19 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   </div>
   <div class="check-item g4-manual" onclick="toggleG4Manual(this)" style="opacity:0.4;pointer-events:none" data-key="stoploss">
     <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">我已計算好停損價格</div><div class="check-detail">收租: credit×2.0 / 進攻: debit×0.5 / IC: credit×2.5。下單後立即設定 STPLMT 止損單</div></div>
+    <div class="check-content"><div class="check-label">我已計算好停損價格</div><div class="check-detail">收租: credit×2.0 / 進攻: debit×0.5 / IC: credit×2.5。教學參考：STPLMT 止損單設定方式</div></div>
   </div>
   <div class="check-item g4-manual" onclick="toggleG4Manual(this)" style="opacity:0.4;pointer-events:none" data-key="confirm">
     <div class="check-box"><svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
-    <div class="check-content"><div class="check-label">送單確認詞</div><div class="check-detail">「我已完成所有確認，這筆符合系統規則」</div></div>
+    <div class="check-content"><div class="check-label">最終確認</div><div class="check-detail">「我已完成學習流程，理解此為教學參考」</div></div>
   </div>
 </div>
 
 <div class="progress-label" style="margin-top:var(--space-4)"><span>確認進度</span><span id="gate4-progress-text">0 / 0</span></div>
 <div class="progress-bar"><div class="progress-fill" id="gate4-progress-fill"></div></div>
 <div class="confirm-box">
-  <div class="confirm-title">🔒 送單確認詞</div>
-  <div class="confirm-phrase">「我已完成所有確認，這筆符合系統規則」</div>
+  <div class="confirm-title">🔒 最終確認</div>
+  <div class="confirm-phrase">「我已完成學習流程，理解此為教學參考」</div>
   <div class="forbidden-list">
     <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可「感覺今天會漲」就進場</div>
     <div class="forbidden-item"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>不可跳過 IVR 閾值</div>
@@ -1429,7 +1429,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="g4-order-summary" style="margin-top:var(--space-6);padding:var(--space-4);background:var(--color-surface);border:2px solid var(--color-primary);border-radius:var(--radius-lg)"></div>
 <div id="g4-final-action" style="text-align:center;margin-top:var(--space-4)">
   <button id="g4-open-broker-btn" onclick="g4DryRun()" style="padding:var(--space-4) var(--space-8);font-size:var(--text-base);font-weight:700;background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-lg);cursor:pointer;opacity:0.4;pointer-events:none">🔍 預覽訂單 (Dry Run)</button>
-  <div style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-2)">完成所有確認後解鎖。先預覽訂單內容，確認後再執行實際下單。</div>
+  <div style="font-size:10px;color:var(--color-text-muted);margin-top:var(--space-2)">完成所有確認後解鎖。此為學習用決策練習工具，非投資建議。</div>
   <div id="g4-order-result" style="margin-top:var(--space-3)"></div>
 </div>
 </section>
@@ -1470,7 +1470,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 <div id="signals-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
 <div class="section-title" style="margin-top:var(--space-6)">💰 風險概覽</div>
 <div id="risk-container"></div>
-<div class="section-title" style="margin-top:var(--space-6)">📬 建議下單</div>
+<div class="section-title" style="margin-top:var(--space-6)">📬 參考標的</div>
 <div id="orders-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
 </section>
 <!-- Strategy detail pages (simplified) -->
@@ -1602,7 +1602,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="summary-item"><div class="summary-key">策略</div><div class="summary-val" id="sum-strategy">—</div></div>
   <div class="summary-item"><div class="summary-key">確認清單</div><div class="summary-val red" id="sum-checks">0 / 8</div></div>
   <div class="summary-item"><div class="summary-key">信號品質</div><div id="sum-quality"><span class="quality-badge grade-c">—</span></div></div>
-  <div class="summary-item"><div class="summary-key">送單狀態</div><div class="summary-val red" id="sum-status">未完成</div></div>
+  <div class="summary-item"><div class="summary-key">確認狀態</div><div class="summary-val red" id="sum-status">未完成</div></div>
   <button class="btn-reset" onclick="resetAll()">↺ 重置</button>
 </div>
 </div><!-- end .app -->
@@ -1782,11 +1782,11 @@ function renderRisk(risk) {
 function renderOrders(positions) {
   const c = document.getElementById('orders-container');
   if (!c) return;
-  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無建議下單</div>'; return; }
+  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無篩選結果</div>'; return; }
   let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>建議</th></tr></thead><tbody>';
   positions.forEach(p => {
     const evData = calcEV(p);
-    const action = evData.evNum > 0 ? '✅ 正EV - 可下單' : '⚠️ 負EV - 請評估';
+    const action = evData.evNum > 0 ? '✅ 正EV - 符合條件' : '⚠️ 負EV - 條件不足';
     html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + action + '</td></tr>';
   });
   html += '</tbody></table>';
@@ -2305,7 +2305,7 @@ function renderSignalHistory() {
   var html = '<div class="sp-history">';
   signalHistory.forEach(function(entry, idx) {
     var badgeClass = entry.decision === 'approved' ? 'decision-approved' : entry.decision === 'blocked' ? 'decision-blocked' : 'decision-review';
-    var decLabel = entry.decision === 'approved' ? 'APPROVED' : entry.decision === 'blocked' ? 'BLOCKED' : 'REVIEW';
+    var decLabel = entry.decision === 'approved' ? '符合條件' : entry.decision === 'blocked' ? '未達條件' : 'REVIEW';
     var detail = entry.strategy + ' \u2192 ' + entry.module;
     if (entry.reject_reason) detail += ' | ' + entry.reject_reason;
     html += '<div class="sp-history-card" onclick="analyzePayload(signalHistory[' + idx + '].payload)">';
@@ -2944,7 +2944,7 @@ function analyzePayload(payload) {
 
   // Build result table
   var decisionClass = decision;
-  var decisionLabel = decision === 'approved' ? '✅ APPROVED' : decision === 'blocked' ? '🚫 BLOCKED' : '⚠️ REVIEW';
+  var decisionLabel = decision === 'approved' ? '✅ 符合篩選條件' : decision === 'blocked' ? '🚫 未達篩選條件' : '⚠️ 待確認';
 
   var signalId = symbol + '-' + Date.now().toString(36).toUpperCase();
   var signalTime = new Date().toLocaleString();
@@ -2983,7 +2983,8 @@ function analyzePayload(payload) {
   var oiResult = estimateOILiquidity(symbol);
   html += '<tr><td>OI 流動性</td><td>' + oiResult.html + (oiResult.tier >= 4 ? ' <span style="font-size:10px;color:var(--color-text-muted)">（小型股需至 TOS 確認 OI > 500）</span>' : '') + '</td></tr>';
   html += '<tr><td>信號品質</td><td>' + renderQualityRow(qr) + '</td></tr>';
-  html += '<tr><td>Decision</td><td><span class="badge ' + (decision === 'approved' ? 'decision-approved' : decision === 'blocked' ? 'decision-blocked' : 'decision-review') + '" style="font-size:var(--text-xs);padding:2px 10px">' + decisionLabel + '</span></td></tr>';
+  html += '<tr><td colspan="2" style="font-size:9px;color:var(--color-text-faint);padding:2px 0;border:none">※ 以上為教學用條件篩選結果，非投資建議</td></tr>
+<tr><td>Decision</td><td><span class="badge ' + (decision === 'approved' ? 'decision-approved' : decision === 'blocked' ? 'decision-blocked' : 'decision-review') + '" style="font-size:var(--text-xs);padding:2px 10px">' + decisionLabel + '</span></td></tr>';
   if (reject_reason) {
     html += '<tr><td>Reject Reason</td><td><span class="val-stop">' + reject_reason + '</span><div style="font-size:11px;color:var(--color-text-muted);margin-top:2px">' + getReasonLabel(reject_reason) + '</div></td></tr>';
   }
@@ -3376,7 +3377,7 @@ async function analyzeAllLINESignals() {
       sumStr.textContent = symbolList;
       sumStr.className = 'summary-val green';
     }
-    // 送單狀態：顯示下一步指引
+    // 確認狀態：顯示下一步指引
     if (sumStatus) {
       sumStatus.innerHTML = '<button onclick="goToGate2()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">→ 第2關 TOS 試算</button>';
       sumStatus.className = 'summary-val';
@@ -4007,7 +4008,7 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetch
       }
     } else {
       g2FetchResults.warned.push(symbol);
-      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-sm);font-weight:600">🚫 流動性不足 — 建議跳過此標的</div>';
+      html += '<div style="margin-top:4px;padding:4px 8px;background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-sm);font-weight:600">🚫 流動性不足 — 此標的條件未達</div>';
       html += '<div style="margin-top:3px;font-size:10px;color:var(--color-text-muted)">OI 或 Bid-Ask 過寬，就算信號通過也難以以合理價格成交</div>';
     }
 
@@ -4046,7 +4047,7 @@ async function autoFetchOptionData(symbol, strategy, expiry, orderText, preFetch
       } else {
         btn.style.background = 'var(--color-warning-highlight)';
         btn.style.color = 'var(--color-warning)';
-        btn.innerHTML = '⚠️ 流動性不足 — 建議跳過此標的';
+        btn.innerHTML = '⚠️ 流動性不足 — 此標的條件未達';
       }
     }
 
@@ -4280,7 +4281,7 @@ async function autoFetchAll() {
       statusText.innerHTML = '✅ ' + p + ' 檔通過，' + w + ' 檔流動性不足建議跳過 — ' + (useTasty ? 'Bid/Ask 為即時報價' : '點擊綠色區塊開啟 ' + brokerConfig.icon + ' ' + brokerConfig.name);
       statusText.style.color = 'var(--color-success)';
     } else {
-      statusText.innerHTML = '⚠️ 全部標的流動性不足 — 建議今日觀望或換標的';
+      statusText.innerHTML = '⚠️ 全部標的全部標的流動性條件未達 — 參考其他標的或觀望';
       statusText.style.color = 'var(--color-warning)';
     }
     if (statusSub) statusSub.innerHTML = useTasty
@@ -4422,7 +4423,7 @@ function completeGate2() {
   // Update summary
   var sumStatus = document.getElementById('sum-status');
   if (sumStatus) {
-    sumStatus.innerHTML = '<button onclick="goToGate4()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">→ 第4關 送單</button>';
+    sumStatus.innerHTML = '<button onclick="goToGate4()" style="background:var(--color-primary);color:#fff;border:none;padding:4px 12px;border-radius:var(--radius-md);cursor:pointer;font-size:var(--text-xs);font-weight:600">→ 第4關 確認</button>';
     sumStatus.className = 'summary-val';
   }
 }
@@ -4534,7 +4535,7 @@ function renderGate3() {
       var sym = g2ApprovedSignals[j].symbol;
       if (underlyings[sym]) {
         corrPass = false;
-        corrMsg += '⚠️ ' + sym + ' 已有 ' + underlyings[sym] + ' 個選擇權部位，不建議重複開倉\n';
+        corrMsg += '⚠️ ' + sym + ' 已有 ' + underlyings[sym] + ' 個選擇權部位，已有持倉，注意集中度風險\n';
       }
     }
   }
@@ -4571,7 +4572,7 @@ function renderGate3() {
     g3Passed[2] = true;
   } else if (bpUsage < 50) {
     bpBar.style.background = 'var(--color-gold)'; bpLabel.style.color = 'var(--color-text)';
-    bpCheck.innerHTML = '🟡 注意 (' + bpUsage.toFixed(1) + '%) — 建議減少倉位';
+    bpCheck.innerHTML = '🟡 注意 (' + bpUsage.toFixed(1) + '%) — 注意：BP 使用率偏高';
     bpCheck.style.background = 'var(--color-gold-highlight)'; bpCheck.style.color = 'var(--color-gold)';
     g3Passed[2] = true; // still passable
   } else if (bpUsage < 70) {
@@ -4591,7 +4592,7 @@ function renderGate3() {
   var passCount = g3Passed.filter(Boolean).length;
   var summaryEl = document.getElementById('g3-summary');
   if (allPass) {
-    summaryEl.innerHTML = '✅ 全部通過 (' + passCount + '/3) — 可以進入第4關送單';
+    summaryEl.innerHTML = '✅ 全部通過 (' + passCount + '/3) — 可以進入第4關確認';
     summaryEl.style.background = 'var(--color-success-highlight)'; summaryEl.style.color = 'var(--color-success)';
   } else {
     summaryEl.innerHTML = '⚠️ ' + passCount + '/3 通過 — 請檢查未通過項目';
@@ -4603,7 +4604,7 @@ function completeGate3() {
   var allPass = g3Passed[0] && g3Passed[1] && g3Passed[2];
   var isAdmin = document.querySelector('.badge-admin') !== null;
   if (!allPass) {
-    if (isAdmin || confirm('部位確認未全部通過。\n管理員模式：是否強制進入第4關？')) {
+    if (isAdmin || confirm('部位確認未全部通過。\n管理員模式：是否進入第4關？')) {
       // continue
     } else {
       return;
@@ -4792,7 +4793,7 @@ function renderOrderSummary() {
 
     // Stop loss instruction
     html += '<div style="margin-top:var(--space-2);padding:var(--space-2);background:var(--color-warning-highlight);border-radius:var(--radius-sm);font-size:11px">';
-    html += '<strong>🛑 下單後立即設定止損:</strong> ';
+    html += '<strong>🛑 參考止損設定方式:</strong> ';
     if (isCredit) {
       html += 'STPLMT 買回 @ $' + stopLoss.toFixed(2) + ' GTC';
     } else {
@@ -5637,5 +5638,15 @@ async function syncSkool() {
 checkAuth();
 
 </script>
+
+<!-- 免責聲明 -->
+<div id="compliance-disclaimer" style="margin-top:var(--space-8);padding:var(--space-4);background:var(--color-surface-alt,#f8f8f8);border-top:2px solid var(--color-border);font-size:11px;color:var(--color-text-muted);line-height:1.6">
+  <div style="font-weight:700;margin-bottom:var(--space-2)">⚖️ 免責聲明 Disclaimer</div>
+  <div>本平台為選擇權策略「教學輔助工具」，所有篩選結果、數據分析及策略參數僅供學習參考，<strong>不構成任何證券投資顧問建議、買賣推薦或獲利保證</strong>。</div>
+  <div style="margin-top:var(--space-1)">使用者應自行評估風險承受能力，並於合法持牌券商平台上獨立做出投資決策。本平台不對任何因參考本工具內容所產生之投資損益負責。</div>
+  <div style="margin-top:var(--space-1)">選擇權交易具有高度風險，可能導致全部本金損失。過去的回測績效不代表未來結果。</div>
+  <div style="margin-top:var(--space-2);font-size:10px;color:var(--color-text-faint)">Options trading involves significant risk and is not suitable for all investors. Past performance does not guarantee future results. This platform is an educational tool only and does not provide investment advice.</div>
+</div>
+
 </body>
 </html>
