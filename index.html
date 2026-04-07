@@ -253,6 +253,21 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .broker-setup-option .name { font-size:13px;font-weight:600; }
 .broker-setup-confirm { margin-top:var(--space-4);width:100%;padding:var(--space-3);background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:var(--text-sm);font-weight:700;cursor:pointer; }
 .broker-setup-confirm:disabled { opacity:0.4;cursor:not-allowed; }
+/* MFA overlays */
+#mfa-setup-overlay, #mfa-login-overlay { position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px); }
+.mfa-card { background:var(--color-surface);border-radius:var(--radius-xl,16px);padding:var(--space-6);max-width:400px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+.mfa-card h3 { font-size:var(--text-lg,20px);font-weight:700;margin:0 0 var(--space-2) 0; }
+.mfa-card .mfa-sub { font-size:12px;color:var(--color-text-muted);margin-bottom:var(--space-4); }
+.mfa-code-input { width:180px;text-align:center;font-size:24px;letter-spacing:8px;padding:var(--space-2) var(--space-3);border:2px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);color:var(--color-text);outline:none;transition:border-color 0.2s; }
+.mfa-code-input:focus { border-color:var(--color-primary); }
+.mfa-btn { margin-top:var(--space-3);width:100%;padding:var(--space-3);background:var(--color-primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:var(--text-sm);font-weight:700;cursor:pointer;transition:opacity 0.2s; }
+.mfa-btn:disabled { opacity:0.4;cursor:not-allowed; }
+.mfa-result { margin-top:var(--space-2);font-size:12px;min-height:18px; }
+.mfa-result.error { color:var(--color-error); }
+.mfa-result.success { color:var(--color-success); }
+.mfa-2fa-badge { display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:var(--radius-sm);font-weight:600; }
+.mfa-2fa-badge.enabled { background:rgba(76,175,80,0.12);color:var(--color-success); }
+.mfa-2fa-badge.disabled { background:rgba(255,152,0,0.12);color:var(--color-warning,#ff9800); }
 /* Sidebar broker badge */
 .sidebar-broker { display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);font-size:11px;color:var(--color-text-muted);cursor:pointer; }
 .sidebar-broker:hover { color:var(--color-text); }
@@ -903,6 +918,31 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   </div>
 </div>
 
+<!-- MFA Setup Overlay (shown after broker binding) -->
+<div id="mfa-setup-overlay">
+  <div class="mfa-card">
+    <h3>🔐 啟用兩步驟驗證</h3>
+    <p class="mfa-sub">為了保護您的券商帳戶安全，請使用 Google Authenticator 或 Authy 掃描 QR Code</p>
+    <div id="mfa-qr-container" style="margin:var(--space-4) 0;min-height:180px;display:flex;align-items:center;justify-content:center">
+      <span style="color:var(--color-text-muted);font-size:12px">載入中...</span>
+    </div>
+    <input type="text" id="mfa-verify-code" class="mfa-code-input" maxlength="6" placeholder="000000" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+    <button onclick="verifyMFASetup()" id="mfa-verify-btn" class="mfa-btn">確認啟用</button>
+    <div id="mfa-setup-result" class="mfa-result"></div>
+  </div>
+</div>
+
+<!-- MFA Login Overlay (shown on login when AAL2 required) -->
+<div id="mfa-login-overlay">
+  <div class="mfa-card">
+    <h3>🔐 兩步驟驗證</h3>
+    <p class="mfa-sub">請輸入您的驗證器 App 中顯示的 6 位驗證碼</p>
+    <input type="text" id="mfa-login-code" class="mfa-code-input" maxlength="6" placeholder="000000" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+    <button onclick="verifyMFALogin()" id="mfa-login-btn" class="mfa-btn">驗證</button>
+    <div id="mfa-login-result" class="mfa-result"></div>
+  </div>
+</div>
+
 <!-- App Container (wraps entire app, hidden until authenticated) -->
 <div id="app-container" style="display:none">
 <div class="app">
@@ -957,6 +997,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     <span class="broker-name" id="sb-broker-name">Schwab / TOS</span>
     <span class="broker-change">變更</span>
   </div>
+  <div id="sidebar-2fa-status" class="student-only" style="padding:0 var(--space-4) var(--space-2);display:none"></div>
 
   <div class="sidebar-divider" id="admin-nav" style="display:none"></div>
   <div class="sidebar-section" id="admin-nav-label" style="display:none">管理</div>
@@ -3731,6 +3772,8 @@ function confirmSetupBroker() {
   updateBrokerUI(broker);
   // Sync to Supabase so it persists across devices
   saveBrokerToCloud(broker);
+  // After broker binding, check if user needs to set up 2FA
+  checkAndPromptMFASetup();
 }
 
 async function saveBrokerToCloud(broker) {
@@ -3742,6 +3785,197 @@ async function saveBrokerToCloud(broker) {
   } catch(e) {
     // Silently fail — localStorage still works as fallback
     console.log('Broker cloud sync skipped:', e.message);
+  }
+}
+
+// === MFA / TOTP 2FA ===
+var mfaEnrollFactorId = null;
+
+async function checkAndPromptMFASetup() {
+  if (!supabaseClient) return;
+  try {
+    var { data, error } = await supabaseClient.auth.mfa.listFactors();
+    if (error) { console.warn('MFA listFactors error:', error.message); return; }
+    var totpFactors = (data.totp || []).filter(function(f) { return f.status === 'verified'; });
+    if (totpFactors.length === 0) {
+      startMFAEnroll();
+    }
+  } catch(e) {
+    console.warn('MFA check error:', e.message);
+  }
+}
+
+async function startMFAEnroll() {
+  if (!supabaseClient) return;
+  var container = document.getElementById('mfa-qr-container');
+  var resultEl = document.getElementById('mfa-setup-result');
+  resultEl.textContent = '';
+  resultEl.className = 'mfa-result';
+  container.innerHTML = '<span style="color:var(--color-text-muted);font-size:12px">載入中...</span>';
+  document.getElementById('mfa-verify-code').value = '';
+  document.getElementById('mfa-setup-overlay').style.display = 'flex';
+  try {
+    var { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+    if (error) {
+      container.innerHTML = '<span style="color:var(--color-error);font-size:12px">QR Code 載入失敗: ' + error.message + '</span>';
+      return;
+    }
+    mfaEnrollFactorId = data.id;
+    container.innerHTML = '<img src="' + data.totp.qr_code + '" alt="TOTP QR Code" style="width:180px;height:180px;border-radius:var(--radius-md);image-rendering:pixelated">';
+    var codeInput = document.getElementById('mfa-verify-code');
+    codeInput.focus();
+  } catch(e) {
+    container.innerHTML = '<span style="color:var(--color-error);font-size:12px">QR Code 載入失敗: ' + e.message + '</span>';
+  }
+}
+
+async function verifyMFASetup() {
+  if (!supabaseClient || !mfaEnrollFactorId) return;
+  var code = document.getElementById('mfa-verify-code').value.trim();
+  var resultEl = document.getElementById('mfa-setup-result');
+  var btn = document.getElementById('mfa-verify-btn');
+  if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+    resultEl.textContent = '請輸入 6 位數字驗證碼';
+    resultEl.className = 'mfa-result error';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '驗證中...';
+  resultEl.textContent = '';
+  resultEl.className = 'mfa-result';
+  try {
+    var { data: challengeData, error: challengeError } = await supabaseClient.auth.mfa.challenge({ factorId: mfaEnrollFactorId });
+    if (challengeError) {
+      resultEl.textContent = '驗證失敗: ' + challengeError.message;
+      resultEl.className = 'mfa-result error';
+      btn.disabled = false; btn.textContent = '確認啟用';
+      return;
+    }
+    var { data: verifyData, error: verifyError } = await supabaseClient.auth.mfa.verify({
+      factorId: mfaEnrollFactorId,
+      challengeId: challengeData.id,
+      code: code
+    });
+    if (verifyError) {
+      resultEl.textContent = '驗證碼錯誤，請重新輸入';
+      resultEl.className = 'mfa-result error';
+      document.getElementById('mfa-verify-code').value = '';
+      document.getElementById('mfa-verify-code').focus();
+      btn.disabled = false; btn.textContent = '確認啟用';
+      return;
+    }
+    resultEl.textContent = '✅ 兩步驟驗證已啟用！';
+    resultEl.className = 'mfa-result success';
+    mfaEnrollFactorId = null;
+    setTimeout(function() {
+      document.getElementById('mfa-setup-overlay').style.display = 'none';
+      showMFA2FAStatus();
+    }, 1200);
+  } catch(e) {
+    resultEl.textContent = '驗證失敗: ' + e.message;
+    resultEl.className = 'mfa-result error';
+  }
+  btn.disabled = false; btn.textContent = '確認啟用';
+}
+
+async function checkMFARequired() {
+  if (!supabaseClient) return false;
+  try {
+    var { data, error } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error) { console.warn('AAL check error:', error.message); return false; }
+    if (data.currentLevel === 'aal1' && data.nextLevel === 'aal2') {
+      // User has TOTP set up but hasn't verified this session
+      showMFALoginOverlay();
+      return true; // MFA required — blocks dashboard access
+    }
+    return false; // No MFA needed or already at aal2
+  } catch(e) {
+    console.warn('AAL check error:', e.message);
+    return false;
+  }
+}
+
+function showMFALoginOverlay() {
+  document.getElementById('mfa-login-code').value = '';
+  document.getElementById('mfa-login-result').textContent = '';
+  document.getElementById('mfa-login-result').className = 'mfa-result';
+  document.getElementById('mfa-login-overlay').style.display = 'flex';
+  setTimeout(function() { document.getElementById('mfa-login-code').focus(); }, 100);
+}
+
+async function verifyMFALogin() {
+  if (!supabaseClient) return;
+  var code = document.getElementById('mfa-login-code').value.trim();
+  var resultEl = document.getElementById('mfa-login-result');
+  var btn = document.getElementById('mfa-login-btn');
+  if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+    resultEl.textContent = '請輸入 6 位數字驗證碼';
+    resultEl.className = 'mfa-result error';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '驗證中...';
+  resultEl.textContent = '';
+  resultEl.className = 'mfa-result';
+  try {
+    var { data: factors } = await supabaseClient.auth.mfa.listFactors();
+    var totpFactor = (factors.totp || []).find(function(f) { return f.status === 'verified'; });
+    if (!totpFactor) {
+      resultEl.textContent = '找不到已驗證的 TOTP 設定';
+      resultEl.className = 'mfa-result error';
+      btn.disabled = false; btn.textContent = '驗證';
+      return;
+    }
+    var { data: challengeData, error: challengeError } = await supabaseClient.auth.mfa.challenge({ factorId: totpFactor.id });
+    if (challengeError) {
+      resultEl.textContent = '驗證失敗: ' + challengeError.message;
+      resultEl.className = 'mfa-result error';
+      btn.disabled = false; btn.textContent = '驗證';
+      return;
+    }
+    var { data: verifyData, error: verifyError } = await supabaseClient.auth.mfa.verify({
+      factorId: totpFactor.id,
+      challengeId: challengeData.id,
+      code: code
+    });
+    if (verifyError) {
+      resultEl.textContent = '驗證碼錯誤，請重新輸入';
+      resultEl.className = 'mfa-result error';
+      document.getElementById('mfa-login-code').value = '';
+      document.getElementById('mfa-login-code').focus();
+      btn.disabled = false; btn.textContent = '驗證';
+      return;
+    }
+    // MFA verified successfully — close overlay and proceed
+    document.getElementById('mfa-login-overlay').style.display = 'none';
+    showApp();
+    showMFA2FAStatus();
+  } catch(e) {
+    resultEl.textContent = '驗證失敗: ' + e.message;
+    resultEl.className = 'mfa-result error';
+    btn.disabled = false; btn.textContent = '驗證';
+  }
+}
+
+async function showMFA2FAStatus() {
+  var statusEl = document.getElementById('sidebar-2fa-status');
+  if (!statusEl || !supabaseClient) return;
+  try {
+    var { data, error } = await supabaseClient.auth.mfa.listFactors();
+    if (error) { statusEl.style.display = 'none'; return; }
+    var totpFactors = (data.totp || []).filter(function(f) { return f.status === 'verified'; });
+    var hasBroker = !!localStorage.getItem('g2_broker');
+    if (totpFactors.length > 0) {
+      statusEl.innerHTML = '<span class="mfa-2fa-badge enabled">🔒 兩步驟驗證：已啟用</span>';
+      statusEl.style.display = 'block';
+    } else if (hasBroker) {
+      statusEl.innerHTML = '<span class="mfa-2fa-badge disabled" style="cursor:pointer" onclick="startMFAEnroll()">⚠️ 請啟用兩步驟驗證</span>';
+      statusEl.style.display = 'block';
+    } else {
+      statusEl.style.display = 'none';
+    }
+  } catch(e) {
+    statusEl.style.display = 'none';
   }
 }
 
@@ -5368,9 +5602,19 @@ async function checkAuth() {
           localStorage.setItem('g2_broker', cloudBroker);
           selectedBroker = cloudBroker;
         }
+        // Check if MFA verification is required before showing dashboard
+        var mfaRequired = await checkMFARequired();
+        if (mfaRequired) {
+          // Don't show dashboard yet — MFA login overlay is displayed
+          // showApp() will be called after successful MFA verification
+          applyRoleRestrictions();
+          updateUserDisplay();
+          return;
+        }
         showApp();
         applyRoleRestrictions();
         updateUserDisplay();
+        showMFA2FAStatus();
       } else if (profile && profile.status !== 'active') {
         showAccessDenied('您的帳號已被停用，請聯絡老師');
       } else {
