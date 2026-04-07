@@ -3189,6 +3189,7 @@ function renderLINECards(signals) {
     html += '<div class="line-card-actions">';
     html += '<button class="btn-sm primary" onclick="analyzeLINESignal(' + i + ')">' + '\u5224\u65b7</button>';
     html += '</div>';
+    html += '<div id="line-result-' + i + '" class="line-card-result" style="margin-top:var(--space-2)"></div>';
     html += '</div>';
     html += '</div>';
   }
@@ -3239,7 +3240,15 @@ function analyzeLINESignal(index) {
     max_loss: s.max_loss,
     event_risk: s.event_risk ? 'true' : 'false'
   };
+  // Render result into the card's inline result area
   analyzePayload(payload);
+  // Copy result from sp-result to the card's inline area
+  var spResult = document.getElementById('sp-result');
+  var lineResult = document.getElementById('line-result-' + index);
+  if (spResult && lineResult) {
+    lineResult.innerHTML = spResult.innerHTML;
+    lineResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 async function analyzeAllLINESignals() {
