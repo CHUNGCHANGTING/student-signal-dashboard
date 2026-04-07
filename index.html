@@ -3815,7 +3815,17 @@ async function startMFAEnroll() {
   document.getElementById('mfa-verify-code').value = '';
   document.getElementById('mfa-setup-overlay').style.display = 'flex';
   try {
-    var { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+    // 先檢查是否已有未驗證的 factor，有的話先刪除再重新 enroll
+    var { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
+    if (factorsData && factorsData.totp && factorsData.totp.length > 0) {
+      for (var fi = 0; fi < factorsData.totp.length; fi++) {
+        var f = factorsData.totp[fi];
+        if (f.status === 'unverified') {
+          await supabaseClient.auth.mfa.unenroll({ factorId: f.id });
+        }
+      }
+    }
+    var { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Dashboard TOTP' });
     if (error) {
       container.innerHTML = '<span style="color:var(--color-error);font-size:12px">QR Code 載入失敗: ' + error.message + '</span>';
       return;
