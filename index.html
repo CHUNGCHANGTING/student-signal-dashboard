@@ -3924,14 +3924,27 @@ async function verifyMFASetup() {
 async function checkMFARequired() {
   if (!supabaseClient) return false;
   try {
+    // Case 1: 已有 TOTP factor 但本次 session 還沒驗證 → 要求輸入驗證碼
     var { data, error } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
     if (error) { console.warn('AAL check error:', error.message); return false; }
     if (data.currentLevel === 'aal1' && data.nextLevel === 'aal2') {
-      // User has TOTP set up but hasn't verified this session
       showMFALoginOverlay();
-      return true; // MFA required — blocks dashboard access
+      return true;
     }
-    return false; // No MFA needed or already at aal2
+    // Case 2: 已綁券商但完全沒有 TOTP factor → 強制進入 enroll
+    var broker = localStorage.getItem('g2_broker');
+    if (!broker && currentUser && currentUser.user_metadata) broker = currentUser.user_metadata.broker;
+    if (broker) {
+      var { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
+      var totpFactors = (factorsData && factorsData.totp) || [];
+      var hasVerified = totpFactors.some(function(f) { return f.status === 'verified'; });
+      if (!hasVerified) {
+        // 有綁券商但沒有 2FA → 強制 enroll
+        startMFAEnroll();
+        return true;
+      }
+    }
+    return false; // 不需要 MFA（沒綁券商 或已驗證 aal2）
   } catch(e) {
     console.warn('AAL check error:', e.message);
     return false;
