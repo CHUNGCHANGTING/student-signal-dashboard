@@ -249,9 +249,10 @@ ranked.forEach(sym => {
       symbol: sym.ticker,
       strategy: s.strategy,
       decision: parseFloat(s.ev) > 0 ? 'GO' : 'SKIP',
+      dte: s.dte || 0,
       note: s.evRange
-        ? `EV=$${s.evRange.evWorst}~$${s.evRange.evBest}(中${parseFloat(s.ev).toFixed(2)}) Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`
-        : `EV=$${parseFloat(s.ev).toFixed(2)} Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss}`,
+        ? `EV=$${s.evRange.evWorst}~$${s.evRange.evBest}(中${parseFloat(s.ev).toFixed(2)}) Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss} ${s.dte || '?'}DTE`
+        : `EV=$${parseFloat(s.ev).toFixed(2)} Kelly=${s.kelly} Δ=${s.shortDelta || '?'} 止盈$${s.takeProfit} 止損$${s.stopLoss} ${s.dte || '?'}DTE`,
       module: moduleMap[s.strategy] || s.strategy,
       bias: sym.direction || 'neutral',
       iv_environment: `IVR=${(parseFloat(sym.ivr)*100).toFixed(0)}%`,
