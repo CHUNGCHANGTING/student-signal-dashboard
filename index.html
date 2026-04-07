@@ -3815,14 +3815,20 @@ async function startMFAEnroll() {
   document.getElementById('mfa-verify-code').value = '';
   document.getElementById('mfa-setup-overlay').style.display = 'flex';
   try {
-    // 先檢查是否已有未驗證的 factor，有的話先刪除再重新 enroll
+    // 檢查現有 TOTP factors
     var { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
-    if (factorsData && factorsData.totp && factorsData.totp.length > 0) {
-      for (var fi = 0; fi < factorsData.totp.length; fi++) {
-        var f = factorsData.totp[fi];
-        if (f.status === 'unverified') {
-          await supabaseClient.auth.mfa.unenroll({ factorId: f.id });
-        }
+    var totpFactors = (factorsData && factorsData.totp) || [];
+    // 如果已有 verified 的 factor，不需要再 enroll
+    var verifiedFactor = totpFactors.find(function(f) { return f.status === 'verified'; });
+    if (verifiedFactor) {
+      container.innerHTML = '<div style="color:var(--color-success);font-size:14px;font-weight:600;padding:var(--space-4)">\u2705 \u5169\u6b65\u9a57\u8b49\u5df2\u555f\u7528\uff0c\u7121\u9700\u91cd\u8907\u8a2d\u5b9a</div>';
+      setTimeout(function() { document.getElementById('mfa-setup-overlay').style.display = 'none'; }, 2000);
+      return;
+    }
+    // 清除所有未驗證的 factor
+    for (var fi = 0; fi < totpFactors.length; fi++) {
+      if (totpFactors[fi].status === 'unverified') {
+        await supabaseClient.auth.mfa.unenroll({ factorId: totpFactors[fi].id });
       }
     }
     var { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Dashboard TOTP' });
