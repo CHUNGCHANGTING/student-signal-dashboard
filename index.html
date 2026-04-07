@@ -940,6 +940,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="sidebar-divider student-only"></div>
   <div class="sidebar-section student-only">即時系統</div>
   <button class="nav-item student-only" onclick="showSection('live-dashboard',this)"><span class="nav-dot live"></span>📊 即時持倉 Dashboard</button>
+  <button class="nav-item" onclick="showSection('history',this)"><span class="nav-dot" style="background:var(--color-primary)"></span>📊 歷史試算</button>
   <div class="sidebar-divider"></div>
   <div class="sidebar-section">收租模組</div>
   <button class="nav-item" onclick="showSection('s-ic',this)"><span class="nav-dot income"></span>Iron Condor</button>
@@ -1553,6 +1554,30 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 </section>
 <section class="gate" id="s-cv" style="display:none"><div class="gate-header"><div class="gate-num" style="background:var(--color-gold-highlight);color:var(--color-gold);font-size:var(--text-xs)">CV</div><div><div class="gate-title">Credit Vertical（次要）</div><div class="gate-subtitle">高 IV 環境專用</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
 
+<!-- History Section -->
+<section class="gate" id="history" style="display:none">
+<div class="gate-header">
+  <div class="gate-num" style="background:var(--color-primary-highlight);color:var(--color-primary);font-size:var(--text-xs)">📊</div>
+  <div>
+    <div class="gate-title">歷史試算紀錄</div>
+    <div class="gate-subtitle">查看過去的信號篩選結果與策略試算資料</div>
+  </div>
+</div>
+<div id="history-controls" style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);flex-wrap:wrap">
+  <select id="history-days-select" class="admin-only" style="display:none;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:var(--text-sm)" onchange="loadSignalHistory()">
+    <option value="7">最近 7 天</option>
+    <option value="30">最近 30 天</option>
+    <option value="9999">全部資料</option>
+  </select>
+  <button id="history-export-btn" class="admin-only" style="display:none;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md);border:1px solid var(--color-primary);background:var(--color-primary);color:#fff;font-size:var(--text-sm);cursor:pointer" onclick="exportHistoryCSV()">⬇ 匯出 Excel (CSV)</button>
+  <span id="history-summary" style="font-size:var(--text-sm);color:var(--color-text-muted)"></span>
+</div>
+<div id="history-loading" style="display:none;text-align:center;padding:var(--space-8);color:var(--color-text-muted)">載入中…</div>
+<div id="history-empty" style="display:none;text-align:center;padding:var(--space-8);color:var(--color-text-muted)">尚無歷史資料</div>
+<div id="history-error" style="display:none;text-align:center;padding:var(--space-8);color:var(--color-error)"></div>
+<div id="history-list"></div>
+</section>
+
 <!-- Admin Panel -->
 <section class="admin-section" id="admin-panel" style="display:none">
 <div class="gate-header"><div class="gate-num" style="background:var(--color-purple-highlight);color:var(--color-purple)">👥</div><div><div class="gate-title">學生管理</div><div class="gate-subtitle">管理學生帳號、權限與 Skool 會員同步</div></div></div>
@@ -1637,7 +1662,7 @@ function closeMobileSidebar() {
   var bd = document.getElementById('sidebar-backdrop');
   sb.classList.remove('open'); bd.classList.remove('open');
 }
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'gate4') loadGate4();   if (id === 'admin-panel') loadStudents();   closeMobileSidebar();   updateSummary(); } let currentGate = 'gate0';
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'gate3') loadGate3();   if (id === 'gate4') loadGate4();   if (id === 'admin-panel') loadStudents();   if (id === 'history') loadSignalHistory();   closeMobileSidebar();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
@@ -5632,6 +5657,206 @@ async function syncSkool() {
   }
   btn.textContent = '同步 Skool 會員';
   btn.disabled = false;
+}
+
+// === Signal History ===
+let historyData = null;
+let historyLoaded = false;
+
+async function loadSignalHistory() {
+  var isAdmin = document.querySelector('.badge-admin') !== null;
+  // Show/hide admin controls
+  var daysSelect = document.getElementById('history-days-select');
+  var exportBtn = document.getElementById('history-export-btn');
+  if (daysSelect) daysSelect.style.display = isAdmin ? 'inline-block' : 'none';
+  if (exportBtn) exportBtn.style.display = isAdmin ? 'inline-block' : 'none';
+
+  var days = isAdmin ? parseInt(document.getElementById('history-days-select').value) : 7;
+
+  document.getElementById('history-loading').style.display = 'block';
+  document.getElementById('history-list').innerHTML = '';
+  document.getElementById('history-empty').style.display = 'none';
+  document.getElementById('history-error').style.display = 'none';
+  document.getElementById('history-summary').textContent = '';
+
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/skool-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get_history', days: days })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    historyData = data;
+    historyLoaded = true;
+    document.getElementById('history-loading').style.display = 'none';
+
+    if (!data.history || data.history.length === 0) {
+      document.getElementById('history-empty').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('history-summary').textContent =
+      '共 ' + (data.totalDays || data.history.length) + ' 天、' + (data.totalSignals || 0) + ' 筆信號';
+    renderHistory(data.history);
+  } catch (e) {
+    console.error('loadSignalHistory error:', e);
+    document.getElementById('history-loading').style.display = 'none';
+    var errEl = document.getElementById('history-error');
+    errEl.textContent = '載入失敗：' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+function renderHistory(history) {
+  var container = document.getElementById('history-list');
+  container.innerHTML = '';
+
+  // Sort by date descending
+  var sorted = history.slice().sort(function(a, b) {
+    return b.date.localeCompare(a.date);
+  });
+
+  var weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+
+  sorted.forEach(function(day, idx) {
+    var d = new Date(day.date + 'T00:00:00');
+    var weekday = weekdays[d.getDay()];
+    var signalCount = day.signals ? day.signals.length : 0;
+
+    var card = document.createElement('div');
+    card.className = 'info-block';
+    card.style.marginBottom = 'var(--space-3)';
+
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:var(--space-3);user-select:none';
+    header.innerHTML =
+      '<div style="display:flex;align-items:center;gap:var(--space-2)">' +
+        '<span style="font-weight:600;font-size:var(--text-base)">' + day.date + ' 週' + weekday + '</span>' +
+        '<span style="font-size:var(--text-sm);color:var(--color-text-muted)">' + signalCount + ' 筆信號</span>' +
+        (day.version ? '<span style="font-size:var(--text-xs);color:var(--color-text-faint)">' + day.version + '</span>' : '') +
+      '</div>' +
+      '<span class="history-toggle" style="font-size:var(--text-sm);transition:transform .2s">▶</span>';
+
+    var body = document.createElement('div');
+    body.style.cssText = 'display:none;padding:0 var(--space-3) var(--space-3);overflow-x:auto';
+
+    if (signalCount === 0) {
+      body.innerHTML = '<p style="color:var(--color-text-muted);font-size:var(--text-sm)">當日無信號</p>';
+    } else {
+      var table = '<table style="width:100%;border-collapse:collapse;font-size:var(--text-sm)">' +
+        '<thead><tr style="border-bottom:2px solid var(--color-border)">' +
+        '<th style="text-align:left;padding:var(--space-2)">標的</th>' +
+        '<th style="text-align:left;padding:var(--space-2)">策略</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">方向</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">IVR</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">POP</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">履約價</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">DTE</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">EV</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">Kelly</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">勝率</th>' +
+        '<th style="text-align:center;padding:var(--space-2)">現價</th>' +
+        '</tr></thead><tbody>';
+
+      day.signals.forEach(function(s) {
+        var biasColor = s.bias === 'bullish' ? 'var(--color-success)' : s.bias === 'bearish' ? 'var(--color-error)' : 'var(--color-text-muted)';
+        var biasLabel = s.bias === 'bullish' ? '🟢 看多' : s.bias === 'bearish' ? '🔴 看空' : s.bias || '—';
+        var strikes = (s.longStrike || '—') + ' / ' + (s.shortStrike || '—');
+        var pop = s.pop != null ? s.pop + '%' : '—';
+        var winRate = s.winRate != null ? (parseFloat(s.winRate) * 100).toFixed(0) + '%' : '—';
+        var kelly = s.kelly != null ? (parseFloat(s.kelly) * 100).toFixed(1) + '%' : '—';
+
+        table += '<tr style="border-bottom:1px solid var(--color-border)">' +
+          '<td style="padding:var(--space-2);font-weight:600">' + (s.symbol || '—') + '</td>' +
+          '<td style="padding:var(--space-2)">' + (s.strategy || '—') + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center;color:' + biasColor + '">' + biasLabel + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + (s.iv_environment || '—') + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + pop + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + strikes + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + (s.dte != null ? s.dte : '—') + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + (s.ev != null ? s.ev : '—') + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + kelly + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + winRate + '</td>' +
+          '<td style="padding:var(--space-2);text-align:center">' + (s.underlyingPrice != null ? s.underlyingPrice : '—') + '</td>' +
+          '</tr>';
+      });
+
+      table += '</tbody></table>';
+      body.innerHTML = table;
+    }
+
+    // Toggle expand/collapse
+    header.addEventListener('click', function() {
+      var isOpen = body.style.display !== 'none';
+      body.style.display = isOpen ? 'none' : 'block';
+      header.querySelector('.history-toggle').textContent = isOpen ? '▶' : '▼';
+    });
+
+    // Auto-expand first card
+    if (idx === 0) {
+      body.style.display = 'block';
+      header.querySelector('.history-toggle').textContent = '▼';
+    }
+
+    card.appendChild(header);
+    card.appendChild(body);
+    container.appendChild(card);
+  });
+}
+
+function exportHistoryCSV() {
+  if (!historyData || !historyData.history) return;
+
+  var bom = '\uFEFF';
+  var headers = '日期,時間,標的,策略,模組,方向,IVR,POP,事件風險,Credit,Debit,最大損失,Long Strike,Short Strike,DTE,EV,Kelly,勝率,現價,版本';
+  var rows = [headers];
+
+  historyData.history.forEach(function(day) {
+    if (!day.signals) return;
+    day.signals.forEach(function(s) {
+      var row = [
+        day.date,
+        day.time || '',
+        s.symbol || '',
+        s.strategy || '',
+        s.module || '',
+        s.bias || '',
+        s.iv_environment || '',
+        s.pop != null ? s.pop : '',
+        s.event_risk ? '是' : '否',
+        s.credit_received != null ? s.credit_received : '',
+        s.debit_paid != null ? s.debit_paid : '',
+        s.max_loss != null ? s.max_loss : '',
+        s.longStrike || '',
+        s.shortStrike || '',
+        s.dte != null ? s.dte : '',
+        s.ev != null ? s.ev : '',
+        s.kelly || '',
+        s.winRate || '',
+        s.underlyingPrice != null ? s.underlyingPrice : '',
+        day.version || ''
+      ].map(function(v) {
+        var str = String(v);
+        if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      });
+      rows.push(row.join(','));
+    });
+  });
+
+  var csv = bom + rows.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '歷史試算_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // === Initialize Auth ===
