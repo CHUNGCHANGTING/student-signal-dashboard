@@ -199,6 +199,13 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .btn-secondary:hover { background: var(--color-surface-dynamic); color: var(--color-text); }
 .btn-excel { padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); background: var(--color-success); color: #fff; font-size: var(--text-xs); font-weight: 600; }
 .btn-excel:hover { opacity: 0.85; }
+.btn-sm { font-size: 11px; padding: 3px 10px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text); font-weight: 600; transition: all var(--transition); }
+.btn-sm:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.btn-sm.btn-suspend { border-color: var(--color-error); color: var(--color-error); }
+.btn-sm.btn-suspend:hover { background: var(--color-error-highlight); }
+.btn-sm.btn-dismiss { border-color: var(--color-text-faint); color: var(--color-text-faint); }
+.btn-sm.btn-dismiss:hover { background: var(--color-surface-dynamic); color: var(--color-text-muted); }
+.dash-panel table { width: 100%; }
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-6); }
 .stat-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); }
 .stat-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: var(--space-2); }
@@ -657,6 +664,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <!-- Login Screen -->
@@ -1272,43 +1281,140 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 </section>
 <!-- Live Dashboard -->
 <section class="live-section" id="live-dashboard" style="display:none">
+<!-- Top Control Bar -->
 <div class="live-topbar">
   <div>
-    <h2 class="section-title">📊 即時持倉 Dashboard</h2>
-    <div class="live-status"><div class="live-dot" id="live-dot"></div><span id="live-time">未連線</span></div>
+    <h2 style="font-size:var(--text-lg);font-weight:700">即時持倉 Dashboard</h2>
+    <div class="live-status">
+      <span class="live-dot" id="dash-live-dot"></span>
+      <span id="dash-last-update">最後更新：--</span>
+    </div>
   </div>
   <div class="live-actions">
-    <button class="btn-secondary" onclick="loadDemo()">載入範例</button>
-    <button class="btn-primary" onclick="loadWebhook()">🔄 刷新</button>
-    <button class="btn-excel" onclick="exportExcel()">📥 匯出 CSV</button>
+    <button class="btn-secondary" id="btn-auto-refresh" onclick="toggleAutoMode()">⚡ 自動模式：OFF</button>
+    <button class="btn-primary" onclick="loadDashboardData()">🔄 立即更新</button>
+    <button class="btn-excel" onclick="exportToExcel()">📥 下載 Excel</button>
   </div>
 </div>
-<div class="load-box">
-  <label>Webhook URL（n8n GET endpoint）</label>
-  <input type="text" id="webhook-url" value="https://chilldove.app.n8n.cloud/webhook/student-positions" placeholder="https://...">
-  <label>或貼上 JSON 資料</label>
-  <textarea id="json-input" placeholder='{"positions":[...],"signals":[...],"risk":{}}'></textarea>
-  <div class="load-row">
-    <button class="btn-primary" onclick="loadWebhook()">載入 Webhook</button>
-    <button class="btn-secondary" onclick="parseJSON()">解析 JSON</button>
-    <button class="btn-secondary" onclick="loadDemo()">載入範例資料</button>
-  </div>
-  <div class="load-status" id="load-status"></div>
+
+<!-- Exit Alert Banner -->
+<div id="exit-alert-banner" style="display:none;background:var(--color-error-highlight);border:1px solid var(--color-error);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4)">
+  <div style="font-size:var(--text-xs);font-weight:700;color:var(--color-error)" id="exit-alert-text"></div>
 </div>
+
+<!-- Stats Cards -->
 <div class="stats-grid">
-  <div class="stat-card"><div class="stat-label">持倉數</div><div class="stat-value" id="stat-pos">—</div><div class="stat-sub">Active Positions</div></div>
-  <div class="stat-card"><div class="stat-label">新訊號</div><div class="stat-value" id="stat-sig">—</div><div class="stat-sub">Pending Signals</div></div>
-  <div class="stat-card"><div class="stat-label">風險預算使用</div><div class="stat-value" id="stat-risk">—</div><div class="stat-sub">Risk Budget Used</div></div>
-  <div class="stat-card"><div class="stat-label">未實現損益</div><div class="stat-value" id="stat-pnl">—</div><div class="stat-sub">Unrealized P&L</div></div>
+  <div class="stat-card">
+    <div class="stat-label">持倉中</div>
+    <div class="stat-value" id="stat-open-count">--</div>
+    <div class="stat-sub">活躍部位數</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">未實現損益</div>
+    <div class="stat-value" id="stat-unrealized-pnl" style="color:var(--color-success)">--</div>
+    <div class="stat-sub" id="stat-unrealized-pct">--</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">本週已實現</div>
+    <div class="stat-value" id="stat-weekly-pnl">--</div>
+    <div class="stat-sub" id="stat-weekly-trades">-- 筆</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">⚠️ 需注意</div>
+    <div class="stat-value" id="stat-alert-count" style="color:var(--color-error)">--</div>
+    <div class="stat-sub">已觸發出場條件</div>
+  </div>
 </div>
-<div class="section-title">📋 持倉列表</div>
-<div id="positions-container"><div style="text-align:center;padding:2rem;color:var(--color-text-faint)">尚未載入資料</div></div>
-<div class="section-title" style="margin-top:var(--space-6)">⚡ 訊號審核</div>
-<div id="signals-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
-<div class="section-title" style="margin-top:var(--space-6)">💰 風險概覽</div>
-<div id="risk-container"></div>
-<div class="section-title" style="margin-top:var(--space-6)">📬 建議下單</div>
-<div id="orders-container"><div style="text-align:center;padding:1rem;color:var(--color-text-faint)">尚未載入資料</div></div>
+
+<!-- Tabs -->
+<div class="param-tabs" id="dash-tabs" style="margin-bottom:var(--space-4)">
+  <button class="param-tab active" onclick="switchDashTab('positions',this)">📊 持倉中</button>
+  <button class="param-tab" onclick="switchDashTab('today',this)">✅ 今日平倉</button>
+  <button class="param-tab" onclick="switchDashTab('history',this)">📋 歷史紀錄</button>
+  <button class="param-tab" onclick="switchDashTab('performance',this)">📈 績效圖</button>
+</div>
+
+<!-- Panel: Positions -->
+<div id="dash-panel-positions" class="dash-panel">
+  <table class="positions-table">
+    <thead>
+      <tr>
+        <th>標的/策略</th><th>進場日</th><th>到期日</th><th>DTE</th>
+        <th>口數</th><th>成本</th><th>P&amp;L$</th><th>P&amp;L%</th>
+        <th>出場狀態</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="positions-tbody">
+      <tr><td colspan="10" style="text-align:center;color:var(--color-text-muted);padding:var(--space-6)">點「立即更新」載入持倉資料</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Panel: Today's Closed -->
+<div id="dash-panel-today" class="dash-panel" style="display:none">
+  <table class="positions-table">
+    <thead>
+      <tr><th>時間</th><th>Symbol</th><th>策略</th><th>出場原因</th><th>P&amp;L$</th><th>P&amp;L%</th></tr>
+    </thead>
+    <tbody id="closed-today-tbody">
+      <tr><td colspan="6" style="text-align:center;color:var(--color-text-muted);padding:var(--space-6)">今日尚無平倉記錄</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Panel: History -->
+<div id="dash-panel-history" class="dash-panel" style="display:none">
+  <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4)">
+    <button class="btn-secondary hist-filter" data-range="1W" onclick="renderHistoryTable('1W')">1 週</button>
+    <button class="btn-secondary hist-filter" data-range="1M" onclick="renderHistoryTable('1M')" style="background:var(--color-primary);color:#fff">1 月</button>
+    <button class="btn-secondary hist-filter" data-range="1Y" onclick="renderHistoryTable('1Y')">1 年</button>
+  </div>
+  <table class="positions-table">
+    <thead>
+      <tr><th>日期</th><th>Symbol</th><th>策略</th><th>持倉天數</th><th>P&amp;L$</th><th>P&amp;L%</th><th>出場原因</th></tr>
+    </thead>
+    <tbody id="history-tbody">
+      <tr><td colspan="7" style="text-align:center;color:var(--color-text-muted)">連接帳號後可查看</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Panel: Performance -->
+<div id="dash-panel-performance" class="dash-panel" style="display:none">
+  <!-- Summary stats -->
+  <div class="stats-grid" style="margin-bottom:var(--space-6)">
+    <div class="stat-card">
+      <div class="stat-label">累積報酬</div>
+      <div class="stat-value" id="perf-total-return" style="color:var(--color-success)">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">超越 SPY</div>
+      <div class="stat-value" id="perf-vs-spy" style="color:var(--color-blue)">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">最大回撤</div>
+      <div class="stat-value" id="perf-max-dd" style="color:var(--color-error)">--</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">勝率</div>
+      <div class="stat-value" id="perf-win-rate" style="color:var(--color-gold)">--</div>
+    </div>
+  </div>
+  <!-- Time filter -->
+  <div style="display:flex;gap:var(--space-2);margin-bottom:var(--space-4)">
+    <button class="btn-secondary perf-filter" data-range="1W" onclick="renderPerformanceChart('1W')">1 週</button>
+    <button class="btn-secondary perf-filter" data-range="1M" onclick="renderPerformanceChart('1M')" style="background:var(--color-primary);color:#fff">1 月</button>
+    <button class="btn-secondary perf-filter" data-range="1Y" onclick="renderPerformanceChart('1Y')">1 年</button>
+  </div>
+  <!-- Chart -->
+  <div style="height:320px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-4)">
+    <canvas id="perf-chart"></canvas>
+  </div>
+  <div style="margin-top:var(--space-3);font-size:var(--text-xs);color:var(--color-text-muted);text-align:center">
+    ━ 我的投組 &nbsp;&nbsp; ╌ SPY（Benchmark）
+  </div>
+</div>
+
 </section>
 <!-- Strategy detail pages (simplified) -->
 <section class="gate" id="s-ic" style="display:none"><div class="gate-header"><div class="gate-num g0" style="font-size:var(--text-xs)">IC</div><div><div class="gate-title">Iron Condor</div><div class="gate-subtitle">SPX / QQQ 專用 • IVR ≥ 30</div></div></div><div class="info-block note"><p>詳細參數請參考原始 SOP 文件</p></div></section>
@@ -1398,7 +1504,7 @@ function switchExitTab(id, el) {
 }
 
 // === Navigation ===
-function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') loadWebhook();   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
+function showSection(id, el) {   document.querySelectorAll('.gate').forEach(g => g.style.display = 'none');   document.querySelectorAll('.live-section').forEach(g => g.style.display = 'none');   document.querySelectorAll('.admin-section').forEach(g => g.style.display = 'none');   const target = document.getElementById(id);   if (target) target.style.display = 'block';   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));   if (el) el.classList.add('active');   currentGate = id;   if (id === 'live-dashboard') { loadDashboardData(); }   if (id === 'admin-panel') loadStudents();   updateSummary(); } let currentGate = 'gate0';
 let currentStrategy = null;
 
 function showGate(id) {
@@ -1466,195 +1572,332 @@ function resetAll() {
   updateSummary();
 }
 
-    // === Live Dashboard ===
-const WEBHOOK_URL = 'https://chilldove.app.n8n.cloud/webhook/student-positions';
-let dashboardData = null;
+    // === Live Dashboard (V2) ===
+let dashAutoMode = false;
+let dashAutoInterval = null;
+let dashData = { positions: [], closedToday: [], history: [], pnl: [] };
 
-async function loadDashboard() {
-  const posC = document.getElementById('positions-container');
-  const sigC = document.getElementById('signals-container');
-  const ordC = document.getElementById('orders-container');
-  const riskC = document.getElementById('risk-container');
-  if (posC) posC.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">載入中...</div>';
-  try {
-    const res = await fetch(WEBHOOK_URL);
-    const data = await res.json();
-    dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
-  } catch(e) {
-    if (posC) posC.innerHTML = '<div style="text-align:center;padding:2rem;color:#e74c3c">載入失敗: ' + e.message + '</div>';
+function switchDashTab(id, el) {
+  document.querySelectorAll('#dash-tabs .param-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.dash-panel').forEach(p => p.style.display = 'none');
+  el.classList.add('active');
+  const panel = document.getElementById('dash-panel-' + id);
+  if (panel) panel.style.display = 'block';
+  if (id === 'performance') renderPerformanceChart();
+}
+
+function toggleAutoMode() {
+  dashAutoMode = !dashAutoMode;
+  const btn = document.getElementById('btn-auto-refresh');
+  if (dashAutoMode) {
+    const ok = confirm('\u26a0\ufe0f \u81ea\u52d5\u6a21\u5f0f\u958b\u555f\u5f8c\uff0c\u7cfb\u7d71\u5c07\u6bcf 5 \u5206\u9418\u81ea\u52d5\u6383\u63cf\u51fa\u5834\u689d\u4ef6\u4e26\u57f7\u884c\u5e73\u5009\u55ae\u3002\u78ba\u8a8d\u958b\u555f\uff1f');
+    if (!ok) { dashAutoMode = false; return; }
+    btn.textContent = '\u26a1 \u81ea\u52d5\u6a21\u5f0f\uff1aON';
+    btn.style.background = 'var(--color-success)';
+    btn.style.color = '#fff';
+    dashAutoInterval = setInterval(loadDashboardData, 5 * 60 * 1000);
+    loadDashboardData();
+  } else {
+    btn.textContent = '\u26a1 \u81ea\u52d5\u6a21\u5f0f\uff1aOFF';
+    btn.style.background = '';
+    btn.style.color = '';
+    clearInterval(dashAutoInterval);
   }
 }
 
-function calcEV(p) {
-  const pop = parseFloat(p.pop);
-  const cr = parseFloat(p.credit_received || 0);
-  const dp = parseFloat(p.debit_paid || 0);
-  const tv = parseFloat(p.target_value || 0);
-  const ml = parseFloat(p.max_loss || 0);
-  if (isNaN(pop) || pop === 0) return { ev: 'N/A', kelly: 'N/A' };
-  const netCredit = cr - dp;
-  const maxProfit = netCredit > 0 ? netCredit * 100 : (tv - dp) * 100;
-  const maxLoss = ml > 0 ? ml * 100 : Math.abs(netCredit) * 100;
-  const ev = (pop / 100) * maxProfit - (1 - pop / 100) * maxLoss;
-  const b = maxProfit / (maxLoss || 1);
-  const kelly = (pop / 100) - ((1 - pop / 100) / b);
-  return { ev: '$' + ev.toFixed(0), kelly: (kelly * 100).toFixed(1) + '%', evNum: ev, kellyNum: kelly };
-}
+async function loadDashboardData() {
+  const dot = document.getElementById('dash-live-dot');
+  if (dot) dot.classList.add('online');
 
-    function renderPositions(positions) {
-  const c = document.getElementById('positions-container');
-  if (!c) return;
-  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--color-text-faint)">無持倉資料</div>'; return; }
-  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>部位</th><th>EV</th><th>Kelly</th><th>狀態</th></tr></thead><tbody id="pos-tbody">';
-  positions.forEach(p => {
-    const evData = calcEV(p);
-    const evClass = evData.evNum > 0 ? 'green' : evData.evNum < 0 ? 'red' : '';
-    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + (p.quantity||'-') + '</td><td class="' + evClass + '">' + evData.ev + '</td><td>' + evData.kelly + '</td><td>' + (p.status||'-') + '</td></tr>';
-  });
-  html += '</tbody></table>';
-  c.innerHTML = html;
-}
+  try {
+    if (!currentUser) { renderDemoState(); return; }
 
-function renderSignals(signals) {
-  const c = document.getElementById('signals-container');
-  if (!c) return;
-  if (!signals.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無新訊號</div>'; return; }
-  let html = '';
-  signals.forEach(s => {
-    const evData = calcEV(s);
-    html += '<div class="signal-card"><div class="signal-header"><span class="signal-symbol">' + (s.symbol||'') + '</span><span class="signal-strategy">' + (s.strategy||'') + '</span></div><div class="signal-details">EV: <span class="' + (evData.evNum > 0 ? 'green' : 'red') + '">' + evData.ev + '</span> | Kelly: ' + evData.kelly + ' | POP: ' + (s.pop||'N/A') + '%</div></div>';
-  });
-  c.innerHTML = html;
-}
-
-function renderRisk(risk) {
-  const c = document.getElementById('risk-container');
-  if (!c) return;
-  const bp = risk.buying_power || 'N/A';
-  const nl = risk.net_liq || 'N/A';
-  const delta = risk.portfolio_delta || 'N/A';
-  c.innerHTML = '<div class="risk-bar"><div class="risk-item"><span class="risk-label">購買力</span><span class="risk-val">' + bp + '</span></div><div class="risk-item"><span class="risk-label">Net Liq</span><span class="risk-val">' + nl + '</span></div><div class="risk-item"><span class="risk-label">Portfolio Δ</span><span class="risk-val">' + delta + '</span></div></div>';
-}
-
-function renderOrders(positions) {
-  const c = document.getElementById('orders-container');
-  if (!c) return;
-  if (!positions.length) { c.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--color-text-faint)">無建議下單</div>'; return; }
-  let html = '<table class="pos-table"><thead><tr><th>個股</th><th>策略</th><th>到期</th><th>建議</th></tr></thead><tbody>';
-  positions.forEach(p => {
-    const evData = calcEV(p);
-    const action = evData.evNum > 0 ? '✅ 正EV - 可下單' : '⚠️ 負EV - 請評估';
-    html += '<tr><td>' + (p.symbol||'-') + '</td><td>' + (p.strategy||'-') + '</td><td>' + (p.expiration||'-') + '</td><td>' + action + '</td></tr>';
-  });
-  html += '</tbody></table>';
-  c.innerHTML = html;
-}
-
-    // === Excel Export ===
-function exportExcel() {
-  if (!dashboardData || !dashboardData.positions) { alert('請先載入 Dashboard 資料'); return; }
-  const positions = dashboardData.positions;
-  let csv = '\uFEFF個股,策略,到期日,部位,POP,Credit,Debit,EV,Kelly,狀態\n';
-  positions.forEach(p => {
-    const evData = calcEV(p);
-    csv += [p.symbol, p.strategy, p.expiration, p.quantity, p.pop, p.credit_received, p.debit_paid, evData.ev, evData.kelly, p.status].join(',') + '\n';
-  });
-  if (dashboardData.signals && dashboardData.signals.length) {
-    csv += '\n訊號\n個股,策略,POP,Credit,Debit,EV,Kelly\n';
-    dashboardData.signals.forEach(s => {
-      const evData = calcEV(s);
-      csv += [s.symbol, s.strategy, s.pop, s.credit_received, s.debit_paid, evData.ev, evData.kelly].join(',') + '\n';
+    // Fetch open positions
+    const posResp = await fetch(SUPABASE_URL + '/rest/v1/positions?student_id=eq.' + currentUser.id + '&status=eq.open&order=created_at.desc', {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
     });
-  }
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'options-dashboard-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
+    const positions = posResp.ok ? await posResp.json() : [];
 
-// === Auto refresh ===
-let refreshInterval = null;
-function startAutoRefresh() {
-  if (refreshInterval) clearInterval(refreshInterval);
-  refreshInterval = setInterval(() => {
-    if (currentGate === 'live-dashboard') loadDashboard();
-  }, 60000);
-}
+    // Fetch today's closed trades
+    const today = new Date().toISOString().slice(0,10);
+    const closedResp = await fetch(SUPABASE_URL + '/rest/v1/closed_trades?student_id=eq.' + currentUser.id + '&close_date=eq.' + today + '&order=created_at.desc', {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+    });
+    const closedToday = closedResp.ok ? await closedResp.json() : [];
 
-// === Webhook/Demo/Parse ===
-function loadWebhook() {
-  const url = document.getElementById('webhook-url').value;
-  const statusEl = document.getElementById('load-status');
-  const dotEl = document.getElementById('live-dot');
-  const timeEl = document.getElementById('live-time');
-  if (statusEl) statusEl.textContent = '載入中...';
-  fetch(url).then(r => r.json()).then(data => {
-    dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
-    updateStats(data);
-    if (dotEl) dotEl.classList.add('online');
-    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
-    if (statusEl) { statusEl.textContent = '✅ 載入成功 (' + new Date().toLocaleTimeString() + ')'; statusEl.className = 'load-status ok'; }
-  }).catch(e => {
-    if (statusEl) { statusEl.textContent = '❌ 載入失敗: ' + e.message; statusEl.className = 'load-status err'; }
-  });
-}
+    // Fetch PnL history (last 365 days)
+    const yearAgo = new Date(Date.now() - 365*24*60*60*1000).toISOString().slice(0,10);
+    const pnlResp = await fetch(SUPABASE_URL + '/rest/v1/daily_pnl?student_id=eq.' + currentUser.id + '&date=gte.' + yearAgo + '&order=date.asc', {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+    });
+    const pnlData = pnlResp.ok ? await pnlResp.json() : [];
 
-function loadDemo() {
-  const demo = {positions:[{symbol:'SPX',strategy:'IC',expiration:'2025-05-16',quantity:2,pop:72,credit_received:1.2,debit_paid:0,max_loss:3.8,status:'active'},{symbol:'QQQ',strategy:'BPCS',expiration:'2025-05-09',quantity:1,pop:68,credit_received:0.85,debit_paid:0,max_loss:4.15,status:'active'},{symbol:'AAPL',strategy:'BCDS',expiration:'2025-05-23',quantity:1,pop:45,credit_received:0,debit_paid:2.5,target_value:5,max_loss:2.5,status:'active'}],signals:[{symbol:'MSFT',strategy:'BPCS',pop:70,credit_received:1.1,debit_paid:0,max_loss:3.9},{symbol:'AMZN',strategy:'BCDS',pop:48,credit_received:0,debit_paid:3.0,target_value:6,max_loss:3.0},{symbol:'SPX',strategy:'IC',pop:75,credit_received:1.5,debit_paid:0,max_loss:3.5}],risk:{buying_power:'$45,000',net_liq:'$52,300',portfolio_delta:'-0.15'}};
-  dashboardData = demo;
-  renderPositions(demo.positions);
-  renderSignals(demo.signals);
-  renderRisk(demo.risk);
-  renderOrders(demo.positions);
-  updateStats(demo);
-  const dotEl = document.getElementById('live-dot');
-  const timeEl = document.getElementById('live-time');
-  const statusEl = document.getElementById('load-status');
-  if (dotEl) dotEl.classList.add('online');
-  if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
-  if (statusEl) { statusEl.textContent = '✅ 範例資料已載入'; statusEl.className = 'load-status ok'; }
-}
+    dashData = { positions, closedToday, pnl: pnlData };
 
-function parseJSON() {
-  const input = document.getElementById('json-input').value;
-  const statusEl = document.getElementById('load-status');
-  try {
-    const data = JSON.parse(input);
-    dashboardData = data;
-    renderPositions(data.positions || []);
-    renderSignals(data.signals || []);
-    renderRisk(data.risk || {});
-    renderOrders(data.positions || []);
-    updateStats(data);
-    if (statusEl) { statusEl.textContent = '✅ JSON 解析成功'; statusEl.className = 'load-status ok'; }
+    renderPositions(positions);
+    renderClosedToday(closedToday);
+    renderStats(positions, closedToday);
+    checkExitAlerts(positions);
+
+    const timeEl = document.getElementById('dash-last-update');
+    if (timeEl) timeEl.textContent = '\u6700\u5f8c\u66f4\u65b0\uff1a' + new Date().toLocaleTimeString('zh-TW');
+
   } catch(e) {
-    if (statusEl) { statusEl.textContent = '❌ JSON 解析失敗: ' + e.message; statusEl.className = 'load-status err'; }
+    console.error('Dashboard load error:', e);
+    renderDemoState();
   }
 }
 
-function updateStats(data) {
-  const pos = data.positions || [];
-  const sig = data.signals || [];
-  const el1 = document.getElementById('stat-pos');
-  const el2 = document.getElementById('stat-sig');
-  if (el1) el1.textContent = pos.length;
-  if (el2) el2.textContent = sig.length;
-        const el3 = document.getElementById('stat-risk');
-      const el4 = document.getElementById('stat-pnl');
-      if (el3) el3.textContent = data.risk_budget_used_pct !== undefined ? data.risk_budget_used_pct + '%' : '--';
-      if (el4) el4.textContent = data.unrealized_pnl !== undefined ? '$' + data.unrealized_pnl : '--';
+function renderStats(positions, closedToday) {
+  const openCount = positions.length;
+  const alertCount = positions.filter(p => p.exit_signal).length;
+  const unrealizedTotal = positions.reduce((s,p) => s + (p.current_pnl_amount || 0), 0);
+  const weeklyPnl = closedToday.reduce((s,t) => s + (t.pnl_amount || 0), 0);
+
+  document.getElementById('stat-open-count').textContent = openCount;
+  document.getElementById('stat-alert-count').textContent = alertCount;
+
+  const upnlEl = document.getElementById('stat-unrealized-pnl');
+  upnlEl.textContent = (unrealizedTotal >= 0 ? '+' : '') + '$' + unrealizedTotal.toFixed(0);
+  upnlEl.style.color = unrealizedTotal >= 0 ? 'var(--color-success)' : 'var(--color-error)';
+
+  const wpnlEl = document.getElementById('stat-weekly-pnl');
+  wpnlEl.textContent = (weeklyPnl >= 0 ? '+' : '') + '$' + weeklyPnl.toFixed(0);
+  wpnlEl.style.color = weeklyPnl >= 0 ? 'var(--color-success)' : 'var(--color-error)';
+  document.getElementById('stat-weekly-trades').textContent = closedToday.length + ' \u7b46\u4eca\u65e5';
 }
+
+function checkExitAlerts(positions) {
+  const alerts = positions.filter(p => p.exit_signal);
+  const banner = document.getElementById('exit-alert-banner');
+  const text = document.getElementById('exit-alert-text');
+  if (alerts.length > 0 && banner && text) {
+    banner.style.display = 'block';
+    text.innerHTML = alerts.map(p =>
+      '\u26a0\ufe0f <strong>' + p.symbol + ' ' + p.strategy + '</strong> \u5df2\u89f8\u767c <span style="color:var(--color-error)">' + p.exit_signal + '</span> \u2014 P&L: ' + ((p.current_pnl_pct||0)*100).toFixed(1) + '%'
+    ).join('<br>');
+  } else if (banner) {
+    banner.style.display = 'none';
+  }
+}
+
+function renderPositions(positions) {
+  const tbody = document.getElementById('positions-tbody');
+  if (!tbody) return;
+  if (positions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--color-text-muted);padding:var(--space-6)">\u76ee\u524d\u7121\u6301\u5009</td></tr>';
+    return;
+  }
+  tbody.innerHTML = positions.map(p => {
+    const pnlPct = (p.current_pnl_pct || 0) * 100;
+    const pnlColor = pnlPct >= 0 ? 'var(--color-success)' : 'var(--color-error)';
+    let statusHTML = '';
+    if (p.exit_signal) {
+      statusHTML = '<span class="badge" style="background:var(--color-error-highlight);color:var(--color-error)">\ud83d\udd34 ' + p.exit_signal + '</span>';
+    } else if (Math.abs(pnlPct) >= 40 || (p.dte && p.dte <= 21)) {
+      statusHTML = '<span class="badge" style="background:var(--color-warning-highlight);color:var(--color-warning)">\ud83d\udfe1 \u8b66\u793a</span>';
+    } else {
+      statusHTML = '<span class="badge" style="background:var(--color-success-highlight);color:var(--color-success)">\ud83d\udfe2 \u6b63\u5e38</span>';
+    }
+    return '<tr>' +
+      '<td><strong>' + p.symbol + '</strong><br><span style="font-size:10px;color:var(--color-text-muted)">' + p.strategy + '</span></td>' +
+      '<td>' + (p.open_date || '--') + '</td>' +
+      '<td>' + (p.expiry_date || '--') + '</td>' +
+      '<td>' + (p.dte || '--') + '</td>' +
+      '<td>' + (p.contracts || 1) + '</td>' +
+      '<td>$' + ((p.credit_received || p.debit_paid || 0) * 100).toFixed(0) + '</td>' +
+      '<td style="color:' + pnlColor + '">$' + ((p.current_pnl_amount||0)).toFixed(0) + '</td>' +
+      '<td style="color:' + pnlColor + ';font-weight:600">' + pnlPct.toFixed(1) + '%</td>' +
+      '<td>' + statusHTML + '</td>' +
+      '<td><button class="btn-sm btn-suspend" onclick="manualClose(\'' + p.id + '\')">\u5e73\u5009</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function renderClosedToday(trades) {
+  const tbody = document.getElementById('closed-today-tbody');
+  if (!tbody) return;
+  if (trades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--color-text-muted);padding:var(--space-6)">\u4eca\u65e5\u5c1a\u7121\u5e73\u5009\u8a18\u9304</td></tr>';
+    return;
+  }
+  const exitColors = {
+    'STRUCTURE_STOP': 'var(--color-error)', 'MAX_LOSS_STOP': 'var(--color-error)',
+    'TIME_STOP': 'var(--color-warning)', 'DTE_DECAY_EXIT': 'var(--color-warning)',
+    'TAKE_PROFIT_FULL': 'var(--color-success)', 'TAKE_PROFIT_PARTIAL': 'var(--color-blue)',
+    'MANUAL': 'var(--color-text-muted)'
+  };
+  tbody.innerHTML = trades.map(t => {
+    const pnlColor = t.pnl_amount >= 0 ? 'var(--color-success)' : 'var(--color-error)';
+    const eColor = exitColors[t.exit_reason] || 'var(--color-text-muted)';
+    return '<tr>' +
+      '<td>' + ((t.created_at||'').slice(11,16)) + '</td>' +
+      '<td><strong>' + t.symbol + '</strong></td>' +
+      '<td style="font-size:10px">' + t.strategy + '</td>' +
+      '<td><span style="color:' + eColor + ';font-weight:600">' + (t.exit_reason||'--') + '</span></td>' +
+      '<td style="color:' + pnlColor + '">$' + (t.pnl_amount||0).toFixed(0) + '</td>' +
+      '<td style="color:' + pnlColor + '">' + ((t.pnl_pct||0)*100).toFixed(1) + '%</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function renderDemoState() {
+  const demoPositions = [
+    { id:'demo1', symbol:'SPX', strategy:'IRON_CONDOR', open_date:'2026-04-01', expiry_date:'2026-04-25', dte:17, contracts:1, credit_received:3.5, current_pnl_amount:175, current_pnl_pct:0.50, exit_signal:'TAKE_PROFIT_FULL' },
+    { id:'demo2', symbol:'NVDA', strategy:'BULL_CALL_DEBIT_SPREAD', open_date:'2026-04-04', expiry_date:'2026-05-02', dte:24, contracts:2, debit_paid:1.8, current_pnl_amount:80, current_pnl_pct:0.22, exit_signal:null },
+    { id:'demo3', symbol:'QQQ', strategy:'BEAR_CALL_CREDIT_SPREAD', open_date:'2026-04-03', expiry_date:'2026-04-18', dte:10, contracts:1, credit_received:1.2, current_pnl_amount:-95, current_pnl_pct:-0.79, exit_signal:'MAX_LOSS_STOP' }
+  ];
+  renderPositions(demoPositions);
+  renderStats(demoPositions, []);
+  checkExitAlerts(demoPositions);
+  const timeEl = document.getElementById('dash-last-update');
+  if (timeEl) timeEl.textContent = '\u6700\u5f8c\u66f4\u65b0\uff1a\u7bc4\u4f8b\u8cc7\u6599';
+}
+
+async function manualClose(positionId) {
+  if (!confirm('\u78ba\u5b9a\u8981\u624b\u52d5\u5e73\u5009\u6b64\u90e8\u4f4d\uff1f')) return;
+  alert('\u624b\u52d5\u5e73\u5009\u529f\u80fd\u9700\u9023\u63a5 Schwab API\uff08V3\uff09\u3002\u76ee\u524d\u8acb\u900f\u904e\u5238\u5546\u5e73\u53f0\u624b\u52d5\u64cd\u4f5c\u3002');
+}
+
+let perfChartInstance = null;
+let perfTimeRange = '1M';
+
+function renderPerformanceChart(range) {
+  if (range) perfTimeRange = range;
+  document.querySelectorAll('.perf-filter').forEach(b => {
+    b.style.background = b.dataset.range === perfTimeRange ? 'var(--color-primary)' : '';
+    b.style.color = b.dataset.range === perfTimeRange ? '#fff' : '';
+  });
+  const pnlData = dashData.pnl || [];
+  const now = new Date();
+  let startDate;
+  if (perfTimeRange === '1W') startDate = new Date(now - 7*24*3600*1000);
+  else if (perfTimeRange === '1M') startDate = new Date(now - 30*24*3600*1000);
+  else startDate = new Date(now - 365*24*3600*1000);
+  const filtered = pnlData.filter(d => new Date(d.date) >= startDate);
+  const labels = filtered.length > 0 ? filtered.map(d => d.date) : generateDemoLabels(perfTimeRange);
+  const myReturns = filtered.length > 0 ? filtered.map(d => d.cumulative_return_pct) : generateDemoReturns(perfTimeRange, 1);
+  const spyReturns = filtered.length > 0 ? filtered.map(d => d.spy_cumulative_return_pct) : generateDemoReturns(perfTimeRange, 0.7);
+  const ctx = document.getElementById('perf-chart');
+  if (!ctx) return;
+  if (perfChartInstance) perfChartInstance.destroy();
+  perfChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: '\u6211\u7684\u6295\u7d44',
+          data: myReturns,
+          borderColor: '#4f98a3',
+          backgroundColor: 'rgba(79,152,163,0.1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.3
+        },
+        {
+          label: 'SPY',
+          data: spyReturns,
+          borderColor: '#d163a7',
+          backgroundColor: 'rgba(209,99,167,0.05)',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.3,
+          borderDash: [5,3]
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--color-text').trim() || '#cdccca', font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx2 => ctx2.dataset.label + ': ' + ctx2.parsed.y.toFixed(2) + '%'
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-muted').trim() || '#797876', maxTicksLimit: 8, font: { size: 10 } },
+          grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--color-divider').trim() || '#262523' }
+        },
+        y: {
+          ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--color-text-muted').trim() || '#797876', callback: v => v.toFixed(1) + '%', font: { size: 10 } },
+          grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--color-divider').trim() || '#262523' }
+        }
+      }
+    }
+  });
+  // Update summary stats
+  const lastMy = myReturns[myReturns.length-1] || 0;
+  const lastSpy = spyReturns[spyReturns.length-1] || 0;
+  const minReturn = Math.min(...myReturns);
+  document.getElementById('perf-total-return').textContent = (lastMy>=0?'+':'') + lastMy.toFixed(2) + '%';
+  document.getElementById('perf-vs-spy').textContent = (lastMy-lastSpy>=0?'+':'') + (lastMy-lastSpy).toFixed(2) + '%';
+  document.getElementById('perf-max-dd').textContent = minReturn.toFixed(2) + '%';
+  const allTrades = dashData.history || [];
+  const wins = allTrades.filter(t => t.pnl_amount > 0).length;
+  document.getElementById('perf-win-rate').textContent = allTrades.length > 0 ? Math.round(wins/allTrades.length*100) + '%' : '--';
+}
+
+function generateDemoLabels(range) {
+  const days = range === '1W' ? 7 : range === '1M' ? 30 : 252;
+  const labels = [];
+  for (let i = days; i >= 0; i--) {
+    const d = new Date(Date.now() - i*24*3600*1000);
+    labels.push(d.toISOString().slice(0,10));
+  }
+  return labels;
+}
+
+function generateDemoReturns(range, factor) {
+  const days = range === '1W' ? 7 : range === '1M' ? 30 : 252;
+  const returns = [0];
+  for (let i = 1; i <= days; i++) {
+    const prev = returns[returns.length-1];
+    const daily = (Math.random() - 0.45) * 1.2 * factor;
+    returns.push(+(prev + daily).toFixed(3));
+  }
+  return returns;
+}
+
+function renderHistoryTable(range) {
+  perfTimeRange = range;
+  document.querySelectorAll('.hist-filter').forEach(b => {
+    b.style.background = b.dataset.range === range ? 'var(--color-primary)' : '';
+    b.style.color = b.dataset.range === range ? '#fff' : '';
+  });
+  const tbody = document.getElementById('history-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-text-muted);padding:var(--space-4)">\u9023\u63a5\u5e33\u865f\u5f8c\u53ef\u67e5\u770b\u6b77\u53f2\u8a18\u9304</td></tr>';
+}
+
+function exportToExcel() {
+  if (typeof XLSX === 'undefined') { alert('Excel \u532f\u51fa\u529f\u80fd\u8f09\u5165\u4e2d\uff0c\u8acb\u7a0d\u5019\u518d\u8a66'); return; }
+  const wsData = [
+    ['\u65e5\u671f', 'Symbol', '\u7b56\u7565', '\u9032\u5834\u65e5', '\u51fa\u5834\u65e5', '\u53e3\u6578', 'P&L$', 'P&L%', '\u51fa\u5834\u539f\u56e0', '\u6301\u5009\u5929\u6578'],
+    ...(dashData.history || []).map(t => [
+      t.close_date, t.symbol, t.strategy, t.open_date, t.close_date,
+      t.contracts_closed, t.pnl_amount ? t.pnl_amount.toFixed(2) : '', ((t.pnl_pct||0)*100).toFixed(2)+'%',
+      t.exit_reason, t.days_held
+    ])
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '\u4ea4\u6613\u7d00\u9304');
+  XLSX.writeFile(wb, 'options_trades_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+
+// Legacy compat stubs for functions that may be called elsewhere
+function loadWebhook() { loadDashboardData(); }
+function loadDemo() { renderDemoState(); }
+function loadDashboard() { loadDashboardData(); }
+function startAutoRefresh() {} // Replaced by toggleAutoMode
     
     // === Signal Payload Dual-Mode Panel ===
 var signalHistory = [];
