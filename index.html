@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260408.10-40a6708 -->
+<!-- build:v3.6.0-20260407.12-ff1a97e -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260408.10';
+  var CURRENT_BUILD = '20260407.12';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -1371,13 +1371,19 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 <div id="g3-loading" style="text-align:center;padding:var(--space-6);color:var(--color-text-muted)">
   <div style="font-size:var(--text-lg);margin-bottom:var(--space-2)">⚡ 讀取帳戶數據...</div>
-  <div style="font-size:var(--text-xs)">透過 n8n 拉取 tastytrade 持倉 + 餘額</div>
+  <div style="font-size:var(--text-xs)" id="g3-loading-subtitle">讀取帳戶數據中...</div>
 </div>
 <div id="g3-error" style="display:none;padding:var(--space-4);background:var(--color-error-highlight);color:var(--color-error);border-radius:var(--radius-md);margin-bottom:var(--space-4)">
   <strong>❌ 帳戶數據拉取失敗</strong><br>
   <span id="g3-error-msg" style="font-size:var(--text-xs)"></span>
 </div>
 <div id="g3-content" style="display:none">
+
+<!-- Broker indicator banner -->
+<div id="g3-broker-banner" style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-4);background:var(--color-primary-highlight);border:1px solid var(--color-primary);border-radius:var(--radius-md);margin-bottom:var(--space-4);font-size:var(--text-xs)">
+  <span>📊 帳戶數據來源：<strong id="g3-broker-label" style="color:var(--color-primary)">—</strong></span>
+  <button onclick="document.getElementById('broker-setup-overlay').style.display='flex'" style="background:none;border:1px solid var(--color-primary);color:var(--color-primary);border-radius:var(--radius-sm);padding:2px 10px;cursor:pointer;font-size:11px;font-weight:600">切換券商</button>
+</div>
 
 <!-- ── Check 1: 帳戶風險 ── -->
 <div style="margin-bottom:var(--space-6)">
@@ -4043,7 +4049,7 @@ async function testBrokerConnection() {
       });
       var data = await resp.json();
       if (data.data && data.data['session-token']) {
-        result.innerHTML = '<span style="color:var(--color-success)">✅ OAuth 連線成功！即時報價已啟用</span>';
+        result.innerHTML = '<span style="color:var(--color-success)">✅ OAuth 連線成功！即時報價已啟用</span> <button onclick="disconnectTastytrade()" style=\'padding:4px 12px;background:var(--color-error-highlight);color:var(--color-error);border:1px solid var(--color-error);border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer\'>🔓 解除連線</button>';
         localStorage.setItem('broker_tt-session', data.data['session-token']);
         localStorage.setItem('broker_tt-auth', 'oauth');
       } else {
@@ -4757,6 +4763,25 @@ function isTastytradeActive() {
   return _ttQuoteLevelLive; // Only true if quote level is 'live'
 }
 
+function disconnectTastytrade() {
+  if (!confirm('確定要解除 tastytrade 連線嗎？')) return;
+  localStorage.removeItem('broker_tt-session');
+  localStorage.removeItem('broker_tt-auth');
+  localStorage.removeItem('broker_tt-account');
+  // Also clear from Supabase via n8n
+  if (currentUser) {
+    fetch('https://chilldove.app.n8n.cloud/webhook/tastytrade-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'disconnect', user_id: currentUser.id })
+    }).catch(function(){});
+  }
+  // Reload the tastytrade card UI
+  if (typeof renderTTCard === 'function') renderTTCard();
+  if (typeof loadPositionDashboard === 'function') loadPositionDashboard();
+  alert('已解除 tastytrade 連線');
+}
+
 // Build tastytrade OCC option symbol: "KO    260417C00076000"
 function buildTastyOptionSymbol(rootSym, expStr, type, strike) {
   if (!expStr) return '';
@@ -5078,26 +5103,99 @@ var g3Passed = [false, false, false];
 
 async function loadGate3() {
   var loading = document.getElementById('g3-loading');
-  var error = document.getElementById('g3-error');
+  var error   = document.getElementById('g3-error');
   var content = document.getElementById('g3-content');
   if (loading) loading.style.display = 'block';
-  if (error) error.style.display = 'none';
+  if (error)   error.style.display   = 'none';
   if (content) content.style.display = 'none';
 
-  try {
-    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'tt-account-data' })
-    });
-    g3Data = await resp.json();
-    if (g3Data.error && !g3Data.balances) throw new Error(g3Data.error);
-  } catch(e) {
-    if (loading) loading.style.display = 'none';
-    if (error) { error.style.display = 'block'; document.getElementById('g3-error-msg').textContent = e.message; }
-    return;
+  // Update broker banner label
+  var broker = localStorage.getItem('g2_broker') || selectedBroker || 'tastytrade';
+  var BROKER_NAMES = {
+    'tastytrade': '🟣 tastytrade',
+    'schwab':     '🟦 Schwab / TOS',
+    'ibkr':       '🔴 IBKR',
+    'firstrade':  '🟢 Firstrade',
+    'webull':     '🟠 Webull',
+    'futu':       '🟡 Futu / moomoo'
+  };
+  var subtitleEl = document.getElementById('g3-loading-subtitle');
+  var bannerLabel = document.getElementById('g3-broker-label');
+  var brokerName = BROKER_NAMES[broker] || broker;
+  if (subtitleEl) subtitleEl.textContent = '讀取 ' + brokerName + ' 帳戶數據中...';
+  if (bannerLabel) bannerLabel.textContent = brokerName;
+
+  // Only tastytrade and schwab support live account data pull
+  // Other brokers: show placeholder data so Gate 3 still works
+  if (broker === 'tastytrade') {
+    var hasTTSession = !!localStorage.getItem('broker_tt-session');
+    if (!hasTTSession) {
+      if (loading) loading.style.display = 'none';
+      if (error) {
+        error.style.display = 'block';
+        document.getElementById('g3-error-msg').textContent = '請先在「即時持倉 Dashboard」連線 tastytrade 帳號';
+      }
+      return;
+    }
+    try {
+      var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'tt-account-data' })
+      });
+      g3Data = await resp.json();
+      if (g3Data.error && !g3Data.balances) throw new Error(g3Data.error);
+    } catch(e) {
+      if (loading) loading.style.display = 'none';
+      if (error) { error.style.display = 'block'; document.getElementById('g3-error-msg').textContent = e.message; }
+      return;
+    }
+  } else {
+    // Non-tastytrade brokers: use placeholder so Gate 3 can proceed
+    // Students manually verify their own account values
+    g3Data = {
+      balances: { netLiq: 0, cashBalance: 0, optionBuyingPower: 0, maintenanceRequirement: 0 },
+      positions: [],
+      _manual: true,
+      _broker: broker
+    };
   }
+
   if (loading) loading.style.display = 'none';
   if (content) content.style.display = 'block';
+
+  // Update broker banner (in case content was hidden before)
+  if (bannerLabel) bannerLabel.textContent = brokerName;
+
+  // For non-tastytrade: show manual input note in risk check
+  if (g3Data._manual) {
+    var riskEl = document.getElementById('g3-risk-check');
+    if (riskEl) {
+      riskEl.innerHTML = 'ℹ️ ' + brokerName + ' 未支援自動讀取帳戶數據。請自行確認帳戶風險後繼續。';
+      riskEl.style.background = 'var(--color-primary-highlight)';
+      riskEl.style.color = 'var(--color-primary)';
+    }
+    var corrEl = document.getElementById('g3-correlation-check');
+    if (corrEl) {
+      corrEl.innerHTML = 'ℹ️ 請自行在 ' + brokerName + ' 確認現有持倉相關性。';
+      corrEl.style.background = 'var(--color-primary-highlight)';
+      corrEl.style.color = 'var(--color-primary)';
+    }
+    var bpEl = document.getElementById('g3-bp-check');
+    if (bpEl) {
+      bpEl.innerHTML = 'ℹ️ 請自行確認 BP 使用率在安全範圍內。';
+      bpEl.style.background = 'var(--color-primary-highlight)';
+      bpEl.style.color = 'var(--color-primary)';
+    }
+    // Auto-pass all checks for non-tastytrade brokers (manual confirmation)
+    g3Passed = [true, true, true];
+    var summaryEl = document.getElementById('g3-summary');
+    if (summaryEl) {
+      summaryEl.innerHTML = '<div style="color:var(--color-primary);font-weight:700">✅ 請自行確認上述三項後點「完成」</div>';
+      summaryEl.style.background = 'var(--color-primary-highlight)';
+    }
+    return;
+  }
+
   renderGate3();
 }
 
@@ -5473,11 +5571,18 @@ function renderOrderSummary() {
     html += '⑤ 成交後立即設 STPLMT 止損單 @ $' + stopLoss.toFixed(2) + ' GTC';
     html += '</div>';
 
-    // 帶入 TOS 按鈕（嘉信用戶）
-    var tosUrl4 = buildTosUrl(s.symbol, orderText, s.expiry || '');
+    // 下單按鈕 — 依選擇的券商顯示不同操作
+    var g4Broker = localStorage.getItem('g2_broker') || selectedBroker || 'tastytrade';
     html += '<div style="margin-top:var(--space-3);display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">';
-    html += '<a href="' + tosUrl4 + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;text-decoration:none">🚀 帶入 TOS 自動下單</a>';
-    html += '<span style="font-size:10px;color:var(--color-text-muted)">需安裝下班鴿 Chrome 擴充功能</span>';
+    if (g4Broker === 'schwab') {
+      var tosUrl4 = buildTosUrl(s.symbol, orderText, s.expiry || '');
+      html += '<a href="' + tosUrl4 + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;text-decoration:none">🚀 帶入 TOS 自動下單</a>';
+      html += '<span style="font-size:10px;color:var(--color-text-muted)">需安裝下班鴿 Chrome 擴充功能</span>';
+    } else if (g4Broker === 'tastytrade') {
+      html += '<button onclick="g4DryRun()" style="display:inline-flex;align-items:center;gap:6px;padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;border:none;cursor:pointer">🟣 tastytrade Dry Run → 下單</button>';
+    } else {
+      html += '<span style="font-size:11px;color:var(--color-text-muted)">請至 ' + g4Broker + ' 手動下單，依上方指令操作</span>';
+    }
     html += '</div>';
 
     html += '</div>';
