@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260408.12-5429010 -->
+<!-- build:v3.6.0-20260407.12-ff1a97e -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260408.12';
+  var CURRENT_BUILD = '20260407.12';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -3267,7 +3267,53 @@ function analyzeSignal() {
     resultEl.innerHTML = '<div class="info-block warn" style="margin-top:var(--space-3)"><p><strong>JSON 格式錯誤：</strong> ' + e.message + '</p></div>';
     return;
   }
+
+  // 支援多筆格式：{ signals: [...] } 或 [...]
+  var list = null;
+  if (Array.isArray(payload)) list = payload;
+  else if (payload && Array.isArray(payload.signals)) list = payload.signals;
+
+  if (list && list.length > 0) {
+    // 多筆：逐筆分析，結果疊加顯示
+    resultEl.innerHTML = '';
+    list.forEach(function(sig, idx) {
+      var divider = document.createElement('div');
+      divider.style.cssText = 'margin:var(--space-4) 0 var(--space-2);padding:var(--space-2) var(--space-3);background:var(--color-surface);border-left:3px solid var(--color-primary);border-radius:var(--radius-sm);font-size:var(--text-xs);font-weight:700;color:var(--color-primary)';
+      divider.textContent = '[ ' + (idx + 1) + ' / ' + list.length + ' ] ' + (sig.symbol || '') + ' — ' + (sig.strategy || '');
+      resultEl.appendChild(divider);
+      // 用獨立容器渲染每筆
+      var subEl = document.createElement('div');
+      resultEl.appendChild(subEl);
+      var origResultEl = document.getElementById('sp-result');
+      // 暫時把 sp-result 指向 subEl 讓 analyzePayload 寫入
+      subEl.id = 'sp-result-sub-' + idx;
+      var realResultEl = resultEl;
+      // 直接呼叫核心邏輯並把 HTML 寫入 subEl
+      analyzePayloadInto(sig, subEl);
+    });
+    // 更新 g2ApprovedSignals 用第一筆通過的
+    return;
+  }
+
+  // 單筆
   analyzePayload(payload);
+}
+
+// 同 analyzePayload 但輸出到指定 DOM 元素
+function analyzePayloadInto(payload, targetEl) {
+  // 用自定義結果容器，不修改全局 sp-result
+  var origEl = document.getElementById('sp-result');
+  var tempId = 'sp-result-tmp-' + Date.now();
+  targetEl.id = tempId;
+  // 暫時替換
+  if (origEl) origEl.removeAttribute('id');
+  targetEl.id = 'sp-result';
+  try {
+    analyzePayload(payload);
+  } finally {
+    targetEl.id = tempId;
+    if (origEl) origEl.id = 'sp-result';
+  }
 }
 
 // Shared analysis core used by all 3 tabs
