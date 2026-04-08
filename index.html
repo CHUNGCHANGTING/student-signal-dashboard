@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260408.13-9137438 -->
+<!-- build:v3.6.0-20260407.12-ff1a97e -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260408.13';
+  var CURRENT_BUILD = '20260407.12';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -1111,7 +1111,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
           <span id="sp-auto-status-text">⏳ 等待 WF-02 訊號推送...</span>
         </div>
         <div class="sp-auto-url-row">
-          <input type="text" id="sp-auto-url" value="https://chilldove.app.n8n.cloud/webhook/skool-verify" placeholder="WF-02 Webhook URL">
+          <input type="text" id="sp-auto-url" value="https://chilldove.app.n8n.cloud/webhook/ev-signals-api" placeholder="WF-02 Webhook URL">
           <button class="btn-primary" onclick="connectAutoReceive()">連線</button>
         </div>
         <p class="sp-auto-desc">當 WF-02 收到 TradingView Alert 或手動觸發後，判斷結果會自動顯示在下方。</p>
@@ -2561,6 +2561,7 @@ function processAutoSignals(data) {
       reject_reason: rf.reason,
       event_warning: rf.event_warning || null,
       bias_warning: rf.bias_warning || null,
+      ivp_warning: rf.ivp_warning || null,
       payload: payload
     };
     signalHistory.unshift(entry);
@@ -2672,13 +2673,14 @@ function renderSignalHistory() {
   }
   var html = '<div class="sp-history">';
   signalHistory.forEach(function(entry, idx) {
-    var hasWarning = entry.event_warning || entry.bias_warning;
+    var hasWarning = entry.event_warning || entry.bias_warning || entry.ivp_warning;
     var badgeClass = entry.decision === 'approved' ? (hasWarning ? 'decision-review' : 'decision-approved') : entry.decision === 'blocked' ? 'decision-blocked' : 'decision-review';
     var decLabel = entry.decision === 'approved' ? (hasWarning ? '⚠️ 通過（有警告）' : '符合條件') : entry.decision === 'blocked' ? '未達條件' : 'REVIEW';
     var detail = entry.strategy + ' \u2192 ' + entry.module;
     if (entry.reject_reason)  detail += ' | ' + entry.reject_reason;
     if (entry.event_warning)  detail += ' | ' + entry.event_warning;
     if (entry.bias_warning)   detail += ' | ' + entry.bias_warning;
+    if (entry.ivp_warning)    detail += ' | ' + entry.ivp_warning;
     html += '<div class="sp-history-card" onclick="analyzePayload(signalHistory[' + idx + '].payload)">';
     html += '<span class="sp-history-dot ' + entry.decision + '"></span>';
     html += '<span class="sp-history-time">' + entry.time + '</span>';
@@ -3204,6 +3206,12 @@ function riskFilterSP(module, strategy, ivr, dte, event_risk, bias) {
   if (is_income && ivr < 27) return { decision: 'blocked', reason: 'ivr_too_low' };
   if ((strategy === 'IRON_CONDOR' || strategy === 'IC_EQUITY') && ivr < 30) return { decision: 'blocked', reason: 'ic_ivr_below_30' };
   if (dte < 14 || dte > 45) return { decision: 'blocked', reason: 'dte_out_of_range' };
+
+  // Debit 策略額外檢查：IVP > 80% 變高時買方成本貴，IV crush 風險
+  if (is_debit && ivr > 80) {
+    return { decision: 'approved', reason: null, ivp_warning: '⚠️ IVP ' + ivr.toFixed(0) + '% 過高，Debit 成本貴，注意 IV crush 風險，可考慮降低部位' };
+  }
+
   return { decision: 'approved', reason: null };
 }
 
@@ -3369,7 +3377,7 @@ function analyzePayload(payload) {
   var isOffense = debit_strats.includes(strategy);
 
   // Build result table
-  var hasRfWarning = rf.event_warning || rf.bias_warning;
+  var hasRfWarning = rf.event_warning || rf.bias_warning || rf.ivp_warning;
   var decisionClass = decision;
   var decisionLabel = decision === 'approved'
     ? (hasRfWarning ? '⚠️ 通過（有警告）' : '✅ 符合篩選條件')
