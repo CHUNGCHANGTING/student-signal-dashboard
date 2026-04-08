@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260408.7-bc237b1 -->
+<!-- build:v3.6.0-20260407.12-ff1a97e -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260408.7';
+  var CURRENT_BUILD = '20260407.12';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -1488,6 +1488,21 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     <button class="btn-secondary" onclick="loadPositionDashboard()">🔄 一鍵更新</button>
     <button id="auto-mode-btn" class="btn-secondary" onclick="toggleAutoMode()" style="min-width:110px">⏸ 自動模式：關</button>
     <button class="btn-excel" onclick="exportPositionsExcel()">📥 匯出 Excel</button>
+  </div>
+</div>
+
+<!-- TOS Extension Download Card -->
+<div id="tos-ext-banner" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);background:var(--color-primary-highlight);border:1px solid var(--color-primary);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4);flex-wrap:wrap">
+  <div style="display:flex;align-items:center;gap:var(--space-3)">
+    <span style="font-size:22px">🚀</span>
+    <div>
+      <div style="font-size:var(--text-xs);font-weight:700;color:var(--color-primary)">下班鴿 TOS 帶單助手 — Chrome 擴充功能</div>
+      <div style="font-size:10px;color:var(--color-text-muted)">Schwab 用戶安裝後，這入第4關點「🚀 帶入 TOS 自動下單」即可自動在 TOS 頁面填入腳位。不需 API，不需授權。</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:var(--space-2);align-items:center">
+    <a href="https://chungchangting.github.io/student-signal-dashboard/tos-extension.zip" download style="display:inline-flex;align-items:center;gap:6px;padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;text-decoration:none">💾 下載擴充功能 (.zip)</a>
+    <button onclick="document.getElementById('tos-ext-banner').style.display='none'" style="background:none;border:none;color:var(--color-text-muted);cursor:pointer;font-size:16px;padding:2px 6px">×</button>
   </div>
 </div>
 
@@ -3858,7 +3873,11 @@ function populateGate2() {
     // 1. Schwab Web option chain link
     // Broker link removed — now integrated into the auto-fetch result badge
 
-    // TOS symbol button removed — students use tastytrade, not ThinkorSwim
+    // 2. 帶入 TOS 按鈕（嘉信 TOS 網頁版）
+    if (s.orderText && s.expiry && selectedBroker === 'schwab') {
+      var tosUrl = buildTosUrl(s.symbol, s.orderText, s.expiry);
+      html += '<a href="' + tosUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--color-primary);color:#fff;border-radius:var(--radius-sm);font-size:10px;font-weight:700;text-decoration:none">🚀 帶入 TOS</a>';
+    }
 
     // 3. Quick info chip: strikes + expiry
     html += '<span style="display:inline-flex;align-items:center;padding:4px 8px;background:var(--color-warning-highlight);color:var(--color-warning);border-radius:var(--radius-sm);font-size:10px;font-weight:600">⚡ ' + strikeInfo + ' | ' + (s.expiry || '').slice(5) + '</span>';
@@ -5364,6 +5383,13 @@ function loadGate4() {
   }
 }
 
+// 建構 TOS 帶單 URL
+function buildTosUrl(symbol, orderText, expiry) {
+  var encoded = encodeURIComponent(orderText || '');
+  var base = 'https://trade.thinkorswim.com/trade';
+  return base + '?symbol=' + encodeURIComponent(symbol) + '&trade=' + encoded + '&expiry=' + encodeURIComponent(expiry) + '&source=chilldove';
+}
+
 function renderOrderSummary() {
   var container = document.getElementById('g4-order-summary');
   if (!container) return;
@@ -5433,6 +5459,13 @@ function renderOrderSummary() {
     html += '③ ' + orderText + ' → 以 Spread 組合單下單（禁止分腳）<br>';
     html += '④ 訂單類型: Limit，價格填 Mid Price<br>';
     html += '⑤ 成交後立即設 STPLMT 止損單 @ $' + stopLoss.toFixed(2) + ' GTC';
+    html += '</div>';
+
+    // 帶入 TOS 按鈕（嘉信用戶）
+    var tosUrl4 = buildTosUrl(s.symbol, orderText, s.expiry || '');
+    html += '<div style="margin-top:var(--space-3);display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">';
+    html += '<a href="' + tosUrl4 + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:700;text-decoration:none">🚀 帶入 TOS 自動下單</a>';
+    html += '<span style="font-size:10px;color:var(--color-text-muted)">需安裝下班鴿 Chrome 擴充功能</span>';
     html += '</div>';
 
     html += '</div>';
