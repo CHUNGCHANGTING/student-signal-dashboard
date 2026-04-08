@@ -5383,20 +5383,23 @@ function loadGate4() {
   }
 }
 
-// 建構 TOS 帶單 URL — 同時寫入 localStorage 給擴充功能讀取
-// （TOS SPA 會清除 URL params，所以改用 localStorage 跨分頁傳參）
+// 建構 TOS 帶單 URL
+// 同時寫入 localStorage（未登入用）和 URL params（已登入用）
 function buildTosUrl(symbol, orderText, expiry) {
-  // 先把任務存進 localStorage，擴充功能從這裡讀取
+  var trade = orderText || '';
+  var exp   = expiry   || '';
+  // 寫入 localStorage — 給未登入走登入流程的用戶用
   try {
     localStorage.setItem('cd_task', JSON.stringify({
-      symbol: symbol,
-      trade:  orderText || '',
-      expiry: expiry || '',
-      ts: Date.now()
+      symbol: symbol, trade: trade, expiry: exp, ts: Date.now()
     }));
   } catch(e) {}
-  // URL 只需要 symbol（TOS 原生支援），其餘靠 localStorage
-  return 'https://trade.thinkorswim.com/trade?symbol=' + encodeURIComponent(symbol);
+  // URL 同時帶參數 — 給已登入用戶直接觸發（永日魚原版邏輯）
+  var encoded = encodeURIComponent(trade);
+  return 'https://trade.thinkorswim.com/trade?symbol=' + encodeURIComponent(symbol)
+       + '&trade=' + encoded
+       + '&expiry=' + encodeURIComponent(exp)
+       + '&source=chilldove';
 }
 
 function renderOrderSummary() {
