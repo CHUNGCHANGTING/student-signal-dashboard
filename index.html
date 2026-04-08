@@ -1336,6 +1336,51 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 <!-- Panel: Positions -->
 <div id="dash-panel-positions" class="dash-panel">
+<!-- tastytrade Connection Card -->
+<div id="tt-connect-card" style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5);margin-bottom:var(--space-5)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4)">
+    <div>
+      <h3 style="font-size:var(--text-sm);font-weight:700;margin-bottom:4px">🟣 tastytrade 帳號連線</h3>
+      <div style="font-size:var(--text-xs);color:var(--color-text-muted)" id="tt-connect-status">未連線 — 連線後系統可即時讀取持倉和報價</div>
+    </div>
+    <div id="tt-connect-badge" style="display:none;background:var(--color-success-highlight);color:var(--color-success);padding:4px 12px;border-radius:999px;font-size:var(--text-xs);font-weight:600">✅ 已連線</div>
+  </div>
+  
+  <!-- Not connected: show form -->
+  <div id="tt-connect-form">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-3)">
+      <div>
+        <label style="font-size:var(--text-xs);color:var(--color-text-muted);display:block;margin-bottom:4px">tastytrade 帳號</label>
+        <input id="tt-username" type="text" placeholder="你的登入帳號" class="activation-input" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:var(--text-xs);color:var(--color-text-muted);display:block;margin-bottom:4px">密碼</label>
+        <input id="tt-password" type="password" placeholder="••••••••" class="activation-input" style="width:100%">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-3)">
+      <button class="btn-primary" style="min-width:120px" onclick="connectTastytrade()">🔌 連線帳號</button>
+      <span id="tt-connect-msg" style="font-size:var(--text-xs);color:var(--color-text-muted)"></span>
+    </div>
+    <div class="info-block note" style="margin-top:var(--space-3)">
+      <p>🔒 帳號密碼僅用於取得 API session token，不會儲存明文密碼。Token 有效期 24 小時後需重新連線。</p>
+    </div>
+  </div>
+  
+  <!-- Connected: show account info -->
+  <div id="tt-connected-info" style="display:none">
+    <div style="display:flex;gap:var(--space-6);font-size:var(--text-xs)">
+      <div><span style="color:var(--color-text-muted)">帳號</span><br><strong id="tt-account-display">--</strong></div>
+      <div><span style="color:var(--color-text-muted)">帳號類型</span><br><strong id="tt-account-type">--</strong></div>
+      <div><span style="color:var(--color-text-muted)">連線時間</span><br><strong id="tt-connected-time">--</strong></div>
+    </div>
+    <div style="margin-top:var(--space-3);display:flex;gap:var(--space-2)">
+      <button class="btn-primary" onclick="loadRealPositions()">📊 載入真實持倉</button>
+      <button class="btn-secondary" onclick="disconnectTastytrade()">斷線</button>
+    </div>
+  </div>
+</div>
+
   <table class="positions-table">
     <thead>
       <tr>
@@ -3184,6 +3229,118 @@ function getBrokerOptionLink(symbol, broker) {
 // Broker selector buttons (required by CI check)
 // data-broker="schwab" data-broker="tastytrade" data-broker="ibkr"
 // data-broker="firstrade" data-broker="webull" data-broker="futu"
+
+// === tastytrade Integration ===
+var ttConnected = false;
+var ttSessionToken = null;
+var ttAccountNumber = null;
+
+async function connectTastytrade() {
+  const username = document.getElementById('tt-username').value.trim();
+  const password = document.getElementById('tt-password').value.trim();
+  const msgEl = document.getElementById('tt-connect-msg');
+  
+  if (!username || !password) {
+    msgEl.textContent = '請填寫帳號和密碼';
+    msgEl.style.color = 'var(--color-error)';
+    return;
+  }
+  
+  msgEl.textContent = '⏳ 連線中...';
+  msgEl.style.color = 'var(--color-text-muted)';
+  
+  try {
+    const resp = await fetch('https://chilldove.app.n8n.cloud/webhook/tastytrade-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: username,
+        password: password,
+        user_id: currentUser ? currentUser.id : ''
+      })
+    });
+    
+    const result = await resp.json();
+    
+    if (result.success) {
+      ttConnected = true;
+      ttSessionToken = result.session_token;
+      ttAccountNumber = result.account_number;
+      
+      // Update UI
+      document.getElementById('tt-connect-form').style.display = 'none';
+      document.getElementById('tt-connected-info').style.display = 'block';
+      document.getElementById('tt-connect-badge').style.display = 'block';
+      document.getElementById('tt-account-display').textContent = result.account_number || result.username;
+      document.getElementById('tt-connected-time').textContent = new Date().toLocaleTimeString('zh-TW');
+      document.getElementById('tt-connect-status').textContent = '已連線 — 可讀取即時持倉和報價';
+      document.getElementById('tt-connect-status').style.color = 'var(--color-success)';
+      
+      msgEl.textContent = '';
+      
+      // Auto-load real positions
+      loadRealPositions();
+    } else {
+      msgEl.textContent = '❌ ' + (result.error || '連線失敗');
+      msgEl.style.color = 'var(--color-error)';
+    }
+  } catch(e) {
+    msgEl.textContent = '❌ 網路錯誤: ' + e.message;
+    msgEl.style.color = 'var(--color-error)';
+  }
+}
+
+function disconnectTastytrade() {
+  ttConnected = false;
+  ttSessionToken = null;
+  ttAccountNumber = null;
+  document.getElementById('tt-connect-form').style.display = 'block';
+  document.getElementById('tt-connected-info').style.display = 'none';
+  document.getElementById('tt-connect-badge').style.display = 'none';
+  document.getElementById('tt-connect-status').textContent = '未連線 — 連線後系統可即時讀取持倉和報價';
+  document.getElementById('tt-connect-status').style.color = '';
+  document.getElementById('tt-username').value = '';
+  document.getElementById('tt-password').value = '';
+}
+
+async function loadRealPositions() {
+  if (!ttSessionToken || !ttAccountNumber) {
+    alert('請先連線 tastytrade 帳號');
+    return;
+  }
+  
+  const tbody = document.getElementById('positions-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:var(--space-4);color:var(--color-text-muted)">⏳ 從 tastytrade 載入持倉...</td></tr>';
+  
+  try {
+    // Call n8n proxy to fetch real positions
+    const resp = await fetch('https://chilldove.app.n8n.cloud/webhook/tt-positions-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_token: ttSessionToken,
+        account_number: ttAccountNumber
+      })
+    });
+    
+    const data = await resp.json();
+    const positions = data.positions || [];
+    
+    if (positions.length === 0) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--color-text-muted);padding:var(--space-6)">tastytrade 帳號目前無持倉</td></tr>';
+      return;
+    }
+    
+    renderPositions(positions);
+    renderStats(positions, []);
+    
+    const timeEl = document.getElementById('dash-last-update');
+    if (timeEl) timeEl.textContent = '最後更新：' + new Date().toLocaleTimeString('zh-TW') + '（tastytrade）';
+    
+  } catch(e) {
+    if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--color-error);padding:var(--space-4)">載入失敗: ' + e.message + '</td></tr>';
+  }
+}
 
 
 </script>
