@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260408.11-8786927 -->
+<!-- build:v3.6.0-20260407.12-ff1a97e -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260408.11';
+  var CURRENT_BUILD = '20260407.12';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -2559,6 +2559,8 @@ function processAutoSignals(data) {
       module: pm.module,
       decision: rf.decision,
       reject_reason: rf.reason,
+      event_warning: rf.event_warning || null,
+      bias_warning: rf.bias_warning || null,
       payload: payload
     };
     signalHistory.unshift(entry);
@@ -2670,10 +2672,13 @@ function renderSignalHistory() {
   }
   var html = '<div class="sp-history">';
   signalHistory.forEach(function(entry, idx) {
-    var badgeClass = entry.decision === 'approved' ? 'decision-approved' : entry.decision === 'blocked' ? 'decision-blocked' : 'decision-review';
-    var decLabel = entry.decision === 'approved' ? '符合條件' : entry.decision === 'blocked' ? '未達條件' : 'REVIEW';
+    var hasWarning = entry.event_warning || entry.bias_warning;
+    var badgeClass = entry.decision === 'approved' ? (hasWarning ? 'decision-review' : 'decision-approved') : entry.decision === 'blocked' ? 'decision-blocked' : 'decision-review';
+    var decLabel = entry.decision === 'approved' ? (hasWarning ? '⚠️ 通過（有警告）' : '符合條件') : entry.decision === 'blocked' ? '未達條件' : 'REVIEW';
     var detail = entry.strategy + ' \u2192 ' + entry.module;
-    if (entry.reject_reason) detail += ' | ' + entry.reject_reason;
+    if (entry.reject_reason)  detail += ' | ' + entry.reject_reason;
+    if (entry.event_warning)  detail += ' | ' + entry.event_warning;
+    if (entry.bias_warning)   detail += ' | ' + entry.bias_warning;
     html += '<div class="sp-history-card" onclick="analyzePayload(signalHistory[' + idx + '].payload)">';
     html += '<span class="sp-history-dot ' + entry.decision + '"></span>';
     html += '<span class="sp-history-time">' + entry.time + '</span>';
@@ -3167,28 +3172,37 @@ function renderQualityRow(qr) {
 }
 
 function riskFilterSP(module, strategy, ivr, dte, event_risk, bias) {
-  var income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL'];
+  var income_strats = ['IRON_CONDOR', 'BULL_PUT_CREDIT_SPREAD', 'BEAR_CALL_CREDIT_SPREAD', 'CREDIT_VERTICAL', 'IC_EQUITY'];
+  var debit_strats  = ['BULL_CALL_DEBIT_SPREAD', 'BEAR_PUT_DEBIT_SPREAD'];
   var is_income = income_strats.includes(strategy);
+  var is_debit  = debit_strats.includes(strategy);
 
   if (module === 'unknown') return { decision: 'blocked', reason: 'module_unknown' };
-  if (event_risk === true || event_risk === 'true') return { decision: 'blocked', reason: 'event_risk' };
+
+  // event_risk 規則：Credit 策略封鎖，Debit 策略僅提示（IV 上升對買方有利）
+  if (event_risk === true || event_risk === 'true') {
+    if (is_income) return { decision: 'blocked', reason: 'event_risk' };
+    if (is_debit)  return { decision: 'approved', reason: null, event_warning: '⚠️ CPI/FOMC 在 2 日內，IV 上升對買方有利，注意方向' };
+  }
 
   // === 大盤方向與策略方向一致性檢查 ===
+  // 在感舆極端日（大跌、大漲），逆勢策略允許，只提示
   var marketBias = g1State.bias || '';
   var strategyBias = '';
   if (strategy === 'BULL_PUT_CREDIT_SPREAD' || strategy === 'BULL_CALL_DEBIT_SPREAD') strategyBias = 'bullish';
   else if (strategy === 'BEAR_CALL_CREDIT_SPREAD' || strategy === 'BEAR_PUT_DEBIT_SPREAD') strategyBias = 'bearish';
-  else if (strategy === 'IRON_CONDOR') strategyBias = 'neutral';
+  else if (strategy === 'IRON_CONDOR' || strategy === 'IC_EQUITY') strategyBias = 'neutral';
 
-  if (marketBias === 'bearish' && strategyBias === 'bullish') {
-    return { decision: 'blocked', reason: 'bias_mismatch_bearish' };
-  }
-  if (marketBias === 'bullish' && strategyBias === 'bearish') {
-    return { decision: 'blocked', reason: 'bias_mismatch_bullish' };
+  var biasMismatch = (marketBias === 'bearish' && strategyBias === 'bullish') ||
+                     (marketBias === 'bullish' && strategyBias === 'bearish');
+  // Debit 逆勢策略允許通過（僅提示），Credit 逆勢封鎖
+  if (biasMismatch) {
+    if (is_income) return { decision: 'blocked', reason: marketBias === 'bearish' ? 'bias_mismatch_bearish' : 'bias_mismatch_bullish' };
+    if (is_debit)  return { decision: 'approved', reason: null, bias_warning: '⚠️ 逆勢策略，確認大盤方向' };
   }
 
   if (is_income && ivr < 27) return { decision: 'blocked', reason: 'ivr_too_low' };
-  if (strategy === 'IRON_CONDOR' && ivr < 30) return { decision: 'blocked', reason: 'ic_ivr_below_30' };
+  if ((strategy === 'IRON_CONDOR' || strategy === 'IC_EQUITY') && ivr < 30) return { decision: 'blocked', reason: 'ic_ivr_below_30' };
   if (dte < 14 || dte > 45) return { decision: 'blocked', reason: 'dte_out_of_range' };
   return { decision: 'approved', reason: null };
 }
@@ -3309,8 +3323,11 @@ function analyzePayload(payload) {
   var isOffense = debit_strats.includes(strategy);
 
   // Build result table
+  var hasRfWarning = rf.event_warning || rf.bias_warning;
   var decisionClass = decision;
-  var decisionLabel = decision === 'approved' ? '✅ 符合篩選條件' : decision === 'blocked' ? '🚫 未達篩選條件' : '⚠️ 待確認';
+  var decisionLabel = decision === 'approved'
+    ? (hasRfWarning ? '⚠️ 通過（有警告）' : '✅ 符合篩選條件')
+    : decision === 'blocked' ? '🚫 未達篩選條件' : '⚠️ 待確認';
 
   var signalId = symbol + '-' + Date.now().toString(36).toUpperCase();
   var signalTime = new Date().toLocaleString();
@@ -3345,7 +3362,13 @@ function analyzePayload(payload) {
   html += '<tr><td>POP</td><td><span class="' + popClass + '">' + (pop * 100).toFixed(1) + '%</span></td></tr>';
   var evR = calcEVRange(ev, pop, credit_received, debit_paid, max_loss_raw);
   html += '<tr><td>EV 參考範圍</td><td><span class="' + evClass + '">$' + evR.evWorst.toFixed(2) + ' ~ $' + evR.evBest.toFixed(2) + '</span> <span style="font-size:10px;color:var(--color-text-muted)">(中值 $' + ev.toFixed(2) + ' | 滑價±$0.04/leg)</span></td></tr>';
-  html += '<tr><td>event_risk</td><td>' + (event_risk === true || event_risk === 'true' ? '<span class="val-stop">⚠ true</span>' : '<span class="val">false</span>') + '</td></tr>';
+  var eventRiskBool = (event_risk === true || event_risk === 'true');
+  var eventRiskDisplay = eventRiskBool
+    ? (rf.event_warning ? '<span style="color:var(--color-warning)">⚠️ true — ' + rf.event_warning + '</span>'
+                        : '<span class="val-stop">⚠ true — Credit 策略封鎖</span>')
+    : '<span class="val">false</span>';
+  html += '<tr><td>event_risk</td><td>' + eventRiskDisplay + '</td></tr>';
+  if (rf.bias_warning) html += '<tr><td>bias_warning</td><td><span style="color:var(--color-warning)">' + rf.bias_warning + '</span></td></tr>';
   var oiResult = estimateOILiquidity(symbol);
   html += '<tr><td>OI 流動性</td><td>' + oiResult.html + (oiResult.tier >= 4 ? ' <span style="font-size:10px;color:var(--color-text-muted)">（小型股需至 TOS 確認 OI > 500）</span>' : '') + '</td></tr>';
   html += '<tr><td>信號品質</td><td>' + renderQualityRow(qr) + '</td></tr>';
