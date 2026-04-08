@@ -1350,8 +1350,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div id="tt-connect-form">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-3)">
       <div>
-        <label style="font-size:var(--text-xs);color:var(--color-text-muted);display:block;margin-bottom:4px">tastytrade 帳號</label>
-        <input id="tt-username" type="text" placeholder="你的登入帳號" class="activation-input" style="width:100%">
+        <label style="font-size:var(--text-xs);color:var(--color-text-muted);display:block;margin-bottom:4px">tastytrade 用戶名 <span style="color:var(--color-error);font-weight:600">(非 email)</span></label>
+        <input id="tt-username" type="text" placeholder="登入用戶名，例如 johndoe123" class="activation-input" style="width:100%">
       </div>
       <div>
         <label style="font-size:var(--text-xs);color:var(--color-text-muted);display:block;margin-bottom:4px">密碼</label>
@@ -1359,7 +1359,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:var(--space-3)">
-      <button class="btn-primary" style="min-width:120px" onclick="connectTastytrade()">🔌 連線帳號</button>
+      <button class="btn-primary" style="min-width:120px" onclick="showTTDisclaimer()">🔌 連線帳號</button>
       <span id="tt-connect-msg" style="font-size:var(--text-xs);color:var(--color-text-muted)"></span>
     </div>
     <div class="info-block note" style="margin-top:var(--space-3)">
@@ -3230,6 +3230,28 @@ function getBrokerOptionLink(symbol, broker) {
 // data-broker="schwab" data-broker="tastytrade" data-broker="ibkr"
 // data-broker="firstrade" data-broker="webull" data-broker="futu"
 
+// === tastytrade Disclaimer Modal ===
+function showTTDisclaimer() {
+  const username = document.getElementById('tt-username').value.trim();
+  const password = document.getElementById('tt-password').value.trim();
+  const msgEl = document.getElementById('tt-connect-msg');
+  if (!username || !password) {
+    msgEl.textContent = '請填寫用戶名和密碼';
+    msgEl.style.color = 'var(--color-error)';
+    return;
+  }
+  const modal = document.getElementById('tt-disclaimer-modal');
+  modal.style.display = 'flex';
+}
+function closeTTDisclaimer() {
+  const modal = document.getElementById('tt-disclaimer-modal');
+  modal.style.display = 'none';
+}
+function acceptTTDisclaimer() {
+  closeTTDisclaimer();
+  connectTastytrade();
+}
+
 // === tastytrade Integration ===
 var ttConnected = false;
 var ttSessionToken = null;
@@ -3354,5 +3376,28 @@ async function loadRealPositions() {
   <button data-broker="webull">webull</button>
   <button data-broker="futu">futu</button>
 </div>
+
+<!-- tastytrade 免責聲明 Modal -->
+<div id="tt-disclaimer-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-6);max-width:520px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <h3 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-4)">⚠️ 連線前請閱讀免責聲明</h3>
+    <div style="font-size:var(--text-xs);line-height:1.7;color:var(--color-text-muted);max-height:280px;overflow-y:auto;margin-bottom:var(--space-4);padding-right:4px">
+      <p style="margin-bottom:var(--space-3)">本系統透過 tastytrade API 讀取您的帳戶資料（持倉、報價），並在出場條件觸發時協助送出平倉單。使用前請確認您已了解以下事項：</p>
+      <ol style="padding-left:var(--space-5);margin:0">
+        <li style="margin-bottom:var(--space-2)"><strong>訊號僅供參考</strong>：所有進出場訊號皆為研究輔助工具，不構成投資建議。最終交易決策由您本人負責。</li>
+        <li style="margin-bottom:var(--space-2)"><strong>自動平倉風險</strong>：開啟自動模式後，系統將依出場條件自動送出市價單。市場波動劇烈時，成交價格可能與預期不同。</li>
+        <li style="margin-bottom:var(--space-2)"><strong>帳號安全</strong>：您的密碼僅用於一次性取得 API session token，本系統不儲存明文密碼。Token 有效期為 24 小時。</li>
+        <li style="margin-bottom:var(--space-2)"><strong>操作責任</strong>：因網路中斷、API 失效或市場閉市造成的未平倉損失，本平台概不負責。</li>
+        <li style="margin-bottom:var(--space-2)"><strong>建議</strong>：使用前請確認 tastytrade 帳戶中未設有衝突的止損單或條件單，以免重複平倉。</li>
+      </ol>
+      <p style="margin-top:var(--space-3);color:var(--color-error);font-weight:600">選擇權交易涉及重大風險，可能導致全部損失。請確認您具備相應的投資知識與風險承受能力。</p>
+    </div>
+    <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+      <button class="btn-secondary" onclick="closeTTDisclaimer()">取消</button>
+      <button class="btn-primary" onclick="acceptTTDisclaimer()">✅ 我已閱讀並同意，繼續連線</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
