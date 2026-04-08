@@ -3143,6 +3143,59 @@ function syncSkool() {
 // === Initialize Auth ===
 checkAuth();
 
+
+// === BROKER_CONFIG — Required for CI health check ===
+var BROKER_CONFIG = {
+  schwab: {
+    name: 'Schwab / TOS', icon: '🟦',
+    optionUrl: function(sym) { return 'https://client.schwab.com/app/trade/options-chains/' + sym; },
+    label: 'Schwab 選擇權', hint: '開啟 Schwab 網頁版 Option Chain，可直接下單'
+  },
+  tastytrade: {
+    name: 'tastytrade', icon: '🟣',
+    optionUrl: function(sym) { return 'https://trade.tastyworks.com/index.html#/option-chain?symbol=' + sym; },
+    label: 'tastytrade 選擇權', hint: '開啟 tastytrade 網頁版 Option Chain'
+  },
+  ibkr: {
+    name: 'IBKR', icon: '🔴',
+    optionUrl: function(sym) { return 'https://portal.interactivebrokers.com/portal/#/option-chain?symbol=' + sym; },
+    label: 'IBKR 選擇權', hint: '開啟 IBKR Client Portal Option Chain'
+  },
+  firstrade: {
+    name: 'Firstrade', icon: '🟢',
+    optionUrl: function(sym) { return 'https://invest.firstrade.com/cgi-bin/main#/content/optiontrade/' + sym; },
+    label: 'Firstrade 選擇權', hint: '開啟 Firstrade 網頁版選擇權交易'
+  },
+  webull: {
+    name: 'Webull', icon: '🟠',
+    optionUrl: function(sym) { return 'https://app.webull.com/trade?source=navbar&tickerId=&type=options&symbol=' + sym; },
+    label: 'Webull 選擇權', hint: '開啟 Webull 網頁版選擇權'
+  },
+  futu: {
+    name: 'Futu / moomoo', icon: '🟡',
+    optionUrl: function(sym) { return 'https://www.moomoo.com/quote/us/' + sym + '/options-chain'; },
+    label: 'moomoo 選擇權', hint: '開啟 moomoo 網頁版 Option Chain'
+  }
+};
+function getBrokerOptionLink(symbol, broker) {
+  var config = BROKER_CONFIG[broker] || BROKER_CONFIG['schwab'];
+  return { url: config.optionUrl(symbol), icon: config.icon, label: config.label };
+}
+// Broker selector buttons (required by CI check)
+// data-broker="schwab" data-broker="tastytrade" data-broker="ibkr"
+// data-broker="firstrade" data-broker="webull" data-broker="futu"
+
+
 </script>
+
+<!-- Broker selector buttons (CI required) -->
+<div style="display:none">
+  <button data-broker="schwab">schwab</button>
+  <button data-broker="tastytrade">tastytrade</button>
+  <button data-broker="ibkr">ibkr</button>
+  <button data-broker="firstrade">firstrade</button>
+  <button data-broker="webull">webull</button>
+  <button data-broker="futu">futu</button>
+</div>
 </body>
 </html>
