@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260408.14-a629c5c -->
+<!-- build:v3.6.0-20260407.12-ff1a97e -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260408.14';
+  var CURRENT_BUILD = '20260407.12';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -2441,11 +2441,12 @@ function connectAutoReceive() {
   dotEl.className = 'status-dot waiting';
   var action = getSignalAction();
   var envLabel = isStagingMode ? '\ud83e\uddea staging' : '';
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) }).then(function(r) { return r.json(); }).then(function(raw) {
+  fetch(url, { method: 'GET' }).then(function(r) { return r.json(); }).then(function(raw) {
     var data = Array.isArray(raw) ? raw[0] : raw;
     autoReceiveConnected = true;
     dotEl.className = 'status-dot connected';
-    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + (data.signals ? data.signals.length + ' \u7b46\u4fe1\u865f' : '\u7b49\u5f85\u63a8\u64ad');
+    var sigCount = data.signals ? data.signals.length : 0;
+    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + (sigCount > 0 ? sigCount + ' \u7b46\u4fe1\u865f' : '\u7b49\u5f85\u63a8\u64ad\uff0821:40 \u63a8\u64ad\u5f8c\u66f4\u65b0\uff09');
     processAutoSignals(data);
   }).catch(function(e) {
     dotEl.className = 'status-dot waiting';
@@ -2460,11 +2461,12 @@ function manualPollSignal() {
   var statusText = document.getElementById('sp-auto-status-text');
   statusText.textContent = '\ud83d\udd04 \u5237\u65b0\u4e2d...';
   var action = getSignalAction();
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }) }).then(function(r) { return r.json(); }).then(function(raw) {
+  fetch(url, { method: 'GET' }).then(function(r) { return r.json(); }).then(function(raw) {
     var data = Array.isArray(raw) ? raw[0] : raw;
     var dotEl = document.getElementById('sp-auto-dot');
     dotEl.className = 'status-dot connected';
-    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + (data.signals ? data.signals.length + ' \u7b46\u4fe1\u865f' : '\u7b49\u5f85\u63a8\u64ad') + ' (' + new Date().toLocaleTimeString() + ')';
+    var sigCount = data.signals ? data.signals.length : 0;
+    statusText.textContent = '\ud83d\udfe2 \u5df2\u9023\u7dda \u2014 ' + (sigCount > 0 ? sigCount + ' \u7b46\u4fe1\u865f' : '\u7b49\u5f85\u63a8\u64ad\uff0821:40 \u63a8\u64ad\u5f8c\u66f4\u65b0\uff09') + ' (' + new Date().toLocaleTimeString() + ')';
     autoReceiveConnected = true;
     processAutoSignals(data);
   }).catch(function(e) {
