@@ -743,6 +743,8 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 .btn-suspend:hover { background: var(--color-error); color: #fff; }
 .btn-role { background: var(--color-purple-highlight); color: var(--color-purple); border: 1px solid var(--color-purple); }
 .btn-role:hover { background: var(--color-purple); color: #fff; }
+.btn-reset-mfa { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid #f59e0b; }
+.btn-reset-mfa:hover { background: #f59e0b; color: #fff; }
 .sync-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-top: var(--space-6); }
 .sync-card h4 { font-size: var(--text-sm); font-weight: 700; margin-bottom: var(--space-3); }
 .sync-card p { font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.6; }
@@ -6441,6 +6443,7 @@ function renderStudentTable(students) {
     } else {
       actions += '<button class="btn-sm btn-role" onclick="updateStudentRole(\'' + s.id + '\',\'admin\')">設為管理員</button>';
     }
+    actions += ' <button class="btn-sm btn-reset-mfa" onclick="resetStudentMFA(\'' + s.id + '\',\'' + email + '\')" title="清除 2FA 綁定，讓學生重新設定">重置 2FA</button>';
 
     return '<tr><td>' + name + '</td><td>' + email + '</td><td>' + roleBadge + '</td><td>' + statusBadge + '</td><td>' + skool + '</td><td>' + date + '</td><td style="white-space:nowrap">' + actions + '</td></tr>';
   }).join('');
@@ -6480,6 +6483,20 @@ async function updateStudentRole(userId, newRole) {
     alert('更新失敗：' + error.message);
   } else {
     loadStudents();
+  }
+}
+
+async function resetStudentMFA(userId, email) {
+  if (!supabaseClient) return;
+  if (!confirm('確定要重置「' + email + '」的兩步驟驗證嗎？\n\n清除後學生需重新掃描 QR Code 綁定驗證器。')) return;
+
+  try {
+    // 呼叫 Supabase RPC 刪除該用戶的所有 mfa_factors
+    const { error } = await supabaseClient.rpc('admin_reset_mfa', { target_user_id: userId });
+    if (error) throw error;
+    alert('✅ ' + email + ' 的 2FA 已重置\n請通知學生重新登入並重新綁定驗證器。');
+  } catch (err) {
+    alert('重置失敗：' + err.message + '\n\n請至 Supabase 後台手動刪除 auth.mfa_factors 中對應記錄。');
   }
 }
 
