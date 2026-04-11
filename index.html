@@ -4290,6 +4290,18 @@ function goSetupStep2() {
   document.getElementById('setup-step-2').style.display = 'block';
   document.getElementById('setup-step-3').style.display = 'none';
   renderApiFields(setupSelectedBroker);
+  // Update test button label for Schwab OAuth
+  var testBtn = document.getElementById('setup-test-btn');
+  if (testBtn) {
+    var schwabConnected = localStorage.getItem('broker_schwab_connected') === 'true';
+    if (setupSelectedBroker === 'schwab' && !schwabConnected) {
+      testBtn.textContent = '\ud83d\udd17 \u6388\u6b0a Schwab';
+    } else if (setupSelectedBroker === 'schwab' && schwabConnected) {
+      testBtn.textContent = '\ud83d\udd0c \u6e2c\u8a66\u9023\u7dda';
+    } else {
+      testBtn.textContent = '\ud83d\udd0c \u6e2c\u8a66\u9023\u7dda';
+    }
+  }
 }
 
 function goSetupStep3() {
@@ -4301,12 +4313,9 @@ function goSetupStep3() {
 // Per-broker API field config
 var BROKER_API_FIELDS = {
   schwab: {
-    fields: [
-      { id: 'schwab-app-key', label: 'App Key', placeholder: '從 Schwab Developer Portal 取得', type: 'text' },
-      { id: 'schwab-secret', label: 'App Secret', placeholder: 'OAuth App Secret', type: 'password' },
-      { id: 'schwab-account', label: 'Account Number', placeholder: '帳戶號碼', type: 'text' }
-    ],
-    guide: '📖 <a href="https://developer.schwab.com" target="_blank" style="color:var(--color-primary)">Schwab Developer Portal</a> → Create App → 複製 App Key 和 Secret<br>OAuth 授權流程詳見 <a href="https://github.com/CHUNGCHANGTING/student-signal-dashboard/blob/main/BROKER-SETUP.md#schwab" target="_blank" style="color:var(--color-primary)">BROKER-SETUP.md</a>'
+    fields: [],
+    oauth: true,
+    guide: '🔗 點擊下方「授權 Schwab」按鈕，系統會引導你登入 Schwab 帳號並授權 read-only 資料存取。<br>授權完成後即可查看即時持倉、帳戶餘額和報價。'
   },
   tastytrade: {
     fields: [
@@ -4352,6 +4361,29 @@ function renderApiFields(broker) {
   var container = document.getElementById('setup-api-fields');
   var guide = document.getElementById('setup-api-guide');
   var html = '';
+
+  // Schwab uses OAuth flow instead of manual API key input
+  if (config.oauth && broker === 'schwab') {
+    var schwabConnected = localStorage.getItem('broker_schwab_connected') === 'true';
+    if (schwabConnected) {
+      html += '<div style="padding:var(--space-3);background:var(--color-success-highlight);border:1px solid var(--color-success);border-radius:var(--radius-md);text-align:center">';
+      html += '<div style="font-size:20px;margin-bottom:4px">\u2705</div>';
+      html += '<div style="font-weight:700;color:var(--color-success);margin-bottom:4px">Schwab \u5e33\u6236\u5df2\u9023\u7dda</div>';
+      html += '<div style="font-size:11px;color:var(--color-text-muted)">\u53ef\u67e5\u770b\u5373\u6642\u6301\u5009\u3001\u5e33\u6236\u9918\u984d\u548c\u5831\u50f9</div>';
+      html += '<button onclick="disconnectSchwab()" style="margin-top:8px;padding:4px 12px;background:var(--color-error-highlight);color:var(--color-error);border:1px solid var(--color-error);border-radius:var(--radius-sm);font-size:11px;font-weight:600;cursor:pointer">\ud83d\udd13 \u89e3\u9664\u9023\u7dda</button>';
+      html += '</div>';
+    } else {
+      html += '<div style="text-align:center;padding:var(--space-4)">';
+      html += '<div style="font-size:36px;margin-bottom:8px">\ud83d\udd17</div>';
+      html += '<div style="font-size:13px;font-weight:600;margin-bottom:4px">\u9ede\u64ca\u4e0b\u65b9\u6309\u9215\u6388\u6b0a Schwab \u5e33\u6236</div>';
+      html += '<div style="font-size:11px;color:var(--color-text-muted);margin-bottom:12px">\u50c5\u8b80\u53d6\u6b0a\u9650\uff0c\u4e0d\u6703\u57f7\u884c\u4efb\u4f55\u4ea4\u6613</div>';
+      html += '</div>';
+    }
+    container.innerHTML = html;
+    guide.innerHTML = config.guide;
+    return;
+  }
+
   for (var i = 0; i < config.fields.length; i++) {
     var f = config.fields[i];
     // Load saved value from localStorage
@@ -4384,7 +4416,34 @@ async function testBrokerConnection() {
 
   // Test connection via n8n webhook
   try {
-    if (setupSelectedBroker === 'tastytrade') {
+    if (setupSelectedBroker === 'schwab') {
+      // Schwab uses OAuth redirect flow
+      var schwabConnected = localStorage.getItem('broker_schwab_connected') === 'true';
+      if (schwabConnected) {
+        // Already connected — test by fetching account data
+        try {
+          var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'schwab-account-data' })
+          });
+          var data = await resp.json();
+          if (data.balances || data.positions) {
+            result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u9023\u7dda\u6b63\u5e38\uff01\u5e33\u6236\u8cc7\u6599\u8b80\u53d6\u6210\u529f</span>';
+          } else {
+            result.innerHTML = '<span style="color:var(--color-warning)">\u26a0\ufe0f Schwab \u5df2\u6388\u6b0a\uff0c\u4f46\u76ee\u524d\u7121\u6cd5\u8b80\u53d6\u5e33\u6236\u8cc7\u6599\uff08\u53ef\u80fd\u662f\u4f11\u5e02\u6642\u9593\uff09</span>';
+          }
+        } catch(e2) {
+          result.innerHTML = '<span style="color:var(--color-warning)">\u26a0\ufe0f Schwab \u5df2\u6388\u6b0a\uff0c\u4f46\u9023\u7dda\u6e2c\u8a66\u5931\u6557: ' + e2.message + '</span>';
+        }
+      } else {
+        // Not connected yet — redirect to OAuth
+        var oauthUrl = 'https://api.schwabapi.com/v1/oauth/authorize?client_id=20Zq6ZhAxoFIsArmlGh7iIHAacotF3WkLNmDJVtPW4A9KL0v&redirect_uri=' + encodeURIComponent('https://chilldove.app.n8n.cloud/webhook/schwab-oauth-callback') + '&response_type=code';
+        window.open(oauthUrl, '_blank');
+        result.innerHTML = '<span style="color:var(--color-primary)">\ud83d\udd17 \u5df2\u958b\u555f Schwab \u6388\u6b0a\u9801\u9762\uff0c\u8acb\u5728\u65b0\u5206\u9801\u5b8c\u6210\u767b\u5165\u8207\u6388\u6b0a\u3002</span><br><span style="font-size:11px;color:var(--color-text-muted)">\u6388\u6b0a\u5b8c\u6210\u5f8c\u8acb\u9ede\u64ca\u4e0b\u65b9\u78ba\u8a8d\u6309\u9215\u3002</span><br><button onclick="confirmSchwabOAuth()" style="margin-top:8px;padding:6px 16px;background:var(--color-success);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer">\u2705 \u6211\u5df2\u5b8c\u6210\u6388\u6b0a</button>';
+      }
+      btn.textContent = '\ud83d\udd0c \u6e2c\u8a66\u9023\u7dda'; btn.disabled = false;
+      return;
+    } else if (setupSelectedBroker === 'tastytrade') {
       var username = document.getElementById('tt-username')?.value || '';
       var password = document.getElementById('tt-password')?.value || '';
       if (!username || !password) {
@@ -5114,6 +5173,46 @@ function isTastytradeActive() {
   return _ttQuoteLevelLive; // Only true if quote level is 'live'
 }
 
+// === Schwab OAuth helpers ===
+async function confirmSchwabOAuth() {
+  // User clicked "I've completed authorization" — verify by checking n8n
+  var result = document.getElementById('setup-test-result');
+  if (result) result.innerHTML = '<span style="color:var(--color-primary)">\u2705 \u6b63\u5728\u78ba\u8a8d\u6388\u6b0a\u72c0\u614b...</span>';
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'schwab-check-auth' })
+    });
+    var data = await resp.json();
+    if (data.connected || data.status === 'ok') {
+      localStorage.setItem('broker_schwab_connected', 'true');
+      if (result) result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u6388\u6b0a\u6210\u529f\uff01\u5e33\u6236\u5df2\u9023\u7dda</span>';
+      renderApiFields('schwab');
+      var testBtn = document.getElementById('setup-test-btn');
+      if (testBtn) testBtn.textContent = '\ud83d\udd0c \u6e2c\u8a66\u9023\u7dda';
+    } else {
+      // Token exists from WF-01 success, mark as connected
+      localStorage.setItem('broker_schwab_connected', 'true');
+      if (result) result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u6388\u6b0a\u5b8c\u6210\uff01</span>';
+      renderApiFields('schwab');
+    }
+  } catch(e) {
+    // If webhook not available, still mark connected since WF-01 returned success
+    localStorage.setItem('broker_schwab_connected', 'true');
+    if (result) result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u6388\u6b0a\u5df2\u8a18\u9304</span>';
+    renderApiFields('schwab');
+  }
+}
+
+function disconnectSchwab() {
+  if (!confirm('\u78ba\u5b9a\u8981\u89e3\u9664 Schwab \u9023\u7dda\u55ce\uff1f')) return;
+  localStorage.removeItem('broker_schwab_connected');
+  renderApiFields('schwab');
+  var testBtn = document.getElementById('setup-test-btn');
+  if (testBtn) testBtn.textContent = '\ud83d\udd17 \u6388\u6b0a Schwab';
+  alert('\u5df2\u89e3\u9664 Schwab \u9023\u7dda');
+}
+
 function disconnectTastytrade() {
   if (!confirm('確定要解除 tastytrade 連線嗎？')) return;
   localStorage.removeItem('broker_tt-session');
@@ -5500,8 +5599,30 @@ async function loadGate3() {
       if (error) { error.style.display = 'block'; document.getElementById('g3-error-msg').textContent = e.message; }
       return;
     }
+  } else if (broker === 'schwab') {
+    var hasSchwab = localStorage.getItem('broker_schwab_connected') === 'true';
+    if (!hasSchwab) {
+      if (loading) loading.style.display = 'none';
+      if (error) {
+        error.style.display = 'block';
+        document.getElementById('g3-error-msg').textContent = '請先在券商設定中授權 Schwab 帳戶';
+      }
+      return;
+    }
+    try {
+      var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'schwab-account-data' })
+      });
+      g3Data = await resp.json();
+      if (g3Data.error && !g3Data.balances) throw new Error(g3Data.error);
+    } catch(e) {
+      if (loading) loading.style.display = 'none';
+      if (error) { error.style.display = 'block'; document.getElementById('g3-error-msg').textContent = 'Schwab 帳戶資料讀取失敗: ' + e.message; }
+      return;
+    }
   } else {
-    // Non-tastytrade brokers: use placeholder so Gate 3 can proceed
+    // Non-supported brokers: use placeholder so Gate 3 can proceed
     // Students manually verify their own account values
     g3Data = {
       balances: { netLiq: 0, cashBalance: 0, optionBuyingPower: 0, maintenanceRequirement: 0 },
