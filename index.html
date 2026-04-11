@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260409.2-187056a -->
+<!-- build:v3.7.0-20260411.1-exitmonitor -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260409.2';
+  var CURRENT_BUILD = '20260411.1';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -1531,6 +1531,7 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <button class="dash-tab" data-tab="today" onclick="switchDashTab('today',this)" style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:600;border-bottom:2px solid transparent;color:var(--color-text-muted);background:none;border-top:none;border-left:none;border-right:none;cursor:pointer">✅ 今日平倉</button>
   <button class="dash-tab" data-tab="history" onclick="switchDashTab('history',this)" style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:600;border-bottom:2px solid transparent;color:var(--color-text-muted);background:none;border-top:none;border-left:none;border-right:none;cursor:pointer">📁 歷史紀錄</button>
   <button class="dash-tab" data-tab="chart" onclick="switchDashTab('chart',this)" style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:600;border-bottom:2px solid transparent;color:var(--color-text-muted);background:none;border-top:none;border-left:none;border-right:none;cursor:pointer">📈 績效圖</button>
+  <button class="dash-tab" data-tab="exitcfg" onclick="switchDashTab('exitcfg',this)" style="padding:var(--space-2) var(--space-4);font-size:var(--text-xs);font-weight:600;border-bottom:2px solid transparent;color:var(--color-text-muted);background:none;border-top:none;border-left:none;border-right:none;cursor:pointer">⚙️ 平倉設定</button>
 </div>
 
 <!-- Tab: Positions -->
@@ -1593,6 +1594,182 @@ a, button, [role=button] { transition: color var(--transition), background var(-
     <div class="stat-card"><div class="stat-label">勝率</div><div class="stat-value" id="perf-win-rate">—</div></div>
   </div>
 </div>
+
+
+<!-- Exit Monitor Overview Panel (shows above positions when there are alerts) -->
+<div id="exit-monitor-panel" style="display:none;margin-bottom:var(--space-4)"></div>
+
+<!-- Tab: Exit Config Settings -->
+<div id="dash-panel-exitcfg" class="dash-panel" style="display:none">
+<div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-5)">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-5)">
+  <div>
+    <h3 style="font-size:var(--text-lg);font-weight:700;margin-bottom:2px">⚙️ 平倉條件設定</h3>
+    <p style="font-size:var(--text-xs);color:var(--color-text-muted)">自訂三大平倉觸發條件門檻，儲存後即時生效（存於瀏覽器 localStorage）</p>
+  </div>
+  <div style="display:flex;gap:var(--space-2)">
+    <button class="btn-secondary" onclick="resetExitConfigUI()" style="font-size:11px">🔄 恢復預設</button>
+    <button class="btn-primary" onclick="saveExitConfigUI()" style="font-size:11px;padding:var(--space-2) var(--space-4)">💾 儲存設定</button>
+  </div>
+</div>
+
+<!-- Section 1: 虧損金額止損 -->
+<div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-4)">
+  <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+    <span style="font-size:18px">🔴</span>
+    <div>
+      <div style="font-weight:700;font-size:var(--text-sm)">虧損金額止損</div>
+      <div style="font-size:10px;color:var(--color-text-muted)">當虧損達到進場成本的倍數時觸發止損</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)">
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">IC（Iron Condor）</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--color-text-muted)">credit ×</span>
+        <input id="ecfg-loss-ic" type="number" step="0.1" min="0.5" max="5" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+      </div>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">PCS（Bull Put Credit）</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--color-text-muted)">credit ×</span>
+        <input id="ecfg-loss-pcs" type="number" step="0.1" min="0.5" max="5" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+      </div>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">CCS（Bear Call Credit）</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--color-text-muted)">credit ×</span>
+        <input id="ecfg-loss-ccs" type="number" step="0.1" min="0.5" max="5" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+      </div>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">BCDS（Bull Call Debit）</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--color-text-muted)">debit ×</span>
+        <input id="ecfg-loss-bcds" type="number" step="0.1" min="0.1" max="1" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+      </div>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">BPDS（Bear Put Debit）</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--color-text-muted)">debit ×</span>
+        <input id="ecfg-loss-bpds" type="number" step="0.1" min="0.1" max="1" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+      </div>
+    </div>
+  </div>
+  <!-- Profit targets -->
+  <div style="margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--color-divider)">
+    <div style="font-weight:600;font-size:11px;margin-bottom:var(--space-2);color:var(--color-success)">✅ 停利目標</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)">
+      <div>
+        <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">收租策略（IC/PCS/CCS）</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--color-text-muted)">credit ×</span>
+          <input id="ecfg-profit-credit" type="number" step="0.05" min="0.1" max="1" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+          <span style="font-size:10px;color:var(--color-text-muted)">（50% = 獲利一半 credit 時停利）</span>
+        </div>
+      </div>
+      <div>
+        <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">進攻策略（BCDS/BPDS）</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--color-text-muted)">debit ×</span>
+          <input id="ecfg-profit-debit" type="number" step="0.1" min="0.5" max="5" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+          <span style="font-size:10px;color:var(--color-text-muted)">（2.0 = 獲利 2 倍 debit 時停利）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: DTE 到期日 -->
+<div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-4)">
+  <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+    <span style="font-size:18px">⏰</span>
+    <div>
+      <div style="font-weight:700;font-size:var(--text-sm)">DTE 到期日觸發</div>
+      <div style="font-size:10px;color:var(--color-text-muted)">剩餘天數低於門檻時觸發警示或出場</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-3)">
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">⚠️ 黃色警示門檻（天）</label>
+      <input id="ecfg-dte-warn" type="number" step="1" min="1" max="30" style="width:80px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">🔴 一般策略出場門檻（天）</label>
+      <input id="ecfg-dte-exit" type="number" step="1" min="0" max="14" style="width:80px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">🔴 IC 專用出場門檻（天）</label>
+      <input id="ecfg-dte-ic" type="number" step="1" min="0" max="14" style="width:80px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: 盤勢轉向 -->
+<div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4)">
+  <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+    <span style="font-size:18px">📉</span>
+    <div>
+      <div style="font-weight:700;font-size:var(--text-sm)">盤勢轉向觸發</div>
+      <div style="font-size:10px;color:var(--color-text-muted)">大盤方向與持倉相反、或 VIX 飆升時觸發</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:var(--space-3)">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input id="ecfg-bias-enabled" type="checkbox" style="width:16px;height:16px;accent-color:var(--color-primary)">
+      <span style="font-size:var(--text-xs);font-weight:600">啟用盤勢轉向監控</span>
+    </label>
+  </div>
+
+  <div id="ecfg-bias-details" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-3)">
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">大盤轉空 → PCS（偏多收租）</label>
+      <select id="ecfg-bias-pcs" style="padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+        <option value="warn">⚠️ 警示（不自動觸發）</option>
+        <option value="exit">🔴 直接觸發出場</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">大盤轉多 → CCS（偏空收租）</label>
+      <select id="ecfg-bias-ccs" style="padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+        <option value="warn">⚠️ 警示（不自動觸發）</option>
+        <option value="exit">🔴 直接觸發出場</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">VIX 飆升門檻</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:11px;color:var(--color-text-muted)">VIX ≥</span>
+        <input id="ecfg-vix-threshold" type="number" step="1" min="15" max="80" style="width:70px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+      </div>
+    </div>
+    <div>
+      <label style="display:block;font-size:10px;color:var(--color-text-muted);margin-bottom:4px">VIX 飆升 → 收租策略</label>
+      <select id="ecfg-vix-action" style="padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg);color:var(--color-text);font-size:var(--text-xs)">
+        <option value="warn">⚠️ 警示（不自動觸發）</option>
+        <option value="exit">🔴 直接觸發出場</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div id="ecfg-status" style="margin-top:var(--space-4);padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);font-size:11px;display:none"></div>
+
+<!-- Reference note -->
+<div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--color-surface-offset);border-radius:var(--radius-sm);font-size:10px;color:var(--color-text-muted)">
+  <strong>📚 參考依據</strong>（回測驗證）：收租策略止損 = credit × 2.0~2.5 ｜ 進攻策略止損 = debit × 0.5 ｜ DTE ≤ 3~5 天 gamma 風險急增 ｜ VIX ≥ 30 收租策略風險倍增。
+  詳見 <a href="https://github.com/chungchangting/student-signal-dashboard/blob/main/docs/stoploss-backtest-results.md" target="_blank" style="color:var(--color-primary)">Monte Carlo 回測報告</a>
+</div>
+
+</div>
+</div>
+
 
 </section>
 
@@ -1938,20 +2115,43 @@ async function loadPositionDashboard() {
     pnlEl.textContent = _fmtDollar(totalPnl);
     pnlEl.style.color = _pnlColor(totalPnl);
     document.getElementById('dash-stat-today').textContent = todayTrades.length;
-    document.getElementById('dash-stat-exits').textContent = exitTriggered;
+    // Exit stats and banner handled by exit monitor below
 
-    // Exit alert banner
-    const alertBanner = document.getElementById('exit-alert-banner');
-    const triggered = positions.filter(p => p.exit_signal);
-    if (triggered.length > 0 && alertBanner) {
-      alertBanner.style.display = 'block';
-      alertBanner.textContent = '⚠️ ' + triggered.length + ' 個部位已觸發出場條件，請確認後手動執行出場操作。';
-    } else if (alertBanner) {
-      alertBanner.style.display = 'none';
+    // Run exit monitor on all positions
+    var marketState = _getCurrentMarketState();
+    var evaluated = runExitMonitor(positions, marketState);
+    _openPositions = evaluated;
+
+    // Update exit stats with combined server + local signals
+    var localExitCount = evaluated.filter(function(p) { return p._exit_signal_local || p.exit_signal; }).length;
+    var localWarnCount = evaluated.filter(function(p) { return p.exit_evaluation && p.exit_evaluation.highest_priority === 'warn' && !p._exit_signal_local && !p.exit_signal; }).length;
+    document.getElementById('dash-stat-exits').textContent = localExitCount;
+
+    // Enhanced exit alert banner
+    var alertBanner2 = document.getElementById('exit-alert-banner');
+    if (alertBanner2) {
+      if (localExitCount > 0) {
+        alertBanner2.style.display = 'block';
+        alertBanner2.style.background = 'var(--color-error-highlight)';
+        alertBanner2.style.borderColor = 'var(--color-error)';
+        alertBanner2.style.color = 'var(--color-error)';
+        alertBanner2.innerHTML = '🔴 <strong>' + localExitCount + ' 個部位已觸發平倉條件</strong>，請確認後執行出場操作。' + (localWarnCount > 0 ? ' 另有 ' + localWarnCount + ' 個部位處於警示狀態。' : '');
+      } else if (localWarnCount > 0) {
+        alertBanner2.style.display = 'block';
+        alertBanner2.style.background = 'var(--color-warning-highlight)';
+        alertBanner2.style.borderColor = 'var(--color-warning)';
+        alertBanner2.style.color = 'var(--color-warning)';
+        alertBanner2.innerHTML = '⚠️ ' + localWarnCount + ' 個部位處於警示狀態，請密切關注。';
+      } else {
+        alertBanner2.style.display = 'none';
+      }
     }
 
-    // Render positions table
-    _renderPositions(positions);
+    // Render enhanced positions table with exit evaluation
+    _renderPositionsWithExit(evaluated);
+
+    // Render exit monitor panel
+    _renderExitMonitorPanel(evaluated);
 
     // Render today tab
     _renderToday(todayTrades);
@@ -2029,7 +2229,7 @@ function toggleAutoMode() {
 
 // --- Tab switching ---
 function switchDashTab(tab, el) {
-  const panels = ['positions','today','history','chart'];
+  const panels = ['positions','today','history','chart','exitcfg'];
   panels.forEach(p => {
     const panel = document.getElementById('dash-panel-' + p);
     if (panel) panel.style.display = (p === tab) ? '' : 'none';
@@ -6714,6 +6914,476 @@ function exportHistoryCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+
+// ============================================================
+// EXIT MONITOR — 平倉條件自動監控 v1.0
+// 功能：虧損金額止損、DTE 到期日觸發、盤勢轉向觸發
+// ============================================================
+
+// ── 0. 預設平倉條件常數（回測結果）──────────────────────────
+var EXIT_RULES_DEFAULT = {
+  loss: {
+    IC:   { multiplier: 2.5, label: 'credit × 2.5' },
+    PCS:  { multiplier: 2.0, label: 'credit × 2.0' },
+    CCS:  { multiplier: 2.0, label: 'credit × 2.0' },
+    BCDS: { multiplier: 0.5, label: 'debit × 0.5' },
+    BPDS: { multiplier: 0.5, label: 'debit × 0.5' },
+  },
+  profit: {
+    IC:   { multiplier: 0.5, label: 'credit × 50%' },
+    PCS:  { multiplier: 0.5, label: 'credit × 50%' },
+    CCS:  { multiplier: 0.5, label: 'credit × 50%' },
+    BCDS: { multiplier: 2.0, label: 'debit × 2.0' },
+    BPDS: { multiplier: 2.0, label: 'debit × 2.0' },
+  },
+  dte: {
+    warn_days: 7,
+    exit_days: 3,
+    ic_exit_days: 5,
+  },
+  bias: {
+    enabled: true,
+    pcs_bearish_action: 'warn',
+    ccs_bullish_action: 'warn',
+    vix_spike_threshold: 30,
+    vix_spike_action: 'warn',
+  }
+};
+
+// ── 1. 學生個人設定存取（localStorage）──────────────────────
+function getExitConfig() {
+  try {
+    var saved = localStorage.getItem('ose_exit_config');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      return _deepMergeExit(JSON.parse(JSON.stringify(EXIT_RULES_DEFAULT)), parsed);
+    }
+  } catch(e) { console.warn('exit config parse error:', e); }
+  return JSON.parse(JSON.stringify(EXIT_RULES_DEFAULT));
+}
+
+function saveExitConfig(config) {
+  try {
+    localStorage.setItem('ose_exit_config', JSON.stringify(config));
+  } catch(e) { console.warn('exit config save error:', e); }
+}
+
+function _deepMergeExit(target, source) {
+  for (var key in source) {
+    if (source.hasOwnProperty(key)) {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        if (!target[key]) target[key] = {};
+        _deepMergeExit(target[key], source[key]);
+      } else {
+        target[key] = source[key];
+      }
+    }
+  }
+  return target;
+}
+
+// ── 2. 核心：Exit Monitor 判斷引擎 ─────────────────────────
+function evaluateExitConditions(position, marketState, config) {
+  var signals = [];
+  var p = position;
+
+  var strategy = _normalizeStrategy(p.strategy || '');
+  var isCredit = ['IC', 'PCS', 'CCS'].indexOf(strategy) >= 0;
+  var isDebit  = ['BCDS', 'BPDS'].indexOf(strategy) >= 0;
+
+  var entryCredit = parseFloat(p.credit_received || p.cost_basis || 0);
+  var entryDebit  = parseFloat(p.debit_paid || p.cost_basis || 0);
+  var entryCost   = isCredit ? entryCredit : entryDebit;
+
+  var currentPnl = parseFloat(p.current_pnl_dollar || 0);
+
+  // ─── 檢查 1：虧損金額止損 ───────────────────────────────
+  if (entryCost > 0) {
+    var lossRule = config.loss[strategy];
+    if (lossRule) {
+      var maxLossAmount = entryCost * lossRule.multiplier * (parseFloat(p.quantity) || 1) * 100;
+      var currentLoss = Math.abs(Math.min(0, currentPnl));
+
+      if (currentPnl < 0 && currentLoss >= maxLossAmount) {
+        signals.push({
+          type: 'MAX_LOSS_STOP', priority: 'exit',
+          label: '🔴 止損觸發',
+          detail: '虧損 $' + currentLoss.toFixed(2) + ' 已達止損線 $' + maxLossAmount.toFixed(2) + '（' + lossRule.label + '）',
+          action: '建議立即平倉',
+        });
+      } else if (currentPnl < 0 && currentLoss >= maxLossAmount * 0.8) {
+        signals.push({
+          type: 'LOSS_WARNING', priority: 'warn',
+          label: '🟡 接近止損',
+          detail: '虧損 $' + currentLoss.toFixed(2) + ' 已達止損線 80%（$' + maxLossAmount.toFixed(2) + '）',
+          action: '密切關注，準備平倉',
+        });
+      }
+    }
+
+    // 止盈
+    var profitRule = config.profit[strategy];
+    if (profitRule && currentPnl > 0) {
+      var targetProfit = entryCost * profitRule.multiplier * (parseFloat(p.quantity) || 1) * 100;
+      if (currentPnl >= targetProfit) {
+        signals.push({
+          type: 'TAKE_PROFIT_FULL', priority: 'exit',
+          label: '✅ 停利觸發',
+          detail: '獲利 $' + currentPnl.toFixed(2) + ' 已達停利目標 $' + targetProfit.toFixed(2) + '（' + profitRule.label + '）',
+          action: '建議獲利了結',
+        });
+      }
+    }
+  }
+
+  // ─── 檢查 2：DTE 到期日觸發 ─────────────────────────────
+  var dte = _parseDTEForExit(p);
+  if (dte !== null) {
+    var exitDays = strategy === 'IC' ? config.dte.ic_exit_days : config.dte.exit_days;
+    var warnDays = config.dte.warn_days;
+
+    if (dte <= 0) {
+      signals.push({
+        type: 'DTE_DECAY_EXIT', priority: 'exit',
+        label: '🔴 已到期',
+        detail: '部位已到期（DTE = ' + dte + '），必須處理',
+        action: '立即平倉或確認自動到期結算',
+      });
+    } else if (dte <= exitDays) {
+      signals.push({
+        type: 'DTE_DECAY_EXIT', priority: 'exit',
+        label: '⏰ DTE 時間停損',
+        detail: 'DTE ' + dte + ' 天 ≤ ' + exitDays + ' 天，接近到期風險急增',
+        action: strategy === 'IC' ? '建議收回 IC 或 roll' : '建議平倉了結',
+      });
+    } else if (dte <= warnDays) {
+      signals.push({
+        type: 'DTE_WARNING', priority: 'warn',
+        label: '🟡 DTE 警示',
+        detail: 'DTE ' + dte + ' 天 ≤ ' + warnDays + ' 天，Theta 衰減加速',
+        action: isCredit ? '觀察是否達停利目標' : '考慮減倉或 roll',
+      });
+    }
+  }
+
+  // ─── 檢查 3：盤勢轉向觸發 ───────────────────────────────
+  if (config.bias.enabled && marketState) {
+    var bias = marketState.bias;
+    var vix  = parseFloat(marketState.vix) || 0;
+
+    if (strategy === 'PCS' && bias === 'bearish') {
+      var act = config.bias.pcs_bearish_action;
+      signals.push({
+        type: act === 'exit' ? 'STRUCTURE_STOP' : 'BIAS_WARNING',
+        priority: act,
+        label: act === 'exit' ? '🔺 盤勢止損' : '🟡 盤勢警示',
+        detail: '大盤轉空，偏多收租（PCS）方向不利',
+        action: act === 'exit' ? '建議立即平倉 PCS' : '密切關注大盤走勢，考慮減倉',
+      });
+    }
+
+    if (strategy === 'CCS' && bias === 'bullish') {
+      var act2 = config.bias.ccs_bullish_action;
+      signals.push({
+        type: act2 === 'exit' ? 'STRUCTURE_STOP' : 'BIAS_WARNING',
+        priority: act2,
+        label: act2 === 'exit' ? '🔺 盤勢止損' : '🟡 盤勢警示',
+        detail: '大盤轉多，偏空收租（CCS）方向不利',
+        action: act2 === 'exit' ? '建議立即平倉 CCS' : '密切關注大盤走勢，考慮減倉',
+      });
+    }
+
+    if (vix >= config.bias.vix_spike_threshold && isCredit) {
+      var act3 = config.bias.vix_spike_action;
+      signals.push({
+        type: act3 === 'exit' ? 'STRUCTURE_STOP' : 'VIX_WARNING',
+        priority: act3,
+        label: act3 === 'exit' ? '🔺 VIX 止損' : '🟡 VIX 警示',
+        detail: 'VIX ' + vix.toFixed(1) + ' ≥ ' + config.bias.vix_spike_threshold + '，收租策略風險急增',
+        action: act3 === 'exit' ? '建議平倉所有收租部位' : '密切關注 VIX，可能需減倉',
+      });
+    }
+
+    if (strategy === 'BCDS' && bias === 'bearish') {
+      signals.push({
+        type: 'BIAS_WARNING', priority: 'warn',
+        label: '🟡 逆勢警示',
+        detail: '偏多進攻（BCDS）在大盤轉空環境，方向不利',
+        action: '考慮停損或縮小部位',
+      });
+    }
+    if (strategy === 'BPDS' && bias === 'bullish') {
+      signals.push({
+        type: 'BIAS_WARNING', priority: 'warn',
+        label: '🟡 逆勢警示',
+        detail: '偏空進攻（BPDS）在大盤轉多環境，方向不利',
+        action: '考慮停損或縮小部位',
+      });
+    }
+  }
+
+  // ─── 結果彙總 ───────────────────────────────────────────
+  var hasPriExit = false, hasPriWarn = false;
+  for (var si = 0; si < signals.length; si++) {
+    if (signals[si].priority === 'exit') hasPriExit = true;
+    if (signals[si].priority === 'warn') hasPriWarn = true;
+  }
+  var highest = hasPriExit ? 'exit' : hasPriWarn ? 'warn' : 'ok';
+
+  var summary = signals.length === 0
+    ? '✓ 所有平倉條件正常'
+    : signals.map(function(s){ return s.label; }).join(' | ');
+
+  return { signals: signals, highest_priority: highest, summary: summary };
+}
+
+// ── 3. 輔助函式 ─────────────────────────────────────────────
+function _normalizeStrategy(str) {
+  var s = str.toUpperCase();
+  if (s.indexOf('IRON') >= 0 || s === 'IC')   return 'IC';
+  if (s.indexOf('BULL_PUT') >= 0 || s === 'PCS' || s.indexOf('PUT_CREDIT') >= 0)  return 'PCS';
+  if (s.indexOf('BEAR_CALL') >= 0 || s === 'CCS' || s.indexOf('CALL_CREDIT') >= 0) return 'CCS';
+  if (s.indexOf('BULL_CALL') >= 0 || s === 'BCDS' || s.indexOf('CALL_DEBIT') >= 0)  return 'BCDS';
+  if (s.indexOf('BEAR_PUT') >= 0 || s === 'BPDS' || s.indexOf('PUT_DEBIT') >= 0)   return 'BPDS';
+  if (s.indexOf('CREDIT') >= 0) return 'PCS';
+  if (s.indexOf('DEBIT') >= 0)  return 'BCDS';
+  return 'PCS';
+}
+
+function _parseDTEForExit(position) {
+  var exp = position.expiration_date || position.expiration || position.expiry || '';
+  if (!exp) return position.dte !== null && position.dte !== undefined ? parseInt(position.dte) : null;
+  var expDate = new Date(exp);
+  if (isNaN(expDate.getTime())) return null;
+  var now = new Date();
+  var diffMs = expDate.getTime() - now.getTime();
+  return Math.ceil(diffMs / 86400000);
+}
+
+// ── 4. 批次監控 ─────────────────────────────────────────────
+function runExitMonitor(positions, marketState) {
+  var config = getExitConfig();
+  return positions.map(function(p) {
+    var evaluation = evaluateExitConditions(p, marketState, config);
+    var exitSig = null;
+    for (var i = 0; i < evaluation.signals.length; i++) {
+      if (evaluation.signals[i].priority === 'exit') { exitSig = evaluation.signals[i].type; break; }
+    }
+    return Object.assign({}, p, {
+      exit_evaluation: evaluation,
+      _exit_signal_local: evaluation.highest_priority === 'exit',
+      _exit_reason_local: exitSig,
+    });
+  });
+}
+
+// ── 5. 取得當前市場狀態 ─────────────────────────────────────
+function _getCurrentMarketState() {
+  var bias = (typeof g1State !== 'undefined' && g1State.bias) ? g1State.bias : 'neutral';
+  var vix = 0;
+  if (typeof g1State !== 'undefined' && !isNaN(g1State.ivr)) vix = g1State.ivr;
+  var spyDisplay = document.getElementById('g0-bias-display');
+  var spyChange = 0;
+  if (spyDisplay) {
+    var match = spyDisplay.textContent.match(/([+-]?\d+\.?\d*)%/);
+    if (match) spyChange = parseFloat(match[1]);
+  }
+  return { bias: bias, vix: vix, spy_change: spyChange };
+}
+
+// ── 6. Enhanced Positions Rendering with Exit Eval ──────────
+function _renderPositionsWithExit(positions) {
+  var tbody = document.getElementById('positions-tbody');
+  if (!tbody) return;
+  if (!positions || positions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--color-text-muted);padding:var(--space-6)">目前無活躍部位</td></tr>';
+    return;
+  }
+  tbody.innerHTML = positions.map(function(p) {
+    var ev = p.exit_evaluation || { signals: [], highest_priority: 'ok', summary: '✓ 正常' };
+    var hasSrvExit = p.exit_signal;
+    var hasLocalExit = p._exit_signal_local;
+    var effectiveExit = hasSrvExit || hasLocalExit;
+    var effectivePriority = effectiveExit ? 'exit' : ev.highest_priority;
+
+    // Badge
+    var badge;
+    if (effectivePriority === 'exit') {
+      var exitSig = ev.signals.filter(function(s){ return s.priority === 'exit'; })[0];
+      var exitLabel = hasSrvExit ? _exitBadge(true, p.exit_reason) : '<span style="background:#fee2e2;color:#dc2626;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600">' + (exitSig ? exitSig.label : '🔴 觸發') + '</span>';
+      badge = exitLabel;
+    } else if (effectivePriority === 'warn') {
+      var warnSig = ev.signals.filter(function(s){ return s.priority === 'warn'; })[0];
+      badge = '<span style="background:#fef9c3;color:#ca8a04;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600">' + (warnSig ? warnSig.label : '🟡 警示') + '</span>';
+    } else {
+      badge = _exitBadge(p.exit_signal, p.exit_reason);
+    }
+
+    var pnlD = parseFloat(p.current_pnl_dollar);
+    var pnlP = parseFloat(p.current_pnl_pct);
+    var dte = _parseDTEForExit(p);
+
+    // Expandable detail
+    var expandId = 'exit-detail-' + (p.id || Math.random().toString(36).slice(2));
+    var detailRows = ev.signals.map(function(s) {
+      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:3px 0;font-size:11px">' +
+        '<span style="white-space:nowrap">' + s.label + '</span>' +
+        '<span style="color:var(--color-text-muted);flex:1">' + s.detail + '</span>' +
+        '<span style="color:' + (s.priority === 'exit' ? 'var(--color-error)' : 'var(--color-warning)') + ';font-weight:600;white-space:nowrap">' + s.action + '</span>' +
+      '</div>';
+    }).join('');
+
+    var rowBg = effectivePriority === 'exit' ? 'background:rgba(220,38,38,0.06)' : effectivePriority === 'warn' ? 'background:rgba(202,138,4,0.06)' : '';
+
+    return '<tr style="' + rowBg + '">' +
+      '<td><strong>' + (p.symbol || '—') + '</strong><br><span style="font-size:11px;color:var(--color-text-muted)">' + (p.strategy || '—') + '</span></td>' +
+      '<td>' + (p.entry_date || '—') + '</td>' +
+      '<td>' + (p.expiration_date || '—') + '</td>' +
+      '<td style="' + (dte !== null && dte <= 7 ? 'color:var(--color-warning);font-weight:700' : '') + '">' + (dte !== null ? dte : '—') + '</td>' +
+      '<td>' + (p.quantity || '—') + '</td>' +
+      '<td>' + (p.cost_basis !== null && p.cost_basis !== undefined ? '$' + parseFloat(p.cost_basis).toFixed(2) : '—') + '</td>' +
+      '<td style="color:' + _pnlColor(pnlD) + ';font-weight:600">' + _fmtDollar(pnlD) + '</td>' +
+      '<td style="color:' + _pnlColor(pnlP) + ';font-weight:600">' + _fmtPct(pnlP) + '</td>' +
+      '<td>' + badge + (ev.signals.length > 0 ? '<button style="margin-left:4px;font-size:9px;padding:1px 5px;background:none;border:1px solid var(--color-border);border-radius:3px;cursor:pointer;color:var(--color-text-muted)" onclick="var el=document.getElementById(\'' + expandId + '\');el.style.display=el.style.display===\'none\'?\'table-row\':\'none\'">' + ev.signals.length + '條</button>' : '') + '</td>' +
+      '<td><button class="btn-secondary" style="font-size:11px;padding:3px 8px" onclick="alert(\'部位 ID: ' + (p.id || '') + '\\n標的: ' + (p.symbol || '') + '\\n請至券商平台執行出場\')">出場</button></td>' +
+    '</tr>' +
+    (ev.signals.length > 0
+      ? '<tr id="' + expandId + '" style="display:none"><td colspan="10" style="padding:8px 16px;background:var(--color-surface-offset)">' + detailRows + '</td></tr>'
+      : '');
+  }).join('');
+}
+
+// ── 7. Exit Monitor Overview Panel ──────────────────────────
+function _renderExitMonitorPanel(positions) {
+  var panel = document.getElementById('exit-monitor-panel');
+  if (!panel) return;
+
+  var exitList = positions.filter(function(p){ return p.exit_evaluation && p.exit_evaluation.highest_priority === 'exit'; });
+  var warnList = positions.filter(function(p){ return p.exit_evaluation && p.exit_evaluation.highest_priority === 'warn'; });
+
+  if (exitList.length === 0 && warnList.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+
+  var cards = '';
+  exitList.forEach(function(p) { cards += _renderExitCard(p, 'exit'); });
+  warnList.forEach(function(p) { cards += _renderExitCard(p, 'warn'); });
+
+  panel.innerHTML = '<div style="font-weight:700;font-size:var(--text-sm);margin-bottom:var(--space-2)">🚨 Exit Monitor 警報</div>' + cards;
+}
+
+function _renderExitCard(p, type) {
+  var ev = p.exit_evaluation;
+  var borderColor = type === 'exit' ? 'var(--color-error)' : 'var(--color-warning)';
+  var bgColor = type === 'exit' ? 'rgba(220,38,38,0.06)' : 'rgba(202,138,4,0.06)';
+  var dte = _parseDTEForExit(p);
+
+  var sigDetails = ev.signals.filter(function(s){ return s.priority === type; }).map(function(s) {
+    return '<div style="font-size:11px;margin-top:2px">' +
+      s.label + ' <span style="color:var(--color-text-muted)">' + s.detail + '</span>' +
+      '<br><span style="font-weight:600;color:' + borderColor + '">' + s.action + '</span>' +
+    '</div>';
+  }).join('');
+
+  return '<div style="border-left:3px solid ' + borderColor + ';background:' + bgColor + ';border-radius:0 var(--radius-md) var(--radius-md) 0;padding:var(--space-3);margin-bottom:var(--space-2)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+      '<strong style="font-size:var(--text-sm)">' + (p.symbol || '') + ' — ' + (p.strategy || '') + '</strong>' +
+      '<span style="font-size:10px;color:var(--color-text-muted)">DTE ' + (dte !== null ? dte : '?') + '</span>' +
+    '</div>' +
+    sigDetails +
+  '</div>';
+}
+
+// ── 8. Exit Config UI ─────────────────────────────────────
+function _loadExitConfigUI() {
+  var cfg = getExitConfig();
+  var el;
+  el = document.getElementById('ecfg-loss-ic'); if (el) el.value = cfg.loss.IC.multiplier;
+  el = document.getElementById('ecfg-loss-pcs'); if (el) el.value = cfg.loss.PCS.multiplier;
+  el = document.getElementById('ecfg-loss-ccs'); if (el) el.value = cfg.loss.CCS.multiplier;
+  el = document.getElementById('ecfg-loss-bcds'); if (el) el.value = cfg.loss.BCDS.multiplier;
+  el = document.getElementById('ecfg-loss-bpds'); if (el) el.value = cfg.loss.BPDS.multiplier;
+  el = document.getElementById('ecfg-profit-credit'); if (el) el.value = cfg.profit.IC.multiplier;
+  el = document.getElementById('ecfg-profit-debit'); if (el) el.value = cfg.profit.BCDS.multiplier;
+  el = document.getElementById('ecfg-dte-warn'); if (el) el.value = cfg.dte.warn_days;
+  el = document.getElementById('ecfg-dte-exit'); if (el) el.value = cfg.dte.exit_days;
+  el = document.getElementById('ecfg-dte-ic'); if (el) el.value = cfg.dte.ic_exit_days;
+  el = document.getElementById('ecfg-bias-enabled'); if (el) el.checked = cfg.bias.enabled;
+  el = document.getElementById('ecfg-bias-pcs'); if (el) el.value = cfg.bias.pcs_bearish_action;
+  el = document.getElementById('ecfg-bias-ccs'); if (el) el.value = cfg.bias.ccs_bullish_action;
+  el = document.getElementById('ecfg-vix-threshold'); if (el) el.value = cfg.bias.vix_spike_threshold;
+  el = document.getElementById('ecfg-vix-action'); if (el) el.value = cfg.bias.vix_spike_action;
+}
+
+function saveExitConfigUI() {
+  var cfg = getExitConfig();
+  var v;
+
+  v = parseFloat(document.getElementById('ecfg-loss-ic').value);   if (!isNaN(v)) cfg.loss.IC.multiplier = v;
+  v = parseFloat(document.getElementById('ecfg-loss-pcs').value);  if (!isNaN(v)) cfg.loss.PCS.multiplier = v;
+  v = parseFloat(document.getElementById('ecfg-loss-ccs').value);  if (!isNaN(v)) cfg.loss.CCS.multiplier = v;
+  v = parseFloat(document.getElementById('ecfg-loss-bcds').value); if (!isNaN(v)) cfg.loss.BCDS.multiplier = v;
+  v = parseFloat(document.getElementById('ecfg-loss-bpds').value); if (!isNaN(v)) cfg.loss.BPDS.multiplier = v;
+
+  v = parseFloat(document.getElementById('ecfg-profit-credit').value);
+  if (!isNaN(v)) { cfg.profit.IC.multiplier = v; cfg.profit.PCS.multiplier = v; cfg.profit.CCS.multiplier = v; }
+  v = parseFloat(document.getElementById('ecfg-profit-debit').value);
+  if (!isNaN(v)) { cfg.profit.BCDS.multiplier = v; cfg.profit.BPDS.multiplier = v; }
+
+  v = parseInt(document.getElementById('ecfg-dte-warn').value);    if (!isNaN(v)) cfg.dte.warn_days = v;
+  v = parseInt(document.getElementById('ecfg-dte-exit').value);    if (!isNaN(v)) cfg.dte.exit_days = v;
+  v = parseInt(document.getElementById('ecfg-dte-ic').value);      if (!isNaN(v)) cfg.dte.ic_exit_days = v;
+
+  cfg.bias.enabled = document.getElementById('ecfg-bias-enabled').checked;
+  cfg.bias.pcs_bearish_action = document.getElementById('ecfg-bias-pcs').value;
+  cfg.bias.ccs_bullish_action = document.getElementById('ecfg-bias-ccs').value;
+  v = parseInt(document.getElementById('ecfg-vix-threshold').value); if (!isNaN(v)) cfg.bias.vix_spike_threshold = v;
+  cfg.bias.vix_spike_action = document.getElementById('ecfg-vix-action').value;
+
+  // Update labels
+  cfg.loss.IC.label = 'credit × ' + cfg.loss.IC.multiplier;
+  cfg.loss.PCS.label = 'credit × ' + cfg.loss.PCS.multiplier;
+  cfg.loss.CCS.label = 'credit × ' + cfg.loss.CCS.multiplier;
+  cfg.loss.BCDS.label = 'debit × ' + cfg.loss.BCDS.multiplier;
+  cfg.loss.BPDS.label = 'debit × ' + cfg.loss.BPDS.multiplier;
+  cfg.profit.IC.label = 'credit × ' + (cfg.profit.IC.multiplier * 100) + '%';
+  cfg.profit.PCS.label = 'credit × ' + (cfg.profit.PCS.multiplier * 100) + '%';
+  cfg.profit.CCS.label = 'credit × ' + (cfg.profit.CCS.multiplier * 100) + '%';
+  cfg.profit.BCDS.label = 'debit × ' + cfg.profit.BCDS.multiplier;
+  cfg.profit.BPDS.label = 'debit × ' + cfg.profit.BPDS.multiplier;
+
+  saveExitConfig(cfg);
+
+  var status = document.getElementById('ecfg-status');
+  if (status) {
+    status.style.display = 'block';
+    status.style.background = 'var(--color-success-highlight)';
+    status.style.color = 'var(--color-success)';
+    status.textContent = '✅ 設定已儲存！下次更新持倉時將使用新設定。';
+    setTimeout(function(){ status.style.display = 'none'; }, 4000);
+  }
+}
+
+function resetExitConfigUI() {
+  localStorage.removeItem('ose_exit_config');
+  _loadExitConfigUI();
+  var status = document.getElementById('ecfg-status');
+  if (status) {
+    status.style.display = 'block';
+    status.style.background = 'var(--color-primary-highlight)';
+    status.style.color = 'var(--color-primary)';
+    status.textContent = '🔄 已恢復為回測建議預設值。';
+    setTimeout(function(){ status.style.display = 'none'; }, 4000);
+  }
+}
+
+// Load config UI on first render
+setTimeout(_loadExitConfigUI, 500);
+
+console.log('[EXIT-MONITOR] v1.0 已載入。平倉條件監控啟動。');
 
 // === Initialize Auth ===
 checkAuth();
