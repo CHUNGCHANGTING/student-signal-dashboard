@@ -5186,6 +5186,8 @@ async function confirmSchwabOAuth() {
     var data = await resp.json();
     if (data.connected || data.status === 'ok') {
       localStorage.setItem('broker_schwab_connected', 'true');
+      localStorage.setItem('g2_broker', 'schwab');
+      selectedBroker = 'schwab';
       if (result) result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u6388\u6b0a\u6210\u529f\uff01\u5e33\u6236\u5df2\u9023\u7dda</span>';
       renderApiFields('schwab');
       var testBtn = document.getElementById('setup-test-btn');
@@ -5193,12 +5195,16 @@ async function confirmSchwabOAuth() {
     } else {
       // Token exists from WF-01 success, mark as connected
       localStorage.setItem('broker_schwab_connected', 'true');
+      localStorage.setItem('g2_broker', 'schwab');
+      selectedBroker = 'schwab';
       if (result) result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u6388\u6b0a\u5b8c\u6210\uff01</span>';
       renderApiFields('schwab');
     }
   } catch(e) {
     // If webhook not available, still mark connected since WF-01 returned success
     localStorage.setItem('broker_schwab_connected', 'true');
+    localStorage.setItem('g2_broker', 'schwab');
+    selectedBroker = 'schwab';
     if (result) result.innerHTML = '<span style="color:var(--color-success)">\u2705 Schwab \u6388\u6b0a\u5df2\u8a18\u9304</span>';
     renderApiFields('schwab');
   }
@@ -5559,8 +5565,25 @@ async function loadGate3() {
   if (error)   error.style.display   = 'none';
   if (content) content.style.display = 'none';
 
+  // Auto-detect Schwab connection if broker not explicitly set
+  var storedBroker = localStorage.getItem('g2_broker');
+  if (!storedBroker || storedBroker === 'tastytrade') {
+    try {
+      var detectResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'schwab-check-auth' })
+      });
+      var detectData = await detectResp.json();
+      if (detectData.connected || detectData.status === 'ok') {
+        localStorage.setItem('g2_broker', 'schwab');
+        localStorage.setItem('broker_schwab_connected', 'true');
+        selectedBroker = 'schwab';
+      }
+    } catch(e) { /* schwab not available, keep current broker */ }
+  }
+
   // Update broker banner label
-  var broker = localStorage.getItem('g2_broker') || selectedBroker || 'tastytrade';
+  var broker = localStorage.getItem('g2_broker') || selectedBroker || (localStorage.getItem('broker_schwab_connected') === 'true' ? 'schwab' : 'tastytrade');
   var BROKER_NAMES = {
     'tastytrade': '🟣 tastytrade',
     'schwab':     '🟦 Schwab / TOS',
@@ -6044,7 +6067,7 @@ function renderOrderSummary() {
     html += '</div>';
 
     // 下單按鈕 — 依選擇的券商顯示不同操作
-    var g4Broker = localStorage.getItem('g2_broker') || selectedBroker || 'tastytrade';
+    var g4Broker = localStorage.getItem('g2_broker') || selectedBroker || (localStorage.getItem('broker_schwab_connected') === 'true' ? 'schwab' : 'tastytrade');
     html += '<div style="margin-top:var(--space-3);display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">';
     if (g4Broker === 'schwab') {
       var tosUrl4 = buildTosUrl(s.symbol, orderText, s.expiry || '');
