@@ -8050,12 +8050,13 @@ console.log('[AUTO-CLOSE] V3-B engine loaded. Admin-only auto-close via Schwab r
 var API_ENDPOINTS = {
   schwab: {
     name: 'Schwab Trader API',
-    url: 'https://api.schwabapi.com/trader/v1/accounts/accountNumbers',
-    method: 'GET',
+    url: 'https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard',
+    method: 'POST',
     icon: '🟦',
     critical: true,
-    description: '下單/平倉核心 API',
-    authCheck: true
+    description: '下單/平倉核心 API（via n8n proxy）',
+    postBody: JSON.stringify({ action: 'schwab-account-data' }),
+    postHeaders: { 'Content-Type': 'application/json' }
   },
   supabase: {
     name: 'Supabase',
@@ -8329,9 +8330,14 @@ async function runApiHealthCheck() {
         mode: 'cors',
         cache: 'no-store'
       };
-      // For HEAD/POST, add headers
+      // For HEAD, add Supabase key
       if (ep.method === 'HEAD') {
         opts.headers = { 'apikey': SUPABASE_ANON_KEY };
+      }
+      // For POST endpoints (e.g. Schwab via n8n proxy)
+      if (ep.method === 'POST' && ep.postBody) {
+        opts.headers = ep.postHeaders || { 'Content-Type': 'application/json' };
+        opts.body = ep.postBody;
       }
 
       var resp = await fetch(ep.url, opts);
