@@ -2139,6 +2139,251 @@ function _fmtPct(v) {
   return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
 }
 
+// ── Schwab Legs → Spread 分組引擎 ────────────────────────────
+// 將 Schwab API 回傳的單腿 positions 按 underlying + expiration
+// 配對為 spread，正確計算 net credit/debit 與策略類型
+function _groupSchwabLegsToSpreads(legs) {
+  // 1. Parse each leg's OCC symbol for underlying, expiration, putCall, strike
+  var parsed = legs.map(function(p, idx) {
+    var sym = (p.optionSymbol || '').trim();
+    // OCC format: "SOFI  260501C00017000" → underlying=SOFI, exp=2026-05-01, type=C, strike=17.000
+    var m = sym.match(/^([A-Z]+)\s+(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/);
+    var underlying = p.symbol || '';
+    var expDate = '';
+    var dte = null;
+    var pc = (p.putCall || '').toUpperCase();
+    var strike = 0;
+    if (m) {
+      underlying = m[1];
+      expDate = '20' + m[2] + '-' + m[3] + '-' + m[4];
+      dte = Math.ceil((new Date(expDate) - new Date()) / 86400000);
+      pc = m[5] === 'C' ? 'CALL' : 'PUT';
+      strike = parseInt(m[6]) / 1000;
+    }
+    return {
+      idx: idx,
+      raw: p,
+      underlying: underlying,
+      expDate: expDate,
+      dte: dte,
+      putCall: pc,
+      strike: strike,
+      qty: p.quantity || 0,        // +N = long, -N = short
+      avgPrice: p.averagePrice || 0,
+      mktVal: p.marketValue || 0,
+      pnl: p.openProfitLoss || 0,
+      description: p.description || ''
+    };
+  });
+
+  // 2. Group by underlying + expiration
+  var groups = {};
+  parsed.forEach(function(leg) {
+    var key = leg.underlying + '|' + leg.expDate;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(leg);
+  });
+
+  // 3. For each group, detect strategy and compute spread-level metrics
+  var spreads = [];
+  var spreadIdx = 0;
+  Object.keys(groups).forEach(function(key) {
+    var grpLegs = groups[key];
+    var parts = key.split('|');
+    var underlying = parts[0];
+    var expDate = parts[1];
+    var dte = grpLegs[0].dte;
+
+    if (grpLegs.length === 1) {
+      // Single leg — naked option, pass through as-is
+      var leg = grpLegs[0];
+      var isShort = leg.qty < 0;
+      spreads.push({
+        id: 'schwab-live-' + spreadIdx++,
+        symbol: underlying,
+        strategy: leg.putCall === 'CALL' ? (isShort ? 'Naked Call' : 'Long Call') : (isShort ? 'Naked Put' : 'Long Put'),
+        entry_date: '—',
+        expiration_date: expDate,
+        expiry_date: expDate,
+        dte: dte,
+        quantity: Math.abs(leg.qty),
+        cost_basis: leg.avgPrice,
+        credit_received: isShort ? leg.avgPrice : 0,
+        debit_paid: isShort ? 0 : leg.avgPrice,
+        current_pnl_dollar: leg.pnl,
+        current_pnl_pct: leg.avgPrice > 0 ? (leg.pnl / (leg.avgPrice * Math.abs(leg.qty) * 100) * 100) : 0,
+        exit_signal: false,
+        exit_reason: null,
+        status: 'open',
+        _schwab_live: true,
+        _legs: [leg]
+      });
+      return;
+    }
+
+    // 2-leg vertical spread
+    if (grpLegs.length === 2) {
+      var allCalls = grpLegs.every(function(l) { return l.putCall === 'CALL'; });
+      var allPuts  = grpLegs.every(function(l) { return l.putCall === 'PUT'; });
+      var shortLeg = grpLegs.find(function(l) { return l.qty < 0; });
+      var longLeg  = grpLegs.find(function(l) { return l.qty > 0; });
+
+      if (!shortLeg || !longLeg) {
+        // Both same direction — not a spread, treat individually
+        grpLegs.forEach(function(leg) {
+          var isShort = leg.qty < 0;
+          spreads.push({
+            id: 'schwab-live-' + spreadIdx++,
+            symbol: underlying, strategy: leg.putCall,
+            entry_date: '—', expiration_date: expDate, expiry_date: expDate, dte: dte,
+            quantity: Math.abs(leg.qty), cost_basis: leg.avgPrice,
+            credit_received: isShort ? leg.avgPrice : 0, debit_paid: isShort ? 0 : leg.avgPrice,
+            current_pnl_dollar: leg.pnl, current_pnl_pct: 0,
+            exit_signal: false, exit_reason: null, status: 'open', _schwab_live: true, _legs: [leg]
+          });
+        });
+        return;
+      }
+
+      // Determine strategy type
+      var contracts = Math.abs(shortLeg.qty);
+      var netPerContract = shortLeg.avgPrice - longLeg.avgPrice; // positive = credit, negative = debit
+      var isNetCredit = netPerContract > 0;
+      var strategy = '';
+      var spreadDesc = '';
+
+      if (allPuts) {
+        if (isNetCredit) {
+          // Short put has higher strike → Bull Put Credit Spread (PCS)
+          strategy = 'PCS';
+          spreadDesc = 'Bull Put Credit Spread $' + Math.min(shortLeg.strike, longLeg.strike) + '/$' + Math.max(shortLeg.strike, longLeg.strike);
+        } else {
+          // Long put has higher strike, paid more → Bear Put Debit Spread (BPDS)
+          strategy = 'BPDS';
+          spreadDesc = 'Bear Put Debit Spread $' + Math.min(shortLeg.strike, longLeg.strike) + '/$' + Math.max(shortLeg.strike, longLeg.strike);
+        }
+      } else if (allCalls) {
+        if (isNetCredit) {
+          // Short call has lower strike → Bear Call Credit Spread (CCS)
+          strategy = 'CCS';
+          spreadDesc = 'Bear Call Credit Spread $' + Math.min(shortLeg.strike, longLeg.strike) + '/$' + Math.max(shortLeg.strike, longLeg.strike);
+        } else {
+          // Long call has lower strike, paid more → Bull Call Debit Spread (BCDS)
+          strategy = 'BCDS';
+          spreadDesc = 'Bull Call Debit Spread $' + Math.min(shortLeg.strike, longLeg.strike) + '/$' + Math.max(shortLeg.strike, longLeg.strike);
+        }
+      } else {
+        strategy = 'Vertical';
+        spreadDesc = 'Vertical Spread';
+      }
+
+      var totalPnl = shortLeg.pnl + longLeg.pnl;
+      var netCreditAbs = isNetCredit ? netPerContract : 0;
+      var netDebitAbs  = isNetCredit ? 0 : Math.abs(netPerContract);
+      var totalCostBasis = Math.abs(netPerContract) * contracts * 100;
+      var pnlPct = totalCostBasis > 0 ? (totalPnl / totalCostBasis * 100) : 0;
+
+      spreads.push({
+        id: 'schwab-live-' + spreadIdx++,
+        symbol: underlying,
+        strategy: strategy,
+        strategy_display: spreadDesc,
+        entry_date: '—',
+        expiration_date: expDate,
+        expiry_date: expDate,
+        dte: dte,
+        quantity: contracts,
+        cost_basis: Math.abs(netPerContract),
+        credit_received: netCreditAbs,
+        debit_paid: netDebitAbs,
+        current_pnl_dollar: totalPnl,
+        current_pnl_pct: pnlPct,
+        exit_signal: false,
+        exit_reason: null,
+        status: 'open',
+        _schwab_live: true,
+        _legs: grpLegs,
+        _leg_details: grpLegs.map(function(l) {
+          return {
+            strike: l.strike, putCall: l.putCall, qty: l.qty,
+            avgPrice: l.avgPrice, mktVal: l.mktVal, pnl: l.pnl,
+            direction: l.qty > 0 ? 'Long' : 'Short'
+          };
+        })
+      });
+      return;
+    }
+
+    // 4-leg Iron Condor
+    if (grpLegs.length === 4) {
+      var puts  = grpLegs.filter(function(l) { return l.putCall === 'PUT'; });
+      var calls = grpLegs.filter(function(l) { return l.putCall === 'CALL'; });
+      if (puts.length === 2 && calls.length === 2) {
+        var contracts4 = Math.abs(grpLegs[0].qty);
+        var totalCredit4 = grpLegs.filter(function(l) { return l.qty < 0; }).reduce(function(s,l) { return s + l.avgPrice; }, 0);
+        var totalDebit4  = grpLegs.filter(function(l) { return l.qty > 0; }).reduce(function(s,l) { return s + l.avgPrice; }, 0);
+        var net4 = totalCredit4 - totalDebit4;
+        var totalPnl4 = grpLegs.reduce(function(s,l) { return s + l.pnl; }, 0);
+        var allStrikes = grpLegs.map(function(l) { return l.strike; }).sort(function(a,b) { return a-b; });
+
+        spreads.push({
+          id: 'schwab-live-' + spreadIdx++,
+          symbol: underlying,
+          strategy: 'IC',
+          strategy_display: 'Iron Condor $' + allStrikes[0] + '/$' + allStrikes[1] + '/$' + allStrikes[2] + '/$' + allStrikes[3],
+          entry_date: '—',
+          expiration_date: expDate,
+          expiry_date: expDate,
+          dte: dte,
+          quantity: contracts4,
+          cost_basis: Math.abs(net4),
+          credit_received: net4 > 0 ? net4 : 0,
+          debit_paid: net4 > 0 ? 0 : Math.abs(net4),
+          current_pnl_dollar: totalPnl4,
+          current_pnl_pct: Math.abs(net4) > 0 ? (totalPnl4 / (Math.abs(net4) * contracts4 * 100) * 100) : 0,
+          exit_signal: false,
+          exit_reason: null,
+          status: 'open',
+          _schwab_live: true,
+          _legs: grpLegs,
+          _leg_details: grpLegs.map(function(l) {
+            return { strike: l.strike, putCall: l.putCall, qty: l.qty, avgPrice: l.avgPrice, pnl: l.pnl, direction: l.qty > 0 ? 'Long' : 'Short' };
+          })
+        });
+        return;
+      }
+    }
+
+    // Fallback: unknown multi-leg — group as single entry
+    var totalPnlFb = grpLegs.reduce(function(s,l) { return s + l.pnl; }, 0);
+    spreads.push({
+      id: 'schwab-live-' + spreadIdx++,
+      symbol: underlying,
+      strategy: grpLegs.length + '-leg',
+      entry_date: '—',
+      expiration_date: expDate,
+      expiry_date: expDate,
+      dte: dte,
+      quantity: Math.abs(grpLegs[0].qty),
+      cost_basis: 0,
+      credit_received: 0,
+      debit_paid: 0,
+      current_pnl_dollar: totalPnlFb,
+      current_pnl_pct: 0,
+      exit_signal: false,
+      exit_reason: null,
+      status: 'open',
+      _schwab_live: true,
+      _legs: grpLegs
+    });
+  });
+
+  console.log('[DASH] Schwab spread grouping:', spreads.map(function(s) {
+    return s.symbol + ' ' + s.strategy + ' cr=' + (s.credit_received||0).toFixed(2) + ' dr=' + (s.debit_paid||0).toFixed(2) + ' pnl=' + s.current_pnl_dollar.toFixed(2);
+  }));
+  return spreads;
+}
+
 // --- Main loader ---
 async function loadPositionDashboard() {
   const dotEl = document.getElementById('live-dot');
@@ -2182,38 +2427,7 @@ async function loadPositionDashboard() {
         });
         const schwabData = await schwabResp.json();
         if (schwabData.positions && schwabData.positions.length > 0) {
-          positions = schwabData.positions.filter(p => p.type === 'OPTION').map((p, idx) => {
-            // Parse expiration from OCC symbol: e.g. "SOFI  260501C00017000" → 2026-05-01
-            const sym = (p.optionSymbol || '').trim();
-            let expirationDate = '';
-            let dte = null;
-            const occMatch = sym.match(/\s+(\d{2})(\d{2})(\d{2})[CP]/);
-            if (occMatch) {
-              expirationDate = '20' + occMatch[1] + '-' + occMatch[2] + '-' + occMatch[3];
-              dte = Math.ceil((new Date(expirationDate) - new Date()) / 86400000);
-            }
-            const costBasis = Math.abs(p.averagePrice * p.quantity * 100);
-            const mktVal = p.marketValue || 0;
-            const pnlDollar = p.openProfitLoss || 0;
-            const pnlPct = costBasis > 0 ? (pnlDollar / costBasis * 100) : 0;
-            return {
-              id: 'schwab-live-' + idx,
-              symbol: p.symbol || '',
-              strategy: p.description || (p.putCall || ''),
-              entry_date: '—',
-              expiration_date: expirationDate,
-              expiry_date: expirationDate,
-              dte: dte,
-              quantity: p.quantity,
-              cost_basis: Math.abs(p.averagePrice),
-              current_pnl_dollar: pnlDollar,
-              current_pnl_pct: pnlPct,
-              exit_signal: false,
-              exit_reason: null,
-              status: 'open',
-              _schwab_live: true
-            };
-          });
+          positions = _groupSchwabLegsToSpreads(schwabData.positions.filter(p => p.type === 'OPTION'));
         }
       } catch(schwabErr) {
         console.warn('[DASH] Schwab live sync failed:', schwabErr);
@@ -7518,7 +7732,7 @@ function _renderPositionsWithExit(positions) {
     var rowBg = effectivePriority === 'exit' ? 'background:rgba(220,38,38,0.06)' : effectivePriority === 'warn' ? 'background:rgba(202,138,4,0.06)' : '';
 
     return '<tr style="' + rowBg + '">' +
-      '<td><strong>' + (p.symbol || '—') + '</strong><br><span style="font-size:11px;color:var(--color-text-muted)">' + (p.strategy || '—') + '</span></td>' +
+      '<td><strong>' + (p.symbol || '—') + '</strong><br><span style="font-size:11px;color:var(--color-text-muted)">' + (p.strategy_display || p.strategy || '—') + '</span></td>' +
       '<td>' + (p.entry_date || '—') + '</td>' +
       '<td>' + (p.expiration_date || '—') + '</td>' +
       '<td style="' + (dte !== null && dte <= 7 ? 'color:var(--color-warning);font-weight:700' : '') + '">' + (dte !== null ? dte : '—') + '</td>' +
@@ -7571,7 +7785,7 @@ function _renderExitCard(p, type) {
 
   return '<div style="border-left:3px solid ' + borderColor + ';background:' + bgColor + ';border-radius:0 var(--radius-md) var(--radius-md) 0;padding:var(--space-3);margin-bottom:var(--space-2)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
-      '<strong style="font-size:var(--text-sm)">' + (p.symbol || '') + ' — ' + (p.strategy || '') + '</strong>' +
+      '<strong style="font-size:var(--text-sm)">' + (p.symbol || '') + ' — ' + (p.strategy_display || p.strategy || '') + '</strong>' +
       '<span style="font-size:10px;color:var(--color-text-muted)">DTE ' + (dte !== null ? dte : '?') + '</span>' +
     '</div>' +
     sigDetails +
