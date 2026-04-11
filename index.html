@@ -2170,8 +2170,56 @@ async function loadPositionDashboard() {
       .gte('close_date', todayStr)
       .order('close_date', { ascending: false });
 
-    const positions = posRes.data || [];
+    let positions = posRes.data || [];
     const todayTrades = todayRes.data || [];
+
+    // ── Schwab Live Sync: if Supabase has no open positions, pull from Schwab API ──
+    if (positions.length === 0 && localStorage.getItem('broker_schwab_connected') === 'true') {
+      try {
+        const schwabResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'schwab-account-data', account: '23668333' })
+        });
+        const schwabData = await schwabResp.json();
+        if (schwabData.positions && schwabData.positions.length > 0) {
+          positions = schwabData.positions.filter(p => p.type === 'OPTION').map((p, idx) => {
+            // Parse expiration from OCC symbol: e.g. "SOFI  260501C00017000" → 2026-05-01
+            const sym = (p.optionSymbol || '').trim();
+            let expirationDate = '';
+            let dte = null;
+            const occMatch = sym.match(/\s+(\d{2})(\d{2})(\d{2})[CP]/);
+            if (occMatch) {
+              expirationDate = '20' + occMatch[1] + '-' + occMatch[2] + '-' + occMatch[3];
+              dte = Math.ceil((new Date(expirationDate) - new Date()) / 86400000);
+            }
+            const costBasis = Math.abs(p.averagePrice * p.quantity * 100);
+            const mktVal = p.marketValue || 0;
+            const pnlDollar = p.openProfitLoss || 0;
+            const pnlPct = costBasis > 0 ? (pnlDollar / costBasis * 100) : 0;
+            return {
+              id: 'schwab-live-' + idx,
+              symbol: p.symbol || '',
+              strategy: p.description || (p.putCall || ''),
+              entry_date: '—',
+              expiration_date: expirationDate,
+              expiry_date: expirationDate,
+              dte: dte,
+              quantity: p.quantity,
+              cost_basis: Math.abs(p.averagePrice),
+              current_pnl_dollar: pnlDollar,
+              current_pnl_pct: pnlPct,
+              exit_signal: false,
+              exit_reason: null,
+              status: 'open',
+              _schwab_live: true
+            };
+          });
+        }
+      } catch(schwabErr) {
+        console.warn('[DASH] Schwab live sync failed:', schwabErr);
+      }
+    }
+
     _openPositions = positions;
 
     // Update stats
