@@ -5637,10 +5637,11 @@ async function loadGate3() {
     try {
       var detectResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'schwab-check-auth' })
+        body: JSON.stringify({ action: 'schwab-account-data' }),
+        signal: AbortSignal.timeout(8000)
       });
       var detectData = await detectResp.json();
-      if (detectData.connected || detectData.status === 'ok') {
+      if (detectData.positions || detectData.balances || detectData.broker === 'schwab') {
         localStorage.setItem('g2_broker', 'schwab');
         localStorage.setItem('broker_schwab_connected', 'true');
         selectedBroker = 'schwab';
@@ -5672,7 +5673,7 @@ async function loadGate3() {
       if (loading) loading.style.display = 'none';
       if (error) {
         error.style.display = 'block';
-        document.getElementById('g3-error-msg').textContent = '請先在「即時持倉 Dashboard」連線 tastytrade 帳號';
+        document.getElementById('g3-error-msg').textContent = '請先在「即時持倉 Dashboard」連線券商帳號，或在「券商設定」切換為 Schwab';
       }
       return;
     }
