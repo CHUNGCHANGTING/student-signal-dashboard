@@ -7631,7 +7631,7 @@ var _autoCloseLastRun = 0;
 var AUTO_CLOSE_COOLDOWN_MS = 60000;   // 60 sec between executions
 var AUTO_CLOSE_DAILY_LIMIT = 10;       // max 10 auto-closes per day
 var AUTO_CLOSE_MAX_LOSS = 500;         // $500+ loss requires manual confirm
-var AUTO_CLOSE_ACCOUNT = '5WZ90854';   // Admin's tastytrade account
+var AUTO_CLOSE_ACCOUNT = '23668333';   // Admin's Schwab account
 
 // ── Admin Detection ─────────────────────────────────────────
 function _isAdminUser() {
@@ -7682,7 +7682,7 @@ function toggleAutoClose() {
     }
   } else {
     // Confirm before enabling
-    if (!confirm('⚠️ 確定啟用自動平倉？\n\n啟用後，Exit Monitor 偵測到觸發條件時將自動：\n1. 更新 Supabase exit_signal\n2. 呼叫 WF-07 送出平倉單到 tastytrade\n\n安全防線：\n• 每次觸發間隔 ≥ 60 秒\n• 每日上限 10 次\n• 單筆虧損 > $500 不自動執行\n\n確定啟用？')) {
+    if (!confirm('⚠️ 確定啟用自動平倉？\n\n啟用後，Exit Monitor 偵測到觸發條件時將自動：\n1. 更新 Supabase exit_signal\n2. 呼叫 WF-08 送出平倉單到 Schwab\n\n安全防線：\n• 每次觸發間隔 ≥ 60 秒\n• 每日上限 10 次\n• 單筆虧損 > $500 不自動執行\n\n確定啟用？')) {
       return;
     }
     _autoCloseEnabled = true;
@@ -7738,31 +7738,35 @@ async function _executeAutoClose(position, exitSignal) {
     console.error('[AUTO-CLOSE] Supabase update failed:', e);
   }
 
-  // Step 2: Build WF-07 payload
-  // Reconstruct legs from position data
+  // Step 2: Build Schwab closing legs
   var legs = _buildClosingLegs(position);
   if (!legs || legs.length === 0) {
     _addAutoCloseLog(position, 'FAILED', '無法解析部位腿位（legs），需手動平倉');
     return { skipped: true, reason: 'no_legs' };
   }
 
+  // Determine limit price for closing order
+  var limitPrice = null;
+  var strategy = _normalizeStrategy(position.strategy || '');
+  var isCredit = ['IC', 'PCS', 'CCS'].indexOf(strategy) >= 0;
+  if (isCredit && position.credit_received) {
+    if (exitSignal.type === 'TAKE_PROFIT_FULL' || exitSignal.type === 'TAKE_PROFIT') {
+      limitPrice = parseFloat(position.credit_received) * 0.1;
+    }
+  }
+
   var payload = {
-    student_id: currentUser ? currentUser.id : '',
-    account_number: AUTO_CLOSE_ACCOUNT,
-    refresh_token: _getStoredRefreshToken(),
-    symbol: position.symbol || '',
-    strategy: _normalizeStrategy(position.strategy || ''),
+    action: 'schwab-close-position',
     legs: legs,
     close_type: exitSignal.type === 'TAKE_PROFIT_FULL' ? 'profit' : 'stop',
-    original_credit: parseFloat(position.credit_received || 0),
-    original_debit: parseFloat(position.debit_paid || 0),
+    limit_price: limitPrice,
     tracking_id: 'AUTO-' + Date.now(),
     note: 'V3-B auto-close: ' + (exitSignal.detail || exitSignal.type)
   };
 
-  // Step 3: Call WF-07 webhook
+  // Step 3: Call WF-08 webhook (schwab-close-position action)
   try {
-    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-close-position', {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -7772,7 +7776,7 @@ async function _executeAutoClose(position, exitSignal) {
     if (result.success) {
       _autoCloseDailyCount++;
       _saveDailyCount();
-      _addAutoCloseLog(position, 'SUCCESS', '平倉單已送出 (Order ID: ' + (result.order_id || '—') + ')');
+      _addAutoCloseLog(position, 'SUCCESS', 'Schwab 平倉單已送出 (Order ID: ' + (result.order_id || '—') + ')');
 
       // Update Supabase: move to closed
       if (supabaseClient && currentUser) {
@@ -7784,7 +7788,7 @@ async function _executeAutoClose(position, exitSignal) {
 
       return { success: true, order_id: result.order_id };
     } else {
-      _addAutoCloseLog(position, 'FAILED', 'WF-07 回傳錯誤: ' + (result.error || 'unknown'));
+      _addAutoCloseLog(position, 'FAILED', 'Schwab 平倉錯誤: ' + (result.error || 'unknown'));
       return { success: false, error: result.error };
     }
   } catch(e) {
@@ -7852,23 +7856,8 @@ function _buildClosingLegs(position) {
   return [];
 }
 
-// ── Get stored tastytrade refresh token ─────────────────────
-function _getStoredRefreshToken() {
-  // Try from broker credentials in localStorage
-  try {
-    var creds = localStorage.getItem('ose_broker_creds');
-    if (creds) {
-      var parsed = JSON.parse(creds);
-      if (parsed.tastytrade && parsed.tastytrade.refresh_token) {
-        return parsed.tastytrade.refresh_token;
-      }
-    }
-  } catch(e) {}
-
-  // Fallback: hardcoded admin token (WF-08 has this)
-  // This should be rotated via OAuth flow
-  return '';
-}
+// ── Schwab token is managed server-side in WF-08 (Google Sheets) ──
+// No client-side token storage needed for Schwab — WF-08 handles refresh
 
 // ── Auto-close log management ───────────────────────────────
 function _addAutoCloseLog(position, status, detail) {
@@ -8002,22 +7991,23 @@ async function _syncExitSignalsToSupabase(positions) {
   }
 }
 
-console.log('[AUTO-CLOSE] V3-B engine loaded. Admin-only auto-close ready.');
+console.log('[AUTO-CLOSE] V3-B engine loaded. Admin-only auto-close via Schwab ready.');
 
 // ============================================================
 // API HEALTH MONITOR + RETRY ENGINE
-// Endpoints: tastytrade, Supabase, n8n webhook, Finnhub, CBOE
+// Endpoints: Schwab, Supabase, n8n webhook, Finnhub, CBOE
 // ============================================================
 
 // ── Endpoint Registry ───────────────────────────────────────
 var API_ENDPOINTS = {
-  tastytrade: {
-    name: 'tastytrade API',
-    url: 'https://api.tastyworks.com/api-quote-tokens',
-    method: 'POST',
-    icon: '🟣',
+  schwab: {
+    name: 'Schwab Trader API',
+    url: 'https://api.schwabapi.com/trader/v1/accounts/accountNumbers',
+    method: 'GET',
+    icon: '🟦',
     critical: true,
-    description: '下單/平倉核心 API'
+    description: '下單/平倉核心 API',
+    authCheck: true
   },
   supabase: {
     name: 'Supabase',
