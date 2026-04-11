@@ -4256,9 +4256,27 @@ function populateGate2() {
 var selectedBroker = localStorage.getItem('g2_broker') || '';
 
 // === Broker Setup Flow ===
-function checkBrokerSetup() {
+async function checkBrokerSetup() {
   // selectedBroker may already be set from Supabase profile during checkAuth
   var saved = selectedBroker || localStorage.getItem('g2_broker');
+
+  // Auto-detect Schwab: if broker is unset or still tastytrade, check if Schwab is connected
+  if (!saved || saved === 'tastytrade') {
+    try {
+      var detectResp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'schwab-check-auth' })
+      });
+      var detectData = await detectResp.json();
+      if (detectData.connected || detectData.status === 'ok') {
+        saved = 'schwab';
+        localStorage.setItem('g2_broker', 'schwab');
+        localStorage.setItem('broker_schwab_connected', 'true');
+        selectedBroker = 'schwab';
+      }
+    } catch(e) { /* Schwab not available, keep current */ }
+  }
+
   if (!saved) {
     // First time on any device — show setup overlay
     document.getElementById('broker-setup-overlay').style.display = 'flex';
