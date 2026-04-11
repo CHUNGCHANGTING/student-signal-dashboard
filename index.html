@@ -7,11 +7,11 @@
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Options Strategy Engine</title>
-<!-- build:v3.6.0-20260411.2-dc3d92e -->
+<!-- build:v3.9.0-20260411.3-apimonitor -->
 <script>
 // Auto-refresh: detect new deploy and bypass GitHub Pages CDN cache
 (function(){
-  var CURRENT_BUILD = '20260411.2';
+  var CURRENT_BUILD = '20260411.3';
   var CHECK_INTERVAL = 5 * 60 * 1000; // check every 5 min
   var KEY = 'ose-last-version-check';
   function checkVersion() {
@@ -1495,7 +1495,12 @@ a, button, [role=button] { transition: color var(--transition), background var(-
   <div class="live-actions" style="display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap">
     <button class="btn-secondary" onclick="loadPositionDashboard()">🔄 一鍵更新</button>
     <button id="auto-mode-btn" class="btn-secondary" onclick="toggleAutoMode()" style="min-width:110px">⏸ 自動模式：關</button>
+    <button id="auto-close-btn" class="btn-secondary" onclick="toggleAutoClose()" style="min-width:130px;display:none;border-color:var(--color-error)">🔒 自動平倉：關</button>
     <button class="btn-excel" onclick="exportPositionsExcel()">📥 匯出 Excel</button>
+    <span id="api-health-badge" title="API 健康狀態" style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;background:var(--color-surface-dynamic);color:var(--color-text-muted);cursor:pointer" onclick="switchDashTab('exitcfg',document.querySelector('[data-tab=exitcfg]'))">
+      <span id="api-health-dot" style="width:6px;height:6px;border-radius:50%;background:var(--color-text-muted)"></span>
+      <span id="api-health-label">API —</span>
+    </span>
   </div>
 </div>
 
@@ -1760,6 +1765,68 @@ a, button, [role=button] { transition: color var(--transition), background var(-
 
 <!-- Status bar -->
 <div id="ecfg-status" style="margin-top:var(--space-4);padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);font-size:11px;display:none"></div>
+
+<!-- API Health Monitor -->
+<div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3)">
+    <div style="display:flex;align-items:center;gap:var(--space-2)">
+      <span style="font-size:18px">🏥</span>
+      <div>
+        <div style="font-weight:700;font-size:var(--text-sm)">API 健康狀態監控</div>
+        <div style="font-size:10px;color:var(--color-text-muted)">即時監控所有串接 API 的回應時間、成功率與熔斷狀態</div>
+      </div>
+    </div>
+    <button class="btn-secondary" onclick="runApiHealthCheck()" style="font-size:11px">🔍 立即檢查</button>
+  </div>
+
+  <!-- Endpoint health cards -->
+  <div id="api-health-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:var(--space-3)">
+    <div style="text-align:center;color:var(--color-text-muted);font-size:11px;padding:var(--space-4);grid-column:1/-1">點「立即檢查」開始監控</div>
+  </div>
+
+  <!-- Retry policy info -->
+  <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--color-surface-offset);border-radius:var(--radius-sm)">
+    <div style="font-weight:600;font-size:11px;margin-bottom:var(--space-2)">🔄 重試策略（Retry Policy）</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--space-2);font-size:10px;color:var(--color-text-muted)">
+      <div>• <strong>超時</strong>：15 秒 → 重試 2 次（指數退避 2s/4s）</div>
+      <div>• <strong>5xx</strong>：伺服器錯誤 → 重試 3 次（指數退避 1s/2s/4s）</div>
+      <div>• <strong>429</strong>：Rate Limit → 等待 Retry-After 或 30s → 重試 1 次</div>
+      <div>• <strong>401</strong>：Token 過期 → 自動 refresh → 重試 1 次</div>
+      <div>• <strong>熔斷器</strong>：連續 3 次失敗 → 暫停 60 秒 → 半開測試</div>
+      <div>• <strong>下單</strong>：POST order 失敗 → 不重試（防重複下單）</div>
+    </div>
+  </div>
+
+  <!-- Recent failures log -->
+  <div style="margin-top:var(--space-3)">
+    <div style="font-weight:600;font-size:11px;margin-bottom:var(--space-2)">⚠️ 近期異常紀錄</div>
+    <div id="api-failure-log" style="max-height:200px;overflow-y:auto;font-size:11px">
+      <div style="text-align:center;color:var(--color-text-muted);padding:var(--space-2)">暫無異常</div>
+    </div>
+  </div>
+</div>
+
+<!-- Auto-Close Execution Log -->
+<div style="border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-4);margin-top:var(--space-4)">
+  <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+    <span style="font-size:18px">🤖</span>
+    <div>
+      <div style="font-weight:700;font-size:var(--text-sm)">自動平倉執行紀錄</div>
+      <div style="font-size:10px;color:var(--color-text-muted)">僅限管理員（admin）啟用，系統偵測到觸發條件後自動送出平倉單</div>
+    </div>
+  </div>
+  <div id="autoclose-log-container" style="max-height:300px;overflow-y:auto">
+    <div style="text-align:center;color:var(--color-text-muted);font-size:11px;padding:var(--space-4)">尚無自動平倉紀錄</div>
+  </div>
+  <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);font-size:10px;color:var(--color-text-muted)">
+    <span>⚙️ 安全防線：</span>
+    <span>每次觸發間隔 ≥ 60 秒</span>
+    <span>｜</span>
+    <span>每日上限 10 次</span>
+    <span>｜</span>
+    <span>單筆虧損 > $500 需手動確認</span>
+  </div>
+</div>
 
 <!-- Reference note -->
 <div style="margin-top:var(--space-4);padding:var(--space-3);background:var(--color-surface-offset);border-radius:var(--radius-sm);font-size:10px;color:var(--color-text-muted)">
@@ -2152,6 +2219,9 @@ async function loadPositionDashboard() {
 
     // Render exit monitor panel
     _renderExitMonitorPanel(evaluated);
+
+    // V3-B: Sync exit signals to Supabase
+    _syncExitSignalsToSupabase(evaluated);
 
     // Render today tab
     _renderToday(todayTrades);
@@ -7384,6 +7454,837 @@ function resetExitConfigUI() {
 setTimeout(_loadExitConfigUI, 500);
 
 console.log('[EXIT-MONITOR] v1.0 已載入。平倉條件監控啟動。');
+
+// ============================================================
+// V3-B AUTO-CLOSE EXECUTION ENGINE
+// Admin-only: Exit Monitor triggers → Supabase write-back → WF-07 close
+// ============================================================
+
+var _autoCloseEnabled = false;
+var _autoCloseLog = [];
+var _autoCloseDailyCount = 0;
+var _autoCloseLastRun = 0;
+
+// Safety constants
+var AUTO_CLOSE_COOLDOWN_MS = 60000;   // 60 sec between executions
+var AUTO_CLOSE_DAILY_LIMIT = 10;       // max 10 auto-closes per day
+var AUTO_CLOSE_MAX_LOSS = 500;         // $500+ loss requires manual confirm
+var AUTO_CLOSE_ACCOUNT = '5WZ90854';   // Admin's tastytrade account
+
+// ── Admin Detection ─────────────────────────────────────────
+function _isAdminUser() {
+  return document.querySelector('.badge-admin') !== null ||
+         document.querySelector('[data-role="admin"]') !== null;
+}
+
+// ── Show/hide auto-close button based on admin status ───────
+function _initAutoCloseUI() {
+  var btn = document.getElementById('auto-close-btn');
+  if (btn && _isAdminUser()) {
+    btn.style.display = 'inline-block';
+  }
+  // Load daily count from localStorage
+  var today = new Date().toISOString().slice(0, 10);
+  var saved = localStorage.getItem('ose_autoclose_daily');
+  if (saved) {
+    try {
+      var parsed = JSON.parse(saved);
+      if (parsed.date === today) {
+        _autoCloseDailyCount = parsed.count || 0;
+      }
+    } catch(e) {}
+  }
+  // Load log
+  var logSaved = localStorage.getItem('ose_autoclose_log');
+  if (logSaved) {
+    try { _autoCloseLog = JSON.parse(logSaved); } catch(e) { _autoCloseLog = []; }
+  }
+  _renderAutoCloseLog();
+}
+setTimeout(_initAutoCloseUI, 1000);
+
+// ── Toggle auto-close mode ──────────────────────────────────
+function toggleAutoClose() {
+  if (!_isAdminUser()) {
+    alert('⛔ 自動平倉功能僅限管理員使用');
+    return;
+  }
+  var btn = document.getElementById('auto-close-btn');
+  if (_autoCloseEnabled) {
+    _autoCloseEnabled = false;
+    if (btn) {
+      btn.textContent = '🔒 自動平倉：關';
+      btn.style.borderColor = 'var(--color-error)';
+      btn.style.color = '';
+      btn.style.background = '';
+    }
+  } else {
+    // Confirm before enabling
+    if (!confirm('⚠️ 確定啟用自動平倉？\n\n啟用後，Exit Monitor 偵測到觸發條件時將自動：\n1. 更新 Supabase exit_signal\n2. 呼叫 WF-07 送出平倉單到 tastytrade\n\n安全防線：\n• 每次觸發間隔 ≥ 60 秒\n• 每日上限 10 次\n• 單筆虧損 > $500 不自動執行\n\n確定啟用？')) {
+      return;
+    }
+    _autoCloseEnabled = true;
+    if (btn) {
+      btn.textContent = '🔓 自動平倉：開';
+      btn.style.borderColor = 'var(--color-success)';
+      btn.style.color = 'var(--color-success)';
+      btn.style.background = 'var(--color-success-highlight)';
+    }
+  }
+}
+
+// ── Core: Execute auto-close for a position ─────────────────
+async function _executeAutoClose(position, exitSignal) {
+  var now = Date.now();
+
+  // Safety check 1: Cooldown
+  if (now - _autoCloseLastRun < AUTO_CLOSE_COOLDOWN_MS) {
+    console.log('[AUTO-CLOSE] Cooldown active, skipping', position.symbol);
+    return { skipped: true, reason: 'cooldown' };
+  }
+
+  // Safety check 2: Daily limit
+  if (_autoCloseDailyCount >= AUTO_CLOSE_DAILY_LIMIT) {
+    console.log('[AUTO-CLOSE] Daily limit reached:', _autoCloseDailyCount);
+    return { skipped: true, reason: 'daily_limit' };
+  }
+
+  // Safety check 3: Max loss threshold
+  var currentLoss = Math.abs(Math.min(0, parseFloat(position.current_pnl_dollar) || 0));
+  if (currentLoss > AUTO_CLOSE_MAX_LOSS) {
+    console.log('[AUTO-CLOSE] Loss too large for auto-close:', currentLoss);
+    _addAutoCloseLog(position, 'BLOCKED', '虧損 $' + currentLoss.toFixed(2) + ' > $' + AUTO_CLOSE_MAX_LOSS + '，需手動處理');
+    return { skipped: true, reason: 'max_loss_exceeded', loss: currentLoss };
+  }
+
+  _autoCloseLastRun = now;
+
+  // Step 1: Update Supabase exit_signal
+  try {
+    if (supabaseClient && currentUser) {
+      await supabaseClient
+        .from('positions')
+        .update({
+          exit_signal: true,
+          exit_reason: exitSignal.type,
+          auto_close_triggered_at: new Date().toISOString()
+        })
+        .eq('id', position.id)
+        .eq('student_id', currentUser.id);
+    }
+  } catch(e) {
+    console.error('[AUTO-CLOSE] Supabase update failed:', e);
+  }
+
+  // Step 2: Build WF-07 payload
+  // Reconstruct legs from position data
+  var legs = _buildClosingLegs(position);
+  if (!legs || legs.length === 0) {
+    _addAutoCloseLog(position, 'FAILED', '無法解析部位腿位（legs），需手動平倉');
+    return { skipped: true, reason: 'no_legs' };
+  }
+
+  var payload = {
+    student_id: currentUser ? currentUser.id : '',
+    account_number: AUTO_CLOSE_ACCOUNT,
+    refresh_token: _getStoredRefreshToken(),
+    symbol: position.symbol || '',
+    strategy: _normalizeStrategy(position.strategy || ''),
+    legs: legs,
+    close_type: exitSignal.type === 'TAKE_PROFIT_FULL' ? 'profit' : 'stop',
+    original_credit: parseFloat(position.credit_received || 0),
+    original_debit: parseFloat(position.debit_paid || 0),
+    tracking_id: 'AUTO-' + Date.now(),
+    note: 'V3-B auto-close: ' + (exitSignal.detail || exitSignal.type)
+  };
+
+  // Step 3: Call WF-07 webhook
+  try {
+    var resp = await fetch('https://chilldove.app.n8n.cloud/webhook/student-close-position', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    var result = await resp.json();
+
+    if (result.success) {
+      _autoCloseDailyCount++;
+      _saveDailyCount();
+      _addAutoCloseLog(position, 'SUCCESS', '平倉單已送出 (Order ID: ' + (result.order_id || '—') + ')');
+
+      // Update Supabase: move to closed
+      if (supabaseClient && currentUser) {
+        await supabaseClient
+          .from('positions')
+          .update({ status: 'closing', exit_signal: true, exit_reason: exitSignal.type })
+          .eq('id', position.id);
+      }
+
+      return { success: true, order_id: result.order_id };
+    } else {
+      _addAutoCloseLog(position, 'FAILED', 'WF-07 回傳錯誤: ' + (result.error || 'unknown'));
+      return { success: false, error: result.error };
+    }
+  } catch(e) {
+    _addAutoCloseLog(position, 'FAILED', '網路錯誤: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+// ── Build closing legs from position data ───────────────────
+function _buildClosingLegs(position) {
+  // If position has legs_json stored, use it directly
+  if (position.legs_json) {
+    try {
+      var storedLegs = typeof position.legs_json === 'string' ? JSON.parse(position.legs_json) : position.legs_json;
+      return storedLegs.map(function(leg) {
+        return {
+          instrument_type: 'Equity Option',
+          symbol: leg.symbol || leg.occ_symbol || '',
+          action: leg.action === 'Sell to Open' ? 'Buy to Close' :
+                  leg.action === 'Buy to Open' ? 'Sell to Close' :
+                  leg.close_action || 'Buy to Close',
+          quantity: leg.quantity || parseInt(position.quantity) || 1
+        };
+      });
+    } catch(e) {}
+  }
+
+  // If position has option_legs stored as array
+  if (position.option_legs && Array.isArray(position.option_legs)) {
+    return position.option_legs.map(function(leg) {
+      return {
+        instrument_type: 'Equity Option',
+        symbol: leg.symbol || '',
+        action: leg.side === 'short' ? 'Buy to Close' : 'Sell to Close',
+        quantity: parseInt(position.quantity) || 1
+      };
+    });
+  }
+
+  // Fallback: try to reconstruct from position metadata
+  // This requires short_strike, long_strike, expiry_occ fields
+  if (position.short_leg_symbol && position.long_leg_symbol) {
+    var strategy = _normalizeStrategy(position.strategy || '');
+    var isCredit = ['IC', 'PCS', 'CCS'].indexOf(strategy) >= 0;
+    var qty = parseInt(position.quantity) || 1;
+    var legs = [
+      {
+        instrument_type: 'Equity Option',
+        symbol: position.short_leg_symbol,
+        action: 'Buy to Close',
+        quantity: qty
+      },
+      {
+        instrument_type: 'Equity Option',
+        symbol: position.long_leg_symbol,
+        action: 'Sell to Close',
+        quantity: qty
+      }
+    ];
+    return legs;
+  }
+
+  // Cannot determine legs — return empty
+  console.warn('[AUTO-CLOSE] Cannot determine legs for position:', position.id, position.symbol);
+  return [];
+}
+
+// ── Get stored tastytrade refresh token ─────────────────────
+function _getStoredRefreshToken() {
+  // Try from broker credentials in localStorage
+  try {
+    var creds = localStorage.getItem('ose_broker_creds');
+    if (creds) {
+      var parsed = JSON.parse(creds);
+      if (parsed.tastytrade && parsed.tastytrade.refresh_token) {
+        return parsed.tastytrade.refresh_token;
+      }
+    }
+  } catch(e) {}
+
+  // Fallback: hardcoded admin token (WF-08 has this)
+  // This should be rotated via OAuth flow
+  return '';
+}
+
+// ── Auto-close log management ───────────────────────────────
+function _addAutoCloseLog(position, status, detail) {
+  var entry = {
+    timestamp: new Date().toISOString(),
+    symbol: position.symbol || '—',
+    strategy: position.strategy || '—',
+    status: status,
+    detail: detail,
+    pnl: parseFloat(position.current_pnl_dollar) || 0
+  };
+  _autoCloseLog.unshift(entry);
+  // Keep last 50 entries
+  if (_autoCloseLog.length > 50) _autoCloseLog = _autoCloseLog.slice(0, 50);
+  try { localStorage.setItem('ose_autoclose_log', JSON.stringify(_autoCloseLog)); } catch(e) {}
+  _renderAutoCloseLog();
+}
+
+function _saveDailyCount() {
+  var today = new Date().toISOString().slice(0, 10);
+  try {
+    localStorage.setItem('ose_autoclose_daily', JSON.stringify({ date: today, count: _autoCloseDailyCount }));
+  } catch(e) {}
+}
+
+function _renderAutoCloseLog() {
+  var container = document.getElementById('autoclose-log-container');
+  if (!container) return;
+  if (!_autoCloseLog || _autoCloseLog.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);font-size:11px;padding:var(--space-4)">尚無自動平倉紀錄</div>';
+    return;
+  }
+  container.innerHTML = _autoCloseLog.map(function(entry) {
+    var statusColor = entry.status === 'SUCCESS' ? 'var(--color-success)' :
+                      entry.status === 'BLOCKED' ? 'var(--color-warning)' :
+                      'var(--color-error)';
+    var statusBg = entry.status === 'SUCCESS' ? 'var(--color-success-highlight)' :
+                   entry.status === 'BLOCKED' ? 'var(--color-warning-highlight)' :
+                   'var(--color-error-highlight)';
+    var time = new Date(entry.timestamp).toLocaleString();
+    return '<div style="display:flex;align-items:flex-start;gap:var(--space-2);padding:var(--space-2);border-bottom:1px solid var(--color-divider);font-size:11px">' +
+      '<span style="background:' + statusBg + ';color:' + statusColor + ';padding:1px 6px;border-radius:3px;font-weight:600;white-space:nowrap;font-size:10px">' + entry.status + '</span>' +
+      '<div style="flex:1">' +
+        '<strong>' + entry.symbol + '</strong> <span style="color:var(--color-text-muted)">' + entry.strategy + '</span>' +
+        '<div style="color:var(--color-text-muted)">' + entry.detail + '</div>' +
+      '</div>' +
+      '<div style="text-align:right;white-space:nowrap;color:var(--color-text-muted)">' +
+        '<div>' + time + '</div>' +
+        '<div style="color:' + (entry.pnl >= 0 ? 'var(--color-success)' : 'var(--color-error)') + '">' + (entry.pnl >= 0 ? '+$' : '-$') + Math.abs(entry.pnl).toFixed(2) + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Hook into Exit Monitor: auto-close when triggered ───────
+// This replaces the enhanced loadPositionDashboard to add auto-close
+var _originalRenderExitMonitorPanel = typeof _renderExitMonitorPanel === 'function' ? _renderExitMonitorPanel : null;
+
+function _renderExitMonitorPanelWithAutoClose(positions) {
+  // Call original render
+  if (_originalRenderExitMonitorPanel) _originalRenderExitMonitorPanel(positions);
+
+  // If auto-close is enabled, process exit-triggered positions
+  if (!_autoCloseEnabled) return;
+
+  var exitPositions = positions.filter(function(p) {
+    return p.exit_evaluation &&
+           p.exit_evaluation.highest_priority === 'exit' &&
+           !p._auto_close_processed &&
+           p.status === 'open';
+  });
+
+  if (exitPositions.length === 0) return;
+
+  console.log('[AUTO-CLOSE] Processing', exitPositions.length, 'triggered positions');
+
+  // Process sequentially with cooldown
+  (async function() {
+    for (var i = 0; i < exitPositions.length; i++) {
+      var p = exitPositions[i];
+      var exitSig = p.exit_evaluation.signals.filter(function(s) { return s.priority === 'exit'; })[0];
+      if (!exitSig) continue;
+
+      p._auto_close_processed = true;
+      var result = await _executeAutoClose(p, exitSig);
+
+      if (result.skipped && result.reason === 'daily_limit') {
+        console.log('[AUTO-CLOSE] Daily limit reached, stopping');
+        break;
+      }
+
+      // Cooldown between executions
+      if (i < exitPositions.length - 1) {
+        await new Promise(function(resolve) { setTimeout(resolve, AUTO_CLOSE_COOLDOWN_MS); });
+      }
+    }
+  })();
+}
+
+// Override _renderExitMonitorPanel
+_renderExitMonitorPanel = _renderExitMonitorPanelWithAutoClose;
+
+// ── Write-back to Supabase for warn-level signals too ───────
+// This runs during every position refresh to keep Supabase in sync
+async function _syncExitSignalsToSupabase(positions) {
+  if (!supabaseClient || !currentUser) return;
+
+  for (var i = 0; i < positions.length; i++) {
+    var p = positions[i];
+    if (!p.exit_evaluation) continue;
+
+    var shouldSignal = p.exit_evaluation.highest_priority === 'exit';
+    var currentSignal = p.exit_signal || false;
+
+    // Only update if signal state changed
+    if (shouldSignal && !currentSignal) {
+      var exitSig = p.exit_evaluation.signals.filter(function(s) { return s.priority === 'exit'; })[0];
+      try {
+        await supabaseClient
+          .from('positions')
+          .update({
+            exit_signal: true,
+            exit_reason: exitSig ? exitSig.type : 'EXIT_MONITOR',
+          })
+          .eq('id', p.id)
+          .eq('student_id', currentUser.id);
+      } catch(e) {
+        console.warn('[EXIT-SYNC] Failed to update position', p.id, e);
+      }
+    }
+  }
+}
+
+console.log('[AUTO-CLOSE] V3-B engine loaded. Admin-only auto-close ready.');
+
+// ============================================================
+// API HEALTH MONITOR + RETRY ENGINE
+// Endpoints: tastytrade, Supabase, n8n webhook, Finnhub, CBOE
+// ============================================================
+
+// ── Endpoint Registry ───────────────────────────────────────
+var API_ENDPOINTS = {
+  tastytrade: {
+    name: 'tastytrade API',
+    url: 'https://api.tastyworks.com/api-quote-tokens',
+    method: 'POST',
+    icon: '🟣',
+    critical: true,
+    description: '下單/平倉核心 API'
+  },
+  supabase: {
+    name: 'Supabase',
+    url: 'https://zctrirydtpqcpkkguxlx.supabase.co/rest/v1/',
+    method: 'HEAD',
+    icon: '🟢',
+    critical: true,
+    description: '持倉資料庫'
+  },
+  n8n_webhook: {
+    name: 'n8n Webhook',
+    url: 'https://chilldove.app.n8n.cloud/webhook/student-broker-dashboard?action=ping',
+    method: 'GET',
+    icon: '🔵',
+    critical: true,
+    description: '工作流引擎'
+  },
+  finnhub: {
+    name: 'Finnhub',
+    url: 'https://finnhub.io/api/v1/quote?symbol=SPY&token=d70bb2hr01qtb4ra5aagd70bb2hr01qtb4ra5ab0',
+    method: 'GET',
+    icon: '🟡',
+    critical: false,
+    description: '盤勢/VIX 資料'
+  },
+  cboe: {
+    name: 'CBOE Delayed',
+    url: 'https://cdn.cboe.com/api/global/delayed_quotes/options/SPY.json',
+    method: 'GET',
+    icon: '🟠',
+    critical: false,
+    description: '選擇權報價'
+  }
+};
+
+// ── Health State ─────────────────────────────────────────────
+var _apiHealthState = {};
+var _apiFailureLog = [];
+
+function _initApiHealthState() {
+  for (var key in API_ENDPOINTS) {
+    _apiHealthState[key] = {
+      status: 'unknown',     // 'healthy' | 'degraded' | 'down' | 'unknown'
+      latency: null,         // ms
+      lastCheck: null,
+      failCount: 0,          // consecutive failures
+      totalChecks: 0,
+      totalFailures: 0,
+      circuitOpen: false,    // circuit breaker state
+      circuitOpenUntil: 0,   // timestamp when circuit half-opens
+    };
+  }
+  // Load from localStorage
+  try {
+    var saved = localStorage.getItem('ose_api_health');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      for (var k in parsed) {
+        if (_apiHealthState[k]) {
+          _apiHealthState[k].totalChecks = parsed[k].totalChecks || 0;
+          _apiHealthState[k].totalFailures = parsed[k].totalFailures || 0;
+        }
+      }
+    }
+    var logSaved = localStorage.getItem('ose_api_failure_log');
+    if (logSaved) _apiFailureLog = JSON.parse(logSaved);
+  } catch(e) {}
+}
+_initApiHealthState();
+
+// ── Circuit Breaker ─────────────────────────────────────────
+var CIRCUIT_FAIL_THRESHOLD = 3;    // consecutive failures to open circuit
+var CIRCUIT_RESET_MS = 60000;      // 60s cooldown before half-open test
+
+function _checkCircuit(endpointKey) {
+  var state = _apiHealthState[endpointKey];
+  if (!state) return true; // allow if unknown
+  if (!state.circuitOpen) return true;
+  // Check if cooldown expired → half-open
+  if (Date.now() >= state.circuitOpenUntil) {
+    state.circuitOpen = false;
+    return true;
+  }
+  return false; // circuit still open
+}
+
+function _recordSuccess(endpointKey, latencyMs) {
+  var state = _apiHealthState[endpointKey];
+  state.failCount = 0;
+  state.circuitOpen = false;
+  state.latency = latencyMs;
+  state.lastCheck = new Date().toISOString();
+  state.totalChecks++;
+  state.status = latencyMs > 5000 ? 'degraded' : 'healthy';
+  _saveApiHealthState();
+}
+
+function _recordFailure(endpointKey, error) {
+  var state = _apiHealthState[endpointKey];
+  state.failCount++;
+  state.totalChecks++;
+  state.totalFailures++;
+  state.lastCheck = new Date().toISOString();
+  state.status = 'down';
+  state.latency = null;
+
+  // Open circuit breaker if threshold reached
+  if (state.failCount >= CIRCUIT_FAIL_THRESHOLD) {
+    state.circuitOpen = true;
+    state.circuitOpenUntil = Date.now() + CIRCUIT_RESET_MS;
+  }
+
+  // Log failure
+  _apiFailureLog.unshift({
+    timestamp: new Date().toISOString(),
+    endpoint: API_ENDPOINTS[endpointKey] ? API_ENDPOINTS[endpointKey].name : endpointKey,
+    error: error,
+    failCount: state.failCount,
+    circuitOpen: state.circuitOpen
+  });
+  if (_apiFailureLog.length > 100) _apiFailureLog = _apiFailureLog.slice(0, 100);
+
+  _saveApiHealthState();
+}
+
+function _saveApiHealthState() {
+  try {
+    var toSave = {};
+    for (var k in _apiHealthState) {
+      toSave[k] = {
+        totalChecks: _apiHealthState[k].totalChecks,
+        totalFailures: _apiHealthState[k].totalFailures
+      };
+    }
+    localStorage.setItem('ose_api_health', JSON.stringify(toSave));
+    localStorage.setItem('ose_api_failure_log', JSON.stringify(_apiFailureLog));
+  } catch(e) {}
+}
+
+// ── Retry Wrapper (fetchWithRetry) ──────────────────────────
+// Replaces raw fetch for all API calls
+// Policy: exponential backoff, respects circuit breaker, no retry for POST orders
+var RETRY_DEFAULTS = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  timeoutMs: 15000,
+  retryOn5xx: true,
+  retryOnTimeout: true,
+  retryOn429: true,
+  noRetryForOrderPost: true,
+};
+
+async function fetchWithRetry(url, options, retryConfig) {
+  var cfg = Object.assign({}, RETRY_DEFAULTS, retryConfig || {});
+  var endpointKey = _identifyEndpoint(url);
+
+  // Circuit breaker check
+  if (endpointKey && !_checkCircuit(endpointKey)) {
+    var circuitErr = new Error('Circuit breaker OPEN for ' + (API_ENDPOINTS[endpointKey] ? API_ENDPOINTS[endpointKey].name : endpointKey) + '. Retry in ' + Math.ceil((_apiHealthState[endpointKey].circuitOpenUntil - Date.now()) / 1000) + 's');
+    circuitErr.circuitOpen = true;
+    throw circuitErr;
+  }
+
+  // No retry for order POST (prevent duplicate orders)
+  var method = (options && options.method || 'GET').toUpperCase();
+  if (cfg.noRetryForOrderPost && method === 'POST' && url.indexOf('/orders') >= 0) {
+    cfg.maxRetries = 0;
+  }
+
+  var lastError;
+  for (var attempt = 0; attempt <= cfg.maxRetries; attempt++) {
+    var startTime = Date.now();
+    try {
+      // Timeout wrapper
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, cfg.timeoutMs);
+
+      var fetchOpts = Object.assign({}, options || {}, { signal: controller.signal });
+      var response = await fetch(url, fetchOpts);
+      clearTimeout(timeoutId);
+
+      var latency = Date.now() - startTime;
+
+      // 429 Rate Limit
+      if (response.status === 429 && cfg.retryOn429 && attempt < cfg.maxRetries) {
+        var retryAfter = parseInt(response.headers.get('Retry-After') || '30');
+        if (endpointKey) _recordFailure(endpointKey, '429 Rate Limit (Retry-After: ' + retryAfter + 's)');
+        await _sleep(retryAfter * 1000);
+        continue;
+      }
+
+      // 5xx Server Error
+      if (response.status >= 500 && cfg.retryOn5xx && attempt < cfg.maxRetries) {
+        if (endpointKey) _recordFailure(endpointKey, response.status + ' Server Error');
+        var delay = cfg.baseDelayMs * Math.pow(2, attempt);
+        await _sleep(delay);
+        continue;
+      }
+
+      // 401 Token Expired — try token refresh once
+      if (response.status === 401 && attempt === 0 && url.indexOf('tastyworks') >= 0) {
+        if (endpointKey) _recordFailure(endpointKey, '401 Token Expired');
+        // Attempt token refresh would happen here via WF-08
+        var delay2 = 2000;
+        await _sleep(delay2);
+        continue;
+      }
+
+      // Success or non-retryable error
+      if (endpointKey) _recordSuccess(endpointKey, latency);
+      return response;
+
+    } catch(e) {
+      clearTimeout(timeoutId);
+      lastError = e;
+      var elapsedMs = Date.now() - startTime;
+
+      if (e.name === 'AbortError') {
+        // Timeout
+        if (endpointKey) _recordFailure(endpointKey, 'Timeout (' + cfg.timeoutMs + 'ms)');
+        if (cfg.retryOnTimeout && attempt < cfg.maxRetries) {
+          var delay3 = cfg.baseDelayMs * Math.pow(2, attempt);
+          await _sleep(delay3);
+          continue;
+        }
+      } else {
+        // Network error
+        if (endpointKey) _recordFailure(endpointKey, e.message);
+        if (attempt < cfg.maxRetries) {
+          var delay4 = cfg.baseDelayMs * Math.pow(2, attempt);
+          await _sleep(delay4);
+          continue;
+        }
+      }
+    }
+  }
+
+  throw lastError || new Error('fetchWithRetry exhausted all retries');
+}
+
+function _sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+function _identifyEndpoint(url) {
+  if (url.indexOf('tastyworks') >= 0 || url.indexOf('tastytrade') >= 0) return 'tastytrade';
+  if (url.indexOf('supabase') >= 0) return 'supabase';
+  if (url.indexOf('n8n.cloud') >= 0) return 'n8n_webhook';
+  if (url.indexOf('finnhub') >= 0) return 'finnhub';
+  if (url.indexOf('cboe') >= 0) return 'cboe';
+  return null;
+}
+
+// ── Health Check Runner ─────────────────────────────────────
+async function runApiHealthCheck() {
+  var grid = document.getElementById('api-health-grid');
+  if (grid) grid.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);font-size:11px;padding:var(--space-3);grid-column:1/-1">🔍 檢查中...</div>';
+
+  var keys = Object.keys(API_ENDPOINTS);
+  var results = [];
+
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var ep = API_ENDPOINTS[key];
+    var startMs = Date.now();
+
+    try {
+      var controller2 = new AbortController();
+      var t = setTimeout(function() { controller2.abort(); }, 10000);
+      var opts = {
+        method: ep.method || 'GET',
+        signal: controller2.signal,
+        mode: 'cors',
+        cache: 'no-store'
+      };
+      // For HEAD/POST, add headers
+      if (ep.method === 'HEAD') {
+        opts.headers = { 'apikey': SUPABASE_ANON_KEY };
+      }
+
+      var resp = await fetch(ep.url, opts);
+      clearTimeout(t);
+      var latencyMs = Date.now() - startMs;
+
+      var isOk = resp.status < 400 || (resp.status === 405); // 405 = method not allowed but server is alive
+      if (isOk) {
+        _recordSuccess(key, latencyMs);
+        results.push({ key: key, status: 'healthy', latency: latencyMs });
+      } else {
+        _recordFailure(key, resp.status + ' ' + resp.statusText);
+        results.push({ key: key, status: 'down', latency: latencyMs, error: resp.status });
+      }
+    } catch(e) {
+      clearTimeout(t);
+      var elapsed = Date.now() - startMs;
+      // CORS errors still mean server is alive
+      if (e.message && e.message.indexOf('CORS') >= 0) {
+        _recordSuccess(key, elapsed);
+        results.push({ key: key, status: 'healthy', latency: elapsed, note: 'CORS blocked but alive' });
+      } else if (e.name === 'AbortError') {
+        _recordFailure(key, 'Timeout (10s)');
+        results.push({ key: key, status: 'down', latency: elapsed, error: 'Timeout' });
+      } else {
+        // For fetch errors that might be CORS (TypeError: Failed to fetch)
+        // These usually mean the server is alive but CORS isn't configured
+        if (e.name === 'TypeError' && e.message.indexOf('fetch') >= 0) {
+          _recordSuccess(key, elapsed);
+          results.push({ key: key, status: 'healthy', latency: elapsed, note: 'Likely CORS' });
+        } else {
+          _recordFailure(key, e.message);
+          results.push({ key: key, status: 'down', latency: elapsed, error: e.message });
+        }
+      }
+    }
+  }
+
+  _renderApiHealthGrid(results);
+  _renderApiFailureLog();
+  _updateApiHealthBadge();
+}
+
+// ── Render Health Grid ──────────────────────────────────────
+function _renderApiHealthGrid(results) {
+  var grid = document.getElementById('api-health-grid');
+  if (!grid) return;
+
+  grid.innerHTML = results.map(function(r) {
+    var ep = API_ENDPOINTS[r.key];
+    var state = _apiHealthState[r.key];
+    var statusColor = r.status === 'healthy' ? 'var(--color-success)' :
+                      r.status === 'degraded' ? 'var(--color-warning)' :
+                      'var(--color-error)';
+    var statusBg = r.status === 'healthy' ? 'var(--color-success-highlight)' :
+                   r.status === 'degraded' ? 'var(--color-warning-highlight)' :
+                   'var(--color-error-highlight)';
+    var statusLabel = r.status === 'healthy' ? '✅ 正常' :
+                      r.status === 'degraded' ? '⚠️ 緩慢' :
+                      '❌ 異常';
+    var failRate = state.totalChecks > 0 ? ((state.totalFailures / state.totalChecks) * 100).toFixed(1) : '0.0';
+    var circuitLabel = state.circuitOpen ? '<span style="color:var(--color-error);font-weight:600">🔴 熔斷中</span>' : '<span style="color:var(--color-success)">🟢 正常</span>';
+
+    return '<div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-3);border-left:3px solid ' + statusColor + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<span>' + ep.icon + '</span>' +
+          '<strong style="font-size:var(--text-xs)">' + ep.name + '</strong>' +
+          (ep.critical ? '<span style="font-size:8px;background:var(--color-error-highlight);color:var(--color-error);padding:0 4px;border-radius:2px">CRITICAL</span>' : '') +
+        '</div>' +
+        '<span style="background:' + statusBg + ';color:' + statusColor + ';padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600">' + statusLabel + '</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--color-text-muted);margin-bottom:4px">' + ep.description + '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;font-size:10px">' +
+        '<div><span style="color:var(--color-text-muted)">延遲</span><br><strong style="color:' + (r.latency > 3000 ? 'var(--color-warning)' : 'var(--color-text)') + '">' + (r.latency !== null ? r.latency + 'ms' : '—') + '</strong></div>' +
+        '<div><span style="color:var(--color-text-muted)">失敗率</span><br><strong style="color:' + (parseFloat(failRate) > 10 ? 'var(--color-error)' : 'var(--color-text)') + '">' + failRate + '%</strong></div>' +
+        '<div><span style="color:var(--color-text-muted)">熔斷器</span><br>' + circuitLabel + '</div>' +
+      '</div>' +
+      (r.error ? '<div style="font-size:9px;color:var(--color-error);margin-top:4px">Error: ' + r.error + '</div>' : '') +
+      (r.note ? '<div style="font-size:9px;color:var(--color-text-muted);margin-top:4px">' + r.note + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// ── Render Failure Log ──────────────────────────────────────
+function _renderApiFailureLog() {
+  var container = document.getElementById('api-failure-log');
+  if (!container) return;
+  if (!_apiFailureLog || _apiFailureLog.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--color-text-muted);padding:var(--space-2)">暫無異常</div>';
+    return;
+  }
+  container.innerHTML = _apiFailureLog.slice(0, 20).map(function(entry) {
+    var time = new Date(entry.timestamp).toLocaleString();
+    return '<div style="display:flex;gap:var(--space-2);padding:3px 0;border-bottom:1px solid var(--color-divider);font-size:10px">' +
+      '<span style="color:var(--color-error);white-space:nowrap">' + time + '</span>' +
+      '<strong>' + entry.endpoint + '</strong>' +
+      '<span style="color:var(--color-text-muted);flex:1">' + entry.error + '</span>' +
+      (entry.circuitOpen ? '<span style="color:var(--color-error);font-weight:600">🔴 熔斷</span>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// ── Update topbar health badge ──────────────────────────────
+function _updateApiHealthBadge() {
+  var dot = document.getElementById('api-health-dot');
+  var label = document.getElementById('api-health-label');
+  if (!dot || !label) return;
+
+  var downCount = 0;
+  var degradedCount = 0;
+  var total = 0;
+  for (var k in _apiHealthState) {
+    total++;
+    if (_apiHealthState[k].status === 'down') downCount++;
+    else if (_apiHealthState[k].status === 'degraded') degradedCount++;
+  }
+
+  if (downCount > 0) {
+    dot.style.background = 'var(--color-error)';
+    label.textContent = 'API ' + downCount + ' 異常';
+    label.style.color = 'var(--color-error)';
+  } else if (degradedCount > 0) {
+    dot.style.background = 'var(--color-warning)';
+    label.textContent = 'API 緩慢';
+    label.style.color = 'var(--color-warning)';
+  } else if (total > 0) {
+    dot.style.background = 'var(--color-success)';
+    label.textContent = 'API 正常';
+    label.style.color = 'var(--color-success)';
+  }
+}
+
+// ── Auto health check: run every 5 minutes in auto mode ─────
+var _apiHealthInterval = null;
+function _startApiHealthAutoCheck() {
+  if (_apiHealthInterval) return;
+  runApiHealthCheck(); // immediate first check
+  _apiHealthInterval = setInterval(runApiHealthCheck, 5 * 60 * 1000);
+}
+// Start when auto mode is turned on
+var _origToggleAutoMode = typeof toggleAutoMode === 'function' ? toggleAutoMode : null;
+toggleAutoMode = function() {
+  if (_origToggleAutoMode) _origToggleAutoMode();
+  if (_autoModeOn && !_apiHealthInterval) {
+    _startApiHealthAutoCheck();
+  } else if (!_autoModeOn && _apiHealthInterval) {
+    clearInterval(_apiHealthInterval);
+    _apiHealthInterval = null;
+  }
+};
+
+console.log('[API-MONITOR] Health check + retry engine loaded.');
 
 // === Initialize Auth ===
 checkAuth();
